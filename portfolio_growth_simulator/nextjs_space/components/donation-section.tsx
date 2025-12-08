@@ -1,0 +1,453 @@
+'use client'
+
+import { useState } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Coffee, ExternalLink, X, Share2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { motion, AnimatePresence } from 'framer-motion'
+import { QRCodeSVG } from 'qrcode.react'
+
+export function DonationSection() {
+  const [isOpen, setIsOpen] = useState(false)
+  const [hideForSession, setHideForSession] = useState(false)
+  const [hasSupported, setHasSupported] = useState(false)
+  const donationPopupUrl = 'https://buymeacoffee.com/chedidandrew'
+
+  const donations = [
+    {
+      name: 'Venmo',
+      handle: '@Andrew-Chedid',
+      url: 'https://venmo.com/Andrew-Chedid',
+      color: 'hover:bg-[#008CFF]/10 hover:shadow-[0_0_24px_rgba(0,140,255,0.35)]',
+    },
+    {
+      name: 'Cash App',
+      handle: '$AndrewChedid',
+      url: 'https://cash.app/$AndrewChedid',
+      color: 'hover:bg-[#00D632]/10 hover:shadow-[0_0_24px_rgba(0,214,50,0.35)]',
+    },
+    {
+      name: 'PayPal',
+      handle: 'PayPal.me',
+      url: 'https://paypal.me/chedidandrew',
+      color: 'hover:bg-[#0070BA]/10 hover:shadow-[0_0_24px_rgba(0,112,186,0.35)]',
+    },
+    {
+      name: 'Bitcoin',
+      handle: 'BTC Wallet',
+      url: 'bitcoin:bc1qnnvqy5fjv33726su7v9ppdd7zntl93zxuaccdl',
+      color: 'hover:bg-[#F7931A]/10 hover:shadow-[0_0_24px_rgba(247,147,26,0.35)]',
+    },
+  ]
+
+  const buyMeACoffeeUrl = 'https://buymeacoffee.com/chedidandrew'
+
+  const handleSupport = () => {
+    setHasSupported(true)
+    setIsOpen(false)
+  }
+
+  const handleShare = async () => {
+    try {
+      const url =
+        typeof window !== 'undefined'
+          ? window.location.href
+          : 'https://portfolio-sim.example'
+      const text =
+        'Check out this Portfolio Simulator that models long term growth, withdrawals, and Monte Carlo scenarios.'
+
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({
+          title: 'Portfolio Simulator',
+          text,
+          url,
+        })
+      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(url)
+      }
+
+      handleSupport()
+    } catch {
+      // ignore
+    }
+  }
+
+  if (hideForSession) {
+    return null
+  }
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        className="mt-8 print:hidden"
+      >
+        <motion.div
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.3}
+          onDragEnd={(_, info) => {
+            if (Math.abs(info.offset.x) > 80 || Math.abs(info.velocity.x) > 800) {
+              setHideForSession(true)
+            }
+          }}
+          className="cursor-grab active:cursor-grabbing"
+        >
+          <Card className="rounded-xl border-[3px] border-amber-400/80 dark:border-[#FACC15] outline outline-1 outline-amber-200/60 dark:outline-[#FDE047]/40 shadow-[0_0_18px_rgba(251,191,36,0.3)] bg-white/70 dark:bg-muted/10 backdrop-blur-sm">
+            <CardContent className="pt-6 pb-6">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3 text-center sm:text-left">
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{
+                      delay: 0.55,
+                      type: 'spring',
+                      stiffness: 260,
+                      damping: 18,
+                    }}
+                    className="p-2 rounded-full bg-amber-100/70 dark:bg-amber-500/10"
+                  >
+                    <Coffee className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+                  </motion.div>
+                  <div>
+                    {hasSupported ? (
+                      <>
+                        <p className="text-sm font-semibold bg-gradient-to-r from-amber-500 via-amber-600 to-amber-400 dark:from-amber-300 dark:via-amber-400 dark:to-amber-200 bg-clip-text text-transparent">
+                          Thank you for your support
+                        </p>
+                        <p className="text-xs text-amber-700 dark:text-amber-200 mt-0.5">
+                          You are officially fueling this free app with caffeine and kindness.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-medium text-zinc-900 dark:text-foreground">
+                          Enjoying this? Buy me a coffee. ❤️
+                        </p>
+                        <p className="text-xs text-zinc-600 dark:text-muted-foreground mt-0.5">
+                          Supporting a free app that somehow still charges me.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {!hasSupported && (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        delay: 0.65,
+                        type: 'spring',
+                        stiffness: 260,
+                        damping: 18,
+                      }}
+                    >
+                      <Button
+                        type="button"
+                        onClick={() => setIsOpen(true)}
+                        className={`
+                          relative overflow-hidden
+                          inline-flex items-center gap-2
+                          rounded-full px-6 py-2.5
+                          text-sm font-semibold
+                          bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500
+                          text-black
+                          border border-amber-200/80
+                          shadow-[0_0_22px_rgba(250,204,21,0.85)]
+                          transition-all duration-300
+                          hover:-translate-y-0.5 hover:scale-105 hover:shadow-[0_0_32px_rgba(250,204,21,1)]
+                          group
+                        `}
+                      >
+                        <span className="relative flex items-center gap-2">
+                          <span className="bg-gradient-to-r from-black to-black bg-clip-text text-transparent">
+                            Buy me a coffee
+                          </span>
+
+                          <Coffee className="h-4 w-4 text-black transition-transform duration-300 group-hover:scale-125 group-hover:rotate-6" />
+                        </span>
+
+                        <span className="pointer-events-none absolute inset-0 rounded-full bg-amber-400/20 opacity-0 group-hover:opacity-100 group-hover:animate-pulse" />
+                        <span className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/40 to-transparent opacity-40 group-hover:opacity-60 transition-opacity duration-300" />
+                      </Button>
+                    </motion.div>
+
+                    {/* Print only QR code for donations */}
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.8, type: 'spring', stiffness: 260, damping: 20 }}
+                      className="print-only justify-center mt-4"
+                    >
+                      <div className="p-3 rounded-2xl bg-white shadow-[0_0_20px_rgba(250,204,21,0.4)] border border-amber-300/40">
+                        <QRCodeSVG
+                          value={donationPopupUrl}
+                          size={120}
+                          bgColor="#ffffff"   // always light background
+                          fgColor="#000000"
+                          level="M"
+                          includeMargin={true}
+                        />
+                        <p className="mt-2 text-center text-[11px] text-zinc-700">
+                          Scan me 📸
+                        </p>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
+
+      <AnimatePresence>
+        {isOpen && !hasSupported && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md px-3 py-6 sm:px-0 sm:py-0 overflow-y-auto"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 24 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 12 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+              className="relative w-full max-w-lg mx-auto rounded-2xl border-[3px] border-amber-400/80 dark:border-[#FACC15] bg-gradient-to-b from-zinc-50 via-white to-zinc-100 dark:from-zinc-950 dark:via-zinc-900 dark:to-black shadow-[0_0_30px_rgba(251,191,36,0.45)] px-4 py-4 sm:px-8 sm:py-7 max-h-[calc(100vh-3rem)] overflow-y-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="pointer-events-none absolute inset-0 rounded-2xl bg-amber-200/20 dark:bg-amber-300/5 blur-3xl" />
+
+              {/* Close button */}
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="
+                  absolute right-3 top-3
+                  flex items-center justify-center
+                  h-6 w-6
+                  rounded-full
+                  bg-zinc-900/80 dark:bg-black/40
+                  border border-amber-300/50
+                  text-amber-100/90
+                  shadow-[0_0_10px_rgba(250,204,21,0.55)]
+                  transition-all duration-200
+                  hover:bg-amber-500/30 hover:text-white hover:scale-105
+                  active:scale-95
+                "
+              >
+                <X className="h-4 w-4 pointer-events-none" />
+              </button>
+
+              <div className="relative space-y-5 pt-5">
+                <div className="flex items-start gap-3">
+                  <motion.div
+                    initial={{ rotate: -8, scale: 0.9 }}
+                    animate={{ rotate: 0, scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+                    className="
+                      p-2.5 rounded-full
+                      bg-amber-200/60 text-amber-700         /* light mode */
+                      shadow-[0_0_20px_rgba(250,204,21,0.55)]
+                      dark:bg-yellow-500/20 dark:text-yellow-300 /* dark mode */
+                    "
+                  >
+                    <Coffee className="h-5 w-5" />
+                  </motion.div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-foreground">
+                      Fuel the simulations
+                    </h3>
+                    <p className="mt-1 text-xs sm:text-sm text-zinc-700 dark:text-muted-foreground">
+                      Thank you for even considering this. You are helping keep a free product alive that absolutely refuses to stop burning my hosting and data bills.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Primary Buy Me a Coffee options */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 }}
+                  className="rounded-xl border border-amber-300/60 bg-amber-50/70 dark:bg-black/40 p-4 sm:p-5 shadow-[0_0_22px_rgba(250,204,21,0.55)]"
+                >
+                  <p className="text-xs uppercase tracking-[0.18em] text-amber-600 dark:text-amber-300 mb-2">
+                    Membership
+                  </p>
+                  <p className="text-sm font-medium mb-1 text-zinc-900 dark:text-foreground">
+                    Buy Me a Coffee
+                  </p>
+                  <p className="text-xs sm:text-sm text-zinc-700 dark:text-muted-foreground mb-4">
+                    Choose a monthly membership or a one time coffee. Same link, different levels of caffeine and commitment.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-2.5">
+                    <motion.a
+                      href={buyMeACoffeeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      whileHover={{ y: -2, scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleSupport}
+                      className="
+                        flex-1 inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5
+                        text-xs sm:text-sm font-semibold
+                        bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500
+                        text-black
+                        shadow-[0_0_26px_rgba(250,204,21,0.9)]
+                        transition-all
+                      "
+                    >
+                      Monthly supporter
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </motion.a>
+
+                    <motion.a
+                      href={buyMeACoffeeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      whileHover={{ y: -2, scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleSupport}
+                      className="
+                        flex-1 inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5
+                        text-xs sm:text-sm font-semibold
+                        bg-zinc-900 text-amber-100
+                        dark:bg-black/60
+                        border border-amber-300/70
+                        shadow-[0_0_18px_rgba(250,204,21,0.6)]
+                        transition-all
+                      "
+                    >
+                      One time coffee
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </motion.a>
+                  </div>
+
+                  <p className="mt-3 text-[11px] text-zinc-600 dark:text-muted-foreground">
+                    Every contribution helps keep the simulations fast, the charts pretty, and me slightly less terrified of server invoices.
+                  </p>
+                </motion.div>
+
+                {/* Other options */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="space-y-2.5"
+                >
+                  <p className="text-[11px] text-zinc-600 dark:text-muted-foreground">
+                    Prefer something else? Here are a few alternate routes to financial hero status:
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {donations.map((platform, index) => (
+                      <motion.a
+                        key={platform.name}
+                        href={platform.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.12 + index * 0.04 }}
+                        whileHover={{ y: -2, scale: 1.01 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleSupport}
+                        className={`
+                          relative overflow-hidden rounded-xl border border-amber-100/40 dark:border-amber-100/15
+                          bg-white/80 dark:bg-black/40 px-3.5 py-2.5
+                          text-xs sm:text-sm
+                          shadow-[0_0_12px_rgba(17,24,39,0.18)]
+                          transition-all duration-300
+                          group
+                          ${platform.color}
+                        `}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-medium text-zinc-900 dark:text-amber-50">
+                              {platform.name}
+                            </p>
+                            <p className="text-[11px] text-zinc-700 dark:text-amber-100/70">
+                              {platform.handle}
+                            </p>
+                          </div>
+                          <ExternalLink className="h-3.5 w-3.5 text-amber-600 dark:text-amber-200/90 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:scale-110" />
+                        </div>
+
+                        <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-200/25 via-transparent to-transparent opacity-0 group-hover:opacity-100" />
+                      </motion.a>
+                    ))}
+                  </div>
+                </motion.div>
+
+                {/* Share option as final fallback */}
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.18 }}
+                  className="pt-1 space-y-2"
+                >
+                  <p className="text-[11px] text-zinc-600 dark:text-muted-foreground text-center">
+                    Not in a spot to donate right now? No problem at all. You can still help by sharing this with a friend.
+                  </p>
+                  <div className="flex justify-center">
+                    <Button
+                      type="button"
+                      onClick={handleShare}
+                      className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs sm:text-sm font-medium border border-amber-300/70 bg-zinc-100 text-amber-800 shadow-[0_0_14px_rgba(250,204,21,0.45)] hover:bg-amber-100 hover:scale-105 transition-transform dark:bg-black/40 dark:text-amber-100"
+                    >
+                      <Share2 className="h-4 w-4" />
+                      Share with a friend
+                    </Button>
+                  </div>
+                </motion.div>
+
+                <motion.p
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.22 }}
+                  className="pt-1 text-[11px] text-center text-zinc-600 dark:text-muted-foreground"
+                >
+                  If you cannot or would rather not donate, that is completely fine too. Using the app, sharing it, and telling friends about it already makes you an honorary legend.
+                </motion.p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* PRINT ONLY SECTION - BUY ME A COFFEE */}
+      <div className="hidden print:flex w-full flex-col items-center justify-center p-6 pt-10 border border-zinc-200 rounded-lg break-inside-avoid text-center bg-white">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <Coffee className="h-5 w-5 text-black" />
+          <p className="text-sm font-bold text-black">Buy me a coffee</p>
+        </div>
+        <p className="text-xs text-zinc-600 mb-4">
+          Supporting a free app that somehow still charges me.
+        </p>
+
+        <div className="p-2 bg-white border border-zinc-200 rounded-lg">
+          <QRCodeSVG
+            value={donationPopupUrl}
+            size={100}
+            bgColor="#ffffff"
+            fgColor="#000000"
+            level="M"
+            includeMargin={true}
+          />
+        </div>
+        <p className="mt-2 text-[10px] text-zinc-500">
+          Scan to support & view interactive results
+        </p>
+      </div>
+    </>
+  )
+}

@@ -1,0 +1,607 @@
+'use client'
+import { useState, useMemo, useEffect } from 'react'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { NumericInput } from '@/components/ui/numeric-input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import {
+  DollarSign,
+  TrendingDown,
+  Calendar,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Download,
+} from 'lucide-react'
+import { useLocalStorage } from '@/hooks/use-local-storage'
+import { WithdrawalChart } from '@/components/withdrawal-chart'
+import { MonteCarloSimulator } from '@/components/monte-carlo-simulator'
+import { DonationSection } from '@/components/donation-section'
+import { motion } from 'framer-motion'
+import * as XLSX from 'xlsx'
+
+interface WithdrawalState {
+  startingBalance: number
+  annualReturn: number
+  duration: number
+  periodicWithdrawal: number
+  inflationAdjustment: number
+  frequency: 'yearly' | 'quarterly' | 'monthly' | 'weekly'
+}
+
+interface YearData {
+  year: number
+  startingBalance: number
+  withdrawals: number
+  endingBalance: number
+  isSustainable: boolean
+}
+
+const FREQUENCY_MULTIPLIER: Record<WithdrawalState['frequency'], number> = {
+  yearly: 1,
+  quarterly: 4,
+  monthly: 12,
+  weekly: 52,
+}
+
+const formatSmartCurrency = (value: number | undefined) => {
+  if (value === undefined || value === null) return '$0';
+  
+  const absoluteValue = Math.abs(value);
+
+  if (absoluteValue < 100_000_000) {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(value);
+  }
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: "compact",
+    compactDisplay: "short",
+    maximumFractionDigits: 1, 
+  }).format(value);
+}
+
+export function WithdrawalMode() {
+  const [state, setState] = useLocalStorage<WithdrawalState>(
+    'withdrawal-mode-state',
+    {
+      startingBalance: 1000000,
+      annualReturn: 7,
+      duration: 30,
+      periodicWithdrawal: 3000,
+      inflationAdjustment: 2.5,
+      frequency: 'monthly',
+    },
+  )
+
+  // Changed to useLocalStorage to persist the toggle state
+  const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('withdrawal-show-monte-carlo', false)
+
+  // FIXED: Added guard clause and updated dependencies
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const search = new URLSearchParams(window.location.search)
+      const mcParam = search.get('mc')
+      if (!mcParam) return
+
+      const decoded = JSON.parse(decodeURIComponent(atob(mcParam)))
+      if (decoded?.mode === 'withdrawal' && !useMonteCarloMode) {
+        setUseMonteCarloMode(true)
+      }
+    } catch {
+      // ignore
+    }
+  }, [useMonteCarloMode, setUseMonteCarloMode])
+
+  const exportToExcel = () => {
+    if (!calculateWithdrawal?.yearData || calculateWithdrawal.yearData.length === 0) return
+
+    const excelData = calculateWithdrawal.yearData.map(row => ({
+      Year: row.year,
+      'Starting Balance': row.startingBalance,
+      'Withdrawals': row.withdrawals,
+      'Ending Balance': row.endingBalance,
+      'Sustainable': row.isSustainable ? 'Yes' : 'No',
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(excelData)
+
+    ws['!cols'] = [
+      { wch: 10 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 15 },
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Balance By Year')
+
+    const date = new Date().toISOString().split('T')[0]
+    const fileName = `portfolio-withdrawal-${date}.xlsx`
+
+    XLSX.writeFile(wb, fileName)
+  }
+
+  const calculateWithdrawal = useMemo(() => {
+    const {
+      startingBalance,
+      annualReturn,
+      duration,
+      periodicWithdrawal,
+      inflationAdjustment,
+      frequency,
+    } = state
+
+    const periods = FREQUENCY_MULTIPLIER[frequency]
+    const yearCount = Math.max(0, duration)
+    const ratePerPeriod = Math.pow(1 + annualReturn / 100, 1 / periods) - 1
+    const inflationFactorPerYear = 1 + inflationAdjustment / 100
+
+    const yearData: YearData[] = []
+
+    let currentBalance = startingBalance
+    let currentWithdrawal = periodicWithdrawal
+    let yearsUntilZero: number | null = null
+
+    for (let year = 1; year <= yearCount; year++) {
+      const startBalance = currentBalance
+      let yearWithdrawals = 0
+
+      for (let period = 0; period < periods; period++) {
+        if (currentBalance <= 0) {
+          currentBalance = 0
+          break
+        }
+        currentBalance = currentBalance * (1 + ratePerPeriod) - currentWithdrawal
+        yearWithdrawals += currentWithdrawal
+      }
+
+      const isSustainable = currentBalance > 0
+
+      if (!isSustainable && yearsUntilZero === null) {
+        yearsUntilZero = year
+      }
+
+      yearData.push({
+        year,
+        startingBalance: Math.max(0, startBalance),
+        withdrawals: yearWithdrawals,
+        endingBalance: Math.max(0, currentBalance),
+        isSustainable,
+      })
+
+      if (currentBalance <= 0) {
+        break
+      }
+      currentWithdrawal *= inflationFactorPerYear
+    }
+
+    const endingBalance = Math.max(0, currentBalance)
+    const totalWithdrawn = yearData.reduce((sum, y) => sum + y.withdrawals, 0)
+    const isSustainable = endingBalance > 0
+
+    return {
+      endingBalance,
+      totalWithdrawn,
+      isSustainable,
+      yearsUntilZero,
+      yearData,
+    }
+  }, [state])
+
+  const sustainabilityColor = calculateWithdrawal?.isSustainable
+    ? 'text-emerald-500'
+    : 'text-destructive'
+
+  return (
+    <div className="space-y-6">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center space-y-2"
+      >
+        <h2 className="text-2xl font-bold">Plan Your Retirement Spending</h2>
+        <p className="text-muted-foreground">
+          Calculate how long your portfolio can sustain regular withdrawals
+        </p>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0 }}
+      >
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base font-semibold">
+                Monte Carlo Simulation
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Model portfolio sustainability with randomized scenarios
+              </p>
+            </div>
+            <Switch
+              checked={useMonteCarloMode}
+              onCheckedChange={setUseMonteCarloMode}
+            />
+          </div>
+        </CardContent>
+      </Card>
+      </motion.div>
+      
+      {useMonteCarloMode ? (
+        <MonteCarloSimulator mode="withdrawal" initialValues={state} />
+      ) : (
+        <>
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0 }}
+          >
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-primary" />
+                Withdrawal Parameters
+              </CardTitle>
+              <CardDescription>
+                Configure your retirement spending plan
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="starting-balance-w">
+                    Starting Balance ($)
+                  </Label>
+                  <NumericInput
+                    id="starting-balance-w"
+                    value={state?.startingBalance ?? 0}
+                    onChange={(value) =>
+                      setState({ ...state, startingBalance: value })
+                    }
+                    min={0}
+                    max={10000000000}
+                    maxErrorMessage="Now you are just being too greedy :)"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="annual-return-w">
+                    Annual Return (%)
+                  </Label>
+                  <NumericInput
+                    id="annual-return-w"
+                    step={0.1}
+                    value={state?.annualReturn ?? 0}
+                    onChange={(value) =>
+                      setState({ ...state, annualReturn: value })
+                    }
+                    min={-100}
+                    max={60}
+                    maxErrorMessage="Now you are just being too greedy :)"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="duration-w">Duration (Years)</Label>
+                  <NumericInput
+                    id="duration-w"
+                    value={state?.duration ?? 0}
+                    onChange={(value) =>
+                      setState({ ...state, duration: value })
+                    }
+                    min={1}
+                    max={100}
+                    maxErrorMessage="Planning for the next century? :)"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="periodic-withdrawal">
+                    Withdrawal Amount ($)
+                  </Label>
+                  <NumericInput
+                    id="periodic-withdrawal"
+                    value={state?.periodicWithdrawal ?? 0}
+                    onChange={(value) =>
+                      setState({ ...state, periodicWithdrawal: value })
+                    }
+                    min={0}
+                    max={10000000}
+                    maxErrorMessage="Now you are just being too greedy :)"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="inflation">
+                    Inflation Adjustment (%)
+                  </Label>
+                  <NumericInput
+                    id="inflation"
+                    step={0.1}
+                    value={state?.inflationAdjustment ?? 0}
+                    onChange={(value) =>
+                      setState({ ...state, inflationAdjustment: value })
+                    }
+                    min={-50}
+                    max={50}
+                    maxErrorMessage="Hyperinflation much? :)"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="frequency-w">Withdrawal Frequency</Label>
+                  <Select
+                    value={state?.frequency ?? 'monthly'}
+                    onValueChange={(value: any) =>
+                      setState({ ...state, frequency: value })
+                    }
+                  >
+                    <SelectTrigger id="frequency-w">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          </motion.div>
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+          >
+			<motion.div
+			  initial={{ opacity: 0, y: 24, scale: 0.9 }}
+			  animate={{
+				opacity: 1,
+				y: 0,
+				scale: 1,
+				boxShadow: calculateWithdrawal?.isSustainable
+				  ? '0 0 30px rgba(16,185,129,0.25)'
+				  : '0 0 30px rgba(239,68,68,0.25)',
+			  }}
+			  whileHover={{ y: -6, scale: 1.02 }}
+			  whileTap={{ scale: 0.98 }}
+			  transition={{ duration: 0.45, ease: 'easeOut' }}
+			>
+			  <Card
+				className={`border-2 ${
+				  calculateWithdrawal?.isSustainable
+					? 'border-emerald-500/50 bg-emerald-500/5'
+					: 'border-destructive/50 bg-destructive/5'
+				}`}
+			  >
+				<CardContent className="pt-6">
+				  <div className="flex items-center gap-3">
+					<motion.div
+					  initial={{ scale: 0.9, opacity: 0 }}
+					  animate={{ scale: 1, opacity: 1 }}
+					  transition={{ delay: 0.1, type: 'spring', stiffness: 260, damping: 16 }}
+					>
+					  {calculateWithdrawal?.isSustainable ? (
+						<CheckCircle2 className="h-8 w-8 text-emerald-500" />
+					  ) : (
+						<AlertTriangle className="h-8 w-8 text-destructive" />
+					  )}
+					</motion.div>
+
+					<div className="flex-1">
+					  <h3 className={`text-lg font-bold ${sustainabilityColor}`}>
+						{calculateWithdrawal?.isSustainable
+						  ? 'Sustainable Plan'
+						  : 'Unsustainable Plan'}
+					  </h3>
+					  <p className="text-sm text-muted-foreground">
+						{calculateWithdrawal?.isSustainable
+						  ? `Your portfolio can sustain withdrawals for the full ${state?.duration} years`
+						  : `Your portfolio will be depleted in approximately ${calculateWithdrawal?.yearsUntilZero} years`}
+					  </p>
+					</div>
+				  </div>
+				</CardContent>
+			  </Card>
+			</motion.div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0 }}
+          >
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingDown className="h-5 w-5 text-primary" />
+                Withdrawal Results
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <motion.div
+                  key={calculateWithdrawal?.endingBalance}
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className={`rounded-lg p-4 space-y-1 ${
+                    calculateWithdrawal?.isSustainable
+                      ? 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5'
+                      : 'bg-gradient-to-br from-destructive/10 to-destructive/5'
+                  }`}
+                >
+                  <p className="text-xs text-muted-foreground">
+                    Ending Balance
+                  </p>
+                  <p
+                    className={`text-lg sm:text-xl md:text-2xl font-bold ${sustainabilityColor} break-words leading-tight`}
+                  >
+                    {formatSmartCurrency(calculateWithdrawal?.endingBalance)}
+                  </p>
+                </motion.div>
+                <motion.div
+                  key={calculateWithdrawal?.totalWithdrawn}
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.1 }}
+                  className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 rounded-lg p-4 space-y-1"
+                >
+                  <p className="text-xs text-muted-foreground">
+                    Total Withdrawn
+                  </p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-500 break-words leading-tight">
+                    {formatSmartCurrency(calculateWithdrawal?.totalWithdrawn)}
+                  </p>
+                </motion.div>
+                <motion.div
+                  key={calculateWithdrawal?.yearsUntilZero}
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 rounded-lg p-4 space-y-1"
+                >
+                  <p className="text-xs text-muted-foreground">
+                    Portfolio Lasts
+                  </p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-500 break-words leading-tight">
+                    {calculateWithdrawal?.yearsUntilZero ??
+                      state?.duration}
+                    + years
+                  </p>
+                </motion.div>
+              </div>
+            </CardContent>
+          </Card>
+          </motion.div>
+          <WithdrawalChart data={calculateWithdrawal?.yearData ?? []} />
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0 }}
+          >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  Balance By Year
+                </CardTitle>
+                <Button 
+                  onClick={exportToExcel} 
+                  variant="outline" 
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Export to Excel
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <div className="rounded-md border overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="sticky top-0 bg-muted">
+                      <tr className="border-b">
+                        <th className="p-3 text-left text-sm font-semibold">
+                          Year
+                        </th>
+                        <th className="p-3 text-right text-sm font-semibold">
+                          Starting Balance
+                        </th>
+                        <th className="p-3 text-right text-sm font-semibold">
+                          Withdrawals
+                        </th>
+                        <th className="p-3 text-right text-sm font-semibold">
+                          Ending Balance
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {calculateWithdrawal?.yearData?.map?.(
+                        (row, idx) => (
+                          <motion.tr
+                            key={row?.year}
+                            initial={{ opacity: 0, x: 10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: idx * 0 }}
+                            className={`border-b hover:bg-muted/50 transition-colors ${
+                              !row?.isSustainable
+                                ? 'bg-destructive/5'
+                                : ''
+                            }`}
+                          >
+                            <td className="p-3 text-sm font-medium">
+                              {row?.year}
+                              {!row?.isSustainable && (
+                                <XCircle className="inline-block ml-2 h-4 w-4 text-destructive" />
+                              )}
+                            </td>
+                            <td className="p-3 text-sm text-right">
+                              $
+                              {row?.startingBalance?.toLocaleString(
+                                undefined,
+                                { maximumFractionDigits: 0 },
+                              ) ?? '0'}
+                            </td>
+                            <td className="p-3 text-sm text-right text-muted-foreground">
+                              $
+                              {row?.withdrawals?.toLocaleString(
+                                undefined,
+                                { maximumFractionDigits: 0 },
+                              ) ?? '0'}
+                            </td>
+                            <td
+                              className={`p-3 text-sm text-right font-semibold ${
+                                row?.isSustainable
+                                  ? 'text-primary'
+                                  : 'text-destructive'
+                              }`}
+                            >
+                              $
+                              {row?.endingBalance?.toLocaleString(
+                                undefined,
+                                { maximumFractionDigits: 0 },
+                              ) ?? '0'}
+                            </td>
+                          </motion.tr>
+                        ),
+                      ) ?? []}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          </motion.div>
+        </>
+      )}
+
+      <DonationSection />
+    </div>
+  )
+}
