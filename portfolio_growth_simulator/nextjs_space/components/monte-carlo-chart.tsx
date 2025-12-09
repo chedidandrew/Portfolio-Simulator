@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { Activity } from 'lucide-react'
+import { ChartSpline } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
 import { formatCurrency } from '@/lib/utils'
@@ -136,7 +136,7 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
+              <ChartSpline className="h-5 w-5 text-primary" />
               Scenario Paths with Percentile Bands
             </CardTitle>
             <div className="flex items-center gap-2">

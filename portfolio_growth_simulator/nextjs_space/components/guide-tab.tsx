@@ -13,13 +13,15 @@ import {
   AlertTriangle,
   Lightbulb,
   Smartphone,
-  Share2,
+  Share,
   Plus,
   ChevronRight,
   Target,
   BarChart3,
   Percent,
   Activity,
+  LaptopMinimalCheck,
+  Laptop,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { DonationSection } from '@/components/donation-section'
@@ -38,7 +40,9 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
         className="text-center space-y-3"
       >
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-2">
-          <Rocket className="h-8 w-8 text-primary" />
+          <TrendingUp className="h-10 w-10 text-primary"
+          strokeWidth={2.5}
+          />
         </div>
         <h2 className="text-3xl font-bold">Welcome to Portfolio Simulator</h2>
         <p className="text-muted-foreground max-w-2xl mx-auto">
@@ -399,7 +403,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
               <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-900 text-white text-xs font-bold shrink-0 dark:bg-gray-700">2</span>
               <div>
                 <p className="font-semibold flex items-center gap-2 text-foreground dark:text-white">
-                  Tap the Share button <Share2 className="h-4 w-4" />
+                  Tap the Share button <Share className="h-4 w-4" />
                 </p>
                 <p className="text-muted-foreground">Located at the bottom of the screen (square with arrow pointing up)</p>
               </div>
@@ -502,7 +506,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
       <Card className="border-blue-500/30 bg-blue-500/5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <Laptop className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             Install on Chrome Desktop
           </CardTitle>
           <CardDescription>
@@ -553,7 +557,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
       <Card className="border-cyan-500/30 bg-cyan-500/5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Smartphone className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+            <Laptop className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
             Install on Microsoft Edge
           </CardTitle>
           <CardDescription>
@@ -604,7 +608,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
         <Card className="border-[#FF7139]/30 bg-[#FF7139]/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-[#FF7139]" />
+              <LaptopMinimalCheck className="h-5 w-5 text-[#FF7139]" />
               Install on Mozilla Firefox
             </CardTitle>
             <CardDescription>
@@ -656,7 +660,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
         <Card className="border-[#FB542B]/30 bg-[#FB542B]/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-[#FB542B]" />
+              <LaptopMinimalCheck className="h-5 w-5 text-[#FB542B]" />
               Install on Brave
             </CardTitle>
             <CardDescription>

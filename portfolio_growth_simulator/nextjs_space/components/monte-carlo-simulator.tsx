@@ -6,7 +6,7 @@ import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { Dices, TrendingUp, AlertCircle, Target, Zap, Share2, FileText, FileSpreadsheet, Lightbulb } from 'lucide-react'
+import { Dices, TrendingUp, AlertCircle, Target, Zap, Share, FileText, FileSpreadsheet, Lightbulb } from 'lucide-react'
 import { MonteCarloChart } from '@/components/monte-carlo-chart'
 import { MonteCarloHistogram } from '@/components/monte-carlo-histogram'
 import { motion } from 'framer-motion'
@@ -649,7 +649,7 @@ const handleExportExcel = () => {
                     transition-colors duration-150
                     hover:bg-[#3B82F6]/15 hover:border-[#3B82F6]"
                   >
-                    <Share2 className="h-3.5 w-3.5" />
+                    <Share className="h-3.5 w-3.5" />
                     <span>Share Results</span>
                   </motion.button>
 

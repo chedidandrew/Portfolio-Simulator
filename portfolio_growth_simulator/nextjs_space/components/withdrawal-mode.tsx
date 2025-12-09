@@ -26,7 +26,7 @@ import {
   CheckCircle2,
   XCircle,
   Download,
-  Share2,
+  Share,
   FileText,
   FileSpreadsheet,
 } from 'lucide-react'
@@ -530,7 +530,7 @@ export function WithdrawalMode() {
                     transition-colors duration-150
                     hover:bg-[#3B82F6]/15 hover:border-[#3B82F6]"
                   >
-                    <Share2 className="h-3.5 w-3.5" />
+                    <Share className="h-3.5 w-3.5" />
                     <span>Share Results</span>
                   </motion.button>
 

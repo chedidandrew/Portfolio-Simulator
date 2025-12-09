@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { DollarSign, TrendingUp, Calendar, Target, Award, Sparkles, Download, Share2, FileText, FileSpreadsheet } from 'lucide-react'
+import { DollarSign, TrendingUp, Calendar, Target, Award, Share, FileText, FileSpreadsheet } from 'lucide-react'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 import { GrowthChart } from '@/components/growth-chart'
 import { MonteCarloSimulator } from '@/components/monte-carlo-simulator'
@@ -558,7 +558,7 @@ export function GrowthMode() {
                     transition-colors duration-150
                     hover:bg-[#3B82F6]/15 hover:border-[#3B82F6]"
                   >
-                    <Share2 className="h-3.5 w-3.5" />
+                    <Share className="h-3.5 w-3.5" />
                     <span>Share Results</span>
                   </motion.button>
 
