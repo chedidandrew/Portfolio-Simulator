@@ -121,13 +121,29 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
   const [isSimulating, setIsSimulating] = useState(false)
 
   // Calculate total invested capital for the multiplier effect
+  // FIXED: Now accounts for inflation compounding annually
   const totalInvested = useMemo(() => {
     const initial = params.initialValue || 0;
-    const contributions = mode === 'growth' 
-      ? (params.cashflowAmount * 12 * params.duration) 
-      : 0;
-    return initial + contributions;
-  }, [params.initialValue, params.cashflowAmount, params.duration, mode]);
+    
+    if (mode === 'withdrawal') {
+        // In withdrawal mode, "Total Invested" is just the starting balance
+        return initial;
+    }
+
+    // In growth mode, calculate contributions with inflation
+    const years = params.duration;
+    const inflationRate = (params.inflationAdjustment ?? 0) / 100;
+    let currentMonthlyContribution = params.cashflowAmount;
+    let totalContributions = 0;
+
+    for (let i = 0; i < years; i++) {
+        totalContributions += currentMonthlyContribution * 12;
+        // Contributions increase by inflation rate at the end of each year
+        currentMonthlyContribution *= (1 + inflationRate);
+    }
+    
+    return initial + totalContributions;
+  }, [params.initialValue, params.cashflowAmount, params.duration, params.inflationAdjustment, mode]);
 
   const buildShareUrl = () => {
     if (typeof window === 'undefined') return ''
@@ -275,7 +291,6 @@ const handleExportExcel = () => {
       { wch: 12 },
       { wch: 12 },
       { wch: 12 },
-      { wch: 13 },
       { wch: 13 },
       { wch: 13 },
       { wch: 13 },
@@ -536,24 +551,24 @@ const handleExportExcel = () => {
                 maxErrorMessage="Now you are just being too greedy :)"
               />
             </div>
-            {mode === 'withdrawal' && (
-              <div className="space-y-2">
-                <Label htmlFor="mc-inflation">
-                  Inflation Adjustment (%)
-                </Label>
-                <NumericInput
-                  id="mc-inflation"
-                  step={0.1}
-                  value={params?.inflationAdjustment ?? 0}
-                  onChange={(value) =>
-                    setParams({ ...params, inflationAdjustment: value })
-                  }
-                  min={-50}
-                  max={50}
-                  maxErrorMessage="Hyperinflation much? :)"
-                />
-              </div>
-            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="mc-inflation">
+                Inflation Adjustment (%)
+              </Label>
+              <NumericInput
+                id="mc-inflation"
+                step={0.1}
+                value={params?.inflationAdjustment ?? 0}
+                onChange={(value) =>
+                  setParams({ ...params, inflationAdjustment: value })
+                }
+                min={-50}
+                max={50}
+                maxErrorMessage="Hyperinflation much? :)"
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="mc-paths">Number of Scenarios</Label>
               <Select
@@ -829,11 +844,19 @@ const handleExportExcel = () => {
                       </p>
                     </div>
                     <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                      {/* FIXED: Display "Success Rate" (Solvency) for withdrawal, "Profit Probability" (Growth) for growth */}
                       <p>
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">Survival Rate:</span> You have a{' '}
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          {mode === 'withdrawal' ? 'Success Rate:' : 'Profit Probability:'}
+                        </span>{' '}
+                        You have a{' '}
                         <span className="font-bold">
-                          {simulationResults?.survivalRate?.toFixed?.(1)}%
-                        </span> chance of ending with more money than you started with.
+                          {mode === 'withdrawal' 
+                            ? simulationResults?.solventRate?.toFixed?.(1) 
+                            : simulationResults?.profitableRate?.toFixed?.(1)
+                          }%
+                        </span>{' '}
+                        chance of {mode === 'withdrawal' ? 'not running out of money' : 'ending with more money than you started with'}.
                       </p>
                     </div>
                   </div>
@@ -951,7 +974,8 @@ function performMonteCarloSimulation(
   const lowestValues: number[] = [] // Lowest value ever reached for each scenario
   
   let pathsReachingGoal = 0
-  let pathsProfitable = 0
+  let pathsProfitable = 0 // > initialValue
+  let pathsSolvent = 0    // > 0
 
   for (let y = 0; y <= duration; y++) {
     annualCAGRs[y] = []
@@ -1002,6 +1026,7 @@ function performMonteCarloSimulation(
 
     if (portfolioGoal && currentValue >= portfolioGoal) pathsReachingGoal++
     if (currentValue > initialValue) pathsProfitable++
+    if (currentValue > 0) pathsSolvent++
 
     let peak = yearlyValues[0]
     let maxDrawdown = 0
@@ -1015,8 +1040,9 @@ function performMonteCarloSimulation(
     maxDrawdowns.push(maxDrawdown)
   }
 
-  endingValues.sort((a, b) => a - b)
-
+  // Create sorted copies for percentile calculations so we don't mutate original arrays
+  const sortedEndingValues = [...endingValues].sort((a, b) => a - b)
+  
   const annualReturnsData = []
   for (let year = 1; year <= duration; year++) {
     const cagrs = annualCAGRs[year]
@@ -1071,16 +1097,17 @@ function performMonteCarloSimulation(
     }
   })
 
+  // Use sorted ending values for stats
   const mean = endingValues.reduce((sum, val) => sum + val, 0) / numPaths
-  const median = calculatePercentile(endingValues, 0.5)
-  const p5 = calculatePercentile(endingValues, 0.05)
-  const p10 = calculatePercentile(endingValues, 0.1)
-  const p25 = calculatePercentile(endingValues, 0.25)
-  const p75 = calculatePercentile(endingValues, 0.75)
-  const p90 = calculatePercentile(endingValues, 0.9)
-  const p95 = calculatePercentile(endingValues, 0.95)
-  const best = endingValues[numPaths - 1]
-  const worst = endingValues[0]
+  const median = calculatePercentile(sortedEndingValues, 0.5)
+  const p5 = calculatePercentile(sortedEndingValues, 0.05)
+  const p10 = calculatePercentile(sortedEndingValues, 0.1)
+  const p25 = calculatePercentile(sortedEndingValues, 0.25)
+  const p75 = calculatePercentile(sortedEndingValues, 0.75)
+  const p90 = calculatePercentile(sortedEndingValues, 0.9)
+  const p95 = calculatePercentile(sortedEndingValues, 0.95)
+  const best = sortedEndingValues[numPaths - 1]
+  const worst = sortedEndingValues[0]
 
   const chartData = []
   for (let year = 0; year <= duration; year++) {
@@ -1103,16 +1130,19 @@ function performMonteCarloSimulation(
   const growthRatio = (p90 > 0 && initialValue > 0) ? p90 / initialValue : 0
   const recommendLogLinear = growthRatio > 20
 
-  const medianDrawdown = calculatePercentile(maxDrawdowns.sort((a,b)=>a-b), 0.5)
+  // Use sorted copy for median drawdown calculation
+  const sortedMaxDrawdowns = [...maxDrawdowns].sort((a, b) => a - b)
+  const medianDrawdown = calculatePercentile(sortedMaxDrawdowns, 0.5)
   const worstDrawdown = Math.max(...maxDrawdowns)
   const recommendLogDrawdown = (medianDrawdown < 0.10 && worstDrawdown > 0.60)
   const goalProbability = portfolioGoal ? (pathsReachingGoal / numPaths) * 100 : 0
-  const survivalRate = (pathsProfitable / numPaths) * 100
+  const profitableRate = (pathsProfitable / numPaths) * 100
+  const solventRate = (pathsSolvent / numPaths) * 100
 
   return {
     //paths, //This array is massive and not needed for display.
-    endingValues,
-    maxDrawdowns,
+    endingValues, // Return unsorted array for export
+    maxDrawdowns, // Return unsorted array for export
     annualReturnsData,
     lossProbData,
     chartData,
@@ -1128,7 +1158,8 @@ function performMonteCarloSimulation(
     worst,
     goalProbability,
     pathsReachingGoal,
-    survivalRate,
+    profitableRate,
+    solventRate,
     numPathsUsed: numPaths,
     recommendLogLinear,
     recommendLogHistogram,
