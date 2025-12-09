@@ -52,8 +52,53 @@ const MILESTONES = [
   { value: 1000000000000, label: 'Trillionaire!',          icon: '👽' },
   { value: 2500000000000, label: 'Quarter Trillionaire+',  icon: '🌠' },
   { value: 5000000000000, label: 'Half Trillionaire+',     icon: '🚁' },
-  { value: 10000000000000, label: 'Keep Dreaming...',         icon: '💤' },
-]
+  { value: 10000000000000, label: 'Keep Dreaming...', icon: '💤' },
+
+  // --- THE QUADRILLIONS (10^15) ---
+  { value: 25000000000000, label: 'US Debt Payoff', icon: '🇺🇸' },
+  { value: 50000000000000, label: 'Global Economy Owner', icon: '🌐' },
+  { value: 1e15, label: 'Quadrillionaire', icon: '🤖' },
+  { value: 5e15, label: 'Earth is your NFT', icon: '🖼️' },
+
+  // --- THE QUINTILLIONS (10^18) ---
+  { value: 1e16, label: 'Buying Mars (Cash)', icon: '🔴' },
+  { value: 1e17, label: 'Jeff Bezos is your pet', icon: '🐕' },
+  { value: 1e18, label: 'Quintillionaire', icon: '🍬' },
+  { value: 5e18, label: 'Solar System CEO', icon: '☀️' },
+
+  // --- THE SEXTILLIONS (10^21) ---
+  { value: 1e19, label: 'Dyson Sphere Funder', icon: '🔋' },
+  { value: 1e20, label: 'Buying Physics DLC', icon: '⚛️' },
+  { value: 1e21, label: 'Sextillionaire', icon: '🌌' },
+  { value: 5e21, label: 'Milky Way Landlord', icon: '🛸' },
+
+  // --- THE SEPTILLIONS (10^24) ---
+  // (1 Mole is 6.022 x 10^23, so let's reference that)
+  { value: 6.02e23, label: 'A Mole of Dollars', icon: '🧪' },
+  { value: 1e24, label: 'Septillionaire', icon: '🍷' },
+  { value: 5e24, label: 'Galactic Emperor', icon: '👑' },
+
+  // --- THE OCTILLIONS (10^27) ---
+  { value: 1e25, label: 'Bribing Black Holes', icon: '🕳️' },
+  { value: 1e26, label: 'Buying the Multiverse', icon: '🌀' },
+  { value: 1e27, label: 'Octillionaire', icon: '🐙' },
+  { value: 5e27, label: 'Atoms in the Human Body', icon: '🧬' },
+
+  // --- THE NONILLIONS (10^30) ---
+  { value: 1e28, label: 'Developer Console Access', icon: '💻' },
+  { value: 1e29, label: 'Why are you doing this?', icon: '🤨' },
+  { value: 1e30, label: 'Nonillionaire', icon: '🤯' },
+
+  // --- THE ABSURD / INSULTING TIER ---
+  { value: 1e31, label: 'Go Touch Grass', icon: '🌳' },
+  { value: 1e32, label: 'Integer Overflow Error', icon: '⚠️' },
+  { value: 1e33, label: 'You Broke Mathematics', icon: '✖️' },
+  { value: 1e34, label: 'Please Stop Clicking', icon: '🛑' },
+  { value: 1e35, label: 'Buying Heaven & Hell', icon: '⚖️' },
+  { value: 1e36, label: 'The Simulation Crashing', icon: '🖥️' },
+  { value: 1e37, label: 'Undecillionaire (Get a life)', icon: '💀' },
+  { value: 1e38, label: 'Okay, you win. Happy?', icon: '🏳️' },
+];
 
 const milestoneVariants = {
   hidden: { scale: 0, opacity: 0, y: 10 },
@@ -172,11 +217,12 @@ export function GrowthMode() {
     periodicAddition: 500,
     frequency: 'monthly',
     targetValue: 500000,
-    inflationAdjustment: 0, // Default to 0 to match previous behavior
+    inflationAdjustment: 0,
   })
 
   // Changed to useLocalStorage to persist the toggle state
   const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('growth-show-monte-carlo', false)
+  const [showFullPrecision, setShowFullPrecision] = useLocalStorage('growth-show-full-precision', false)
   
   const [isCalculated, setIsCalculated] = useState(false)
   const [confettiBursts, setConfettiBursts] = useState<{
@@ -184,6 +230,13 @@ export function GrowthMode() {
     burst: number
     origin: { x: number; y: number }
   }[]>([])
+
+  // Helper for formatting result cards: Full Precision if toggled AND < 100M
+  const formatResult = (val: number | undefined) => {
+    if (val === undefined) return '$0'
+    const shouldUseCompact = (val >= 100_000_000_000_000_000_000_000_000_000_000_000_000) || !showFullPrecision
+    return formatCurrency(val, true, 2, shouldUseCompact)
+  }
 
   // Load state from URL if sharing link is used
   useEffect(() => {
@@ -201,6 +254,10 @@ export function GrowthMode() {
           // Restore deterministic state
           setUseMonteCarloMode(false)
           setState(decoded.params)
+          // Restore full precision setting
+          if (typeof decoded.showFullPrecision === 'boolean') {
+            setShowFullPrecision(decoded.showFullPrecision)
+          }
           // Clean URL to prevent re-reading on reload if desired, or keep it
           window.history.replaceState(null, '', window.location.pathname)
         } else if (decoded.type !== 'deterministic' && !useMonteCarloMode) {
@@ -228,6 +285,7 @@ export function GrowthMode() {
       mode: 'growth',
       type: 'deterministic',
       params: state,
+      showFullPrecision, // Include in share link
     }
     const encoded = typeof btoa !== 'undefined' ? btoa(encodeURIComponent(JSON.stringify(payload))) : ''
     if (encoded) url.searchParams.set('mc', encoded)
@@ -546,6 +604,17 @@ export function GrowthMode() {
                 </CardTitle>
 
                 <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 text-xs sm:text-sm print:hidden">
+                  <div className="flex items-center gap-2 mr-2 border-r border-border pr-3">
+                    <Switch
+                      id="precision-toggle"
+                      checked={showFullPrecision}
+                      onCheckedChange={setShowFullPrecision}
+                    />
+                    <Label htmlFor="precision-toggle" className="font-normal cursor-pointer">
+                      Full Precision
+                    </Label>
+                  </div>
+
                   <motion.button
                     type="button"
                     onClick={handleShareLink}
@@ -604,7 +673,7 @@ export function GrowthMode() {
                 >
                   <p className="text-xs text-muted-foreground">Final Portfolio Value</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary break-words leading-tight">
-                    {formatCurrency(calculateGrowth?.finalValue)}
+                    {formatResult(calculateGrowth?.finalValue)}
                   </p>
                 </motion.div>
 
@@ -617,7 +686,7 @@ export function GrowthMode() {
                 >
                   <p className="text-xs text-muted-foreground">Total Contributions</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-500 break-words leading-tight">
-                    {formatCurrency(calculateGrowth?.totalContributions)}
+                    {formatResult(calculateGrowth?.totalContributions)}
                   </p>
                 </motion.div>
 
@@ -639,7 +708,7 @@ export function GrowthMode() {
                       isProfitNegative ? 'text-destructive' : 'text-emerald-500'
                     }`}
                   >
-                    {formatCurrency(calculateGrowth?.totalProfit)}
+                    {formatResult(calculateGrowth?.totalProfit)}
                   </p>
                 </motion.div>
 

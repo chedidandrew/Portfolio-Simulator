@@ -68,6 +68,14 @@ export function WithdrawalMode() {
 
   // Changed to useLocalStorage to persist the toggle state
   const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('withdrawal-show-monte-carlo', false)
+  const [showFullPrecision, setShowFullPrecision] = useLocalStorage('withdrawal-show-full-precision', false)
+
+  // Helper for formatting result cards: Full Precision if toggled AND < 100M
+  const formatResult = (val: number | undefined) => {
+    if (val === undefined) return '$0'
+    const shouldUseCompact = (val >= 100_000_000_000_000_000_000_000_000_000_000_000_000) || !showFullPrecision
+    return formatCurrency(val, true, 2, shouldUseCompact)
+  }
 
   // Load state from URL if sharing link is used
   useEffect(() => {
@@ -84,6 +92,10 @@ export function WithdrawalMode() {
           // Restore deterministic state
           setUseMonteCarloMode(false)
           setState(decoded.params)
+          // Restore full precision setting
+          if (typeof decoded.showFullPrecision === 'boolean') {
+            setShowFullPrecision(decoded.showFullPrecision)
+          }
            // Clean URL
            window.history.replaceState(null, '', window.location.pathname)
         } else if (decoded.type !== 'deterministic' && !useMonteCarloMode) {
@@ -104,6 +116,7 @@ export function WithdrawalMode() {
       mode: 'withdrawal',
       type: 'deterministic',
       params: state,
+      showFullPrecision, // Include in share link
     }
     const encoded = typeof btoa !== 'undefined' ? btoa(encodeURIComponent(JSON.stringify(payload))) : ''
     if (encoded) url.searchParams.set('mc', encoded)
@@ -488,6 +501,17 @@ export function WithdrawalMode() {
                 </CardTitle>
 
                 <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 text-xs sm:text-sm print:hidden">
+                  <div className="flex items-center gap-2 mr-2 border-r border-border pr-3">
+                    <Switch
+                      id="precision-toggle-withdrawal"
+                      checked={showFullPrecision}
+                      onCheckedChange={setShowFullPrecision}
+                    />
+                    <Label htmlFor="precision-toggle-withdrawal" className="font-normal cursor-pointer">
+                      Full Precision
+                    </Label>
+                  </div>
+
                   <motion.button
                     type="button"
                     onClick={handleShareLink}
@@ -553,7 +577,7 @@ export function WithdrawalMode() {
                   <p
                     className={`text-lg sm:text-xl md:text-2xl font-bold ${sustainabilityColor} break-words leading-tight`}
                   >
-                    {formatCurrency(calculateWithdrawal?.endingBalance)}
+                    {formatResult(calculateWithdrawal?.endingBalance)}
                   </p>
                 </motion.div>
                 <motion.div
@@ -567,7 +591,7 @@ export function WithdrawalMode() {
                     Total Withdrawn
                   </p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-500 break-words leading-tight">
-                    {formatCurrency(calculateWithdrawal?.totalWithdrawn)}
+                    {formatResult(calculateWithdrawal?.totalWithdrawn)}
                   </p>
                 </motion.div>
                 <motion.div

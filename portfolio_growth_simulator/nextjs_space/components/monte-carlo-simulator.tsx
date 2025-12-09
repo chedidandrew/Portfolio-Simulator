@@ -6,6 +6,7 @@ import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { Dices, TrendingUp, AlertCircle, Target, Zap, Share, FileText, FileSpreadsheet, Lightbulb } from 'lucide-react'
 import { MonteCarloChart } from '@/components/monte-carlo-chart'
 import { MonteCarloHistogram } from '@/components/monte-carlo-histogram'
@@ -92,6 +93,16 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
 
   const [simulationResults, setSimulationResults] = useLocalStorage<any>( `mc-results-${mode}`, null)
   const [isSimulating, setIsSimulating] = useState(false)
+  
+  // Use local storage for full precision preference per mode
+  const [showFullPrecision, setShowFullPrecision] = useLocalStorage('mc-show-full-precision-' + mode, false)
+
+  // Helper for formatting result cards: Full Precision if toggled AND < 100M
+  const formatResult = (val: number | undefined) => {
+    if (val === undefined) return '$0'
+    const shouldUseCompact = (val >= 100_000_000_000_000_000_000_000_000_000_000_000_000) || !showFullPrecision
+    return formatCurrency(val, true, 2, shouldUseCompact)
+  }
 
   // Calculate total invested capital for the multiplier effect
   const totalInvested = useMemo(() => {
@@ -135,6 +146,7 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
       params,
       rngSeed,
       logScales,
+      showFullPrecision, // Include in share link
     }
 
     const encoded =
@@ -426,6 +438,11 @@ const handleExportExcel = () => {
       }
 
       const savedLogScales = decoded.logScales as LogScaleSettings | undefined
+      
+      // Restore full precision setting
+      if (typeof decoded.showFullPrecision === 'boolean') {
+        setShowFullPrecision(decoded.showFullPrecision)
+      }
 
       runSimulation(mergedParams, seedFromUrl, savedLogScales)
 
@@ -637,6 +654,17 @@ const handleExportExcel = () => {
 
               {simulationResults && (
                 <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 text-xs sm:text-sm print:hidden">
+                  <div className="flex items-center gap-2 mr-2 border-r border-border pr-3">
+                    <Switch
+                      id="precision-toggle-mc"
+                      checked={showFullPrecision}
+                      onCheckedChange={setShowFullPrecision}
+                    />
+                    <Label htmlFor="precision-toggle-mc" className="font-normal cursor-pointer">
+                      Full Precision
+                    </Label>
+                  </div>
+
                   <motion.button
                     type="button"
                     onClick={handleShareLink}
@@ -696,7 +724,7 @@ const handleExportExcel = () => {
                 >
                   <p className="text-xs text-muted-foreground">Median Outcome</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary break-words leading-tight">
-                    {formatCurrency(simulationResults?.median)}
+                    {formatResult(simulationResults?.median)}
                   </p>
                 </motion.div>
 
@@ -708,7 +736,7 @@ const handleExportExcel = () => {
                 >
                   <p className="text-xs text-muted-foreground">Mean Outcome</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-500 break-words leading-tight">
-                    {formatCurrency(simulationResults?.mean)}
+                    {formatResult(simulationResults?.mean)}
                   </p>
                 </motion.div>
 
@@ -720,7 +748,7 @@ const handleExportExcel = () => {
                 >
                   <p className="text-xs text-muted-foreground">Best Case (95%)</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-emerald-500 break-words leading-tight">
-                    {formatCurrency(simulationResults?.p95)}
+                    {formatResult(simulationResults?.p95)}
                   </p>
                 </motion.div>
 
@@ -732,7 +760,7 @@ const handleExportExcel = () => {
                 >
                   <p className="text-xs text-muted-foreground">Worst Case (5%)</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-orange-500 break-words leading-tight">
-                    {formatCurrency(simulationResults?.p5)}
+                    {formatResult(simulationResults?.p5)}
                   </p>
                 </motion.div>
               </div>
@@ -743,42 +771,42 @@ const handleExportExcel = () => {
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">10th percentile</span>
                     <span className="font-bold text-lg leading-tight truncate">
-                      {formatCurrency(simulationResults?.p10)}
+                      {formatResult(simulationResults?.p10)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">25th percentile</span>
                     <span className="font-bold text-lg leading-tight truncate">
-                      {formatCurrency(simulationResults?.p25)}
+                      {formatResult(simulationResults?.p25)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">75th percentile</span>
                     <span className="font-bold text-lg leading-tight truncate">
-                      {formatCurrency(simulationResults?.p75)}
+                      {formatResult(simulationResults?.p75)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">90th percentile</span>
                     <span className="font-bold text-lg leading-tight truncate">
-                      {formatCurrency(simulationResults?.p90)}
+                      {formatResult(simulationResults?.p90)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">Best outcome</span>
                     <span className="font-bold text-lg leading-tight truncate text-emerald-500">
-                      {formatCurrency(simulationResults?.best)}
+                      {formatResult(simulationResults?.best)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">Worst outcome</span>
                     <span className="font-bold text-lg leading-tight truncate text-orange-500">
-                      {formatCurrency(simulationResults?.worst)}
+                      {formatResult(simulationResults?.worst)}
                     </span>
                   </div>
                 </div>
@@ -815,7 +843,7 @@ const handleExportExcel = () => {
                       <p>
                         <span className="font-semibold">Total Invested:</span> Over {params.duration} years, you invested a total of{' '}
                         <span className="text-indigo-500 font-bold">
-                          {formatCurrency(totalInvested)}
+                          {formatResult(totalInvested)}
                         </span>
                       </p>
                     </div>
@@ -825,11 +853,11 @@ const handleExportExcel = () => {
                       <p>
                         <span className="font-semibold">Typical Outcome:</span> There is a 50% chance your balance ends between{' '}
                         <span className="text-orange-500 font-bold">
-                          {formatCurrency(simulationResults?.p25)}
+                          {formatResult(simulationResults?.p25)}
                         </span>
                         {' '}and{' '}
                         <span className="text-emerald-500 font-bold">
-                          {formatCurrency(simulationResults?.p75)}
+                          {formatResult(simulationResults?.p75)}
                         </span>
                       </p>
                     </div>

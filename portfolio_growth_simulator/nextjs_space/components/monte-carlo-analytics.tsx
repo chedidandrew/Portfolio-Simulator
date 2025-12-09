@@ -422,8 +422,8 @@ export function InvestmentBreakdownChart({ data, isDark }: AnalyticsProps) {
                 />
                 <YAxis 
                   tickLine={false}
-                  // Fixed: Use central formatCurrency instead of hardcoded 'k'
-                  tickFormatter={(val) => formatCurrency(val, false, 0)}
+                  // Fixed: Use central formatCurrency with $ enabled and compact
+                  tickFormatter={(val) => formatCurrency(val, true, 0)}
                   tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#71717a' }}
                 />
                 <Tooltip content={<InvestmentTooltip />} />

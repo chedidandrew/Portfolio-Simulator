@@ -169,7 +169,8 @@ export function WithdrawalChart({ data }: WithdrawalChartProps) {
                 <YAxis
                   tickLine={false}
                   tick={{ fontSize: 10, fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)' }}
-                  tickFormatter={(value) => formatCurrency(value, false, 1)}
+                  // Fixed: Added dollar sign
+                  tickFormatter={(value) => formatCurrency(value, true, 1)}
                   scale={useLogScale ? 'log' : 'linear'}
                   domain={useLogScale ? ['auto', 'auto'] : [0, 'auto']}
                   allowDataOverflow={false}
