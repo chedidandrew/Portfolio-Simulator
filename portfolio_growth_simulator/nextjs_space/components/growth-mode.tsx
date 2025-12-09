@@ -9,13 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { DollarSign, TrendingUp, Calendar, Target, Award, Sparkles, Download } from 'lucide-react'
+import { DollarSign, TrendingUp, Calendar, Target, Award, Sparkles, Download, Share2, FileText, FileSpreadsheet } from 'lucide-react'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 import { GrowthChart } from '@/components/growth-chart'
 import { MonteCarloSimulator } from '@/components/monte-carlo-simulator'
 import { DonationSection } from '@/components/donation-section'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as XLSX from 'xlsx'
+import { triggerHaptic } from '@/hooks/use-haptics'
 
 interface GrowthState {
   startingBalance: number
@@ -213,7 +214,7 @@ export function GrowthMode() {
     origin: { x: number; y: number }
   }[]>([])
 
-  // FIXED: Added guard clause and updated dependencies
+  // Load state from URL if sharing link is used
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -223,13 +224,24 @@ export function GrowthMode() {
       if (!mcParam) return
 
       const decoded = JSON.parse(decodeURIComponent(atob(mcParam)))
-      if (decoded?.mode === 'growth' && !useMonteCarloMode) {
-        setUseMonteCarloMode(true)
+      
+      if (decoded?.mode === 'growth') {
+        if (decoded.type === 'deterministic' && decoded.params) {
+          // Restore deterministic state
+          setUseMonteCarloMode(false)
+          setState(decoded.params)
+          // Clean URL to prevent re-reading on reload if desired, or keep it
+          window.history.replaceState(null, '', window.location.pathname)
+        } else if (decoded.type !== 'deterministic' && !useMonteCarloMode) {
+          // Default to MC if no type specified (legacy) or type is monte-carlo
+          setUseMonteCarloMode(true)
+        }
       }
     } catch {
       // ignore
     }
-  }, [useMonteCarloMode, setUseMonteCarloMode])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   
   const frequencyMultiplier = {
     yearly: 1,
@@ -238,32 +250,49 @@ export function GrowthMode() {
     weekly: 52,
   }
 
-  const exportToExcel = () => {
-    if (!calculateGrowth?.yearData || calculateGrowth.yearData.length === 0) return
+  const buildShareUrl = () => {
+    if (typeof window === 'undefined') return ''
+    const url = new URL(window.location.href)
+    const payload = {
+      mode: 'growth',
+      type: 'deterministic',
+      params: state,
+    }
+    const encoded = typeof btoa !== 'undefined' ? btoa(encodeURIComponent(JSON.stringify(payload))) : ''
+    if (encoded) url.searchParams.set('mc', encoded)
+    return url.toString()
+  }
 
-    const excelData = calculateGrowth.yearData.map(row => ({
-      Year: row.year,
-      'Starting Value': row.startingValue,
-      'Contributions': row.contributions,
-      'Ending Value': row.endingValue,
-    }))
+  const handleShareLink = async () => {
+    triggerHaptic('light')
+    const url = buildShareUrl()
+    if (!url) return
 
-    const ws = XLSX.utils.json_to_sheet(excelData)
+    try {
+      const shareText = 'Check my results in Portfolio Simulator.'
+      const cleanMarkdown = `[Check my results](${url})`
 
-    ws['!cols'] = [
-      { wch: 10 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 20 },
-    ]
+      if (typeof navigator !== 'undefined' && (navigator as any).share) {
+        await (navigator as any).share({
+          title: 'Portfolio Simulator',
+          text: shareText,
+          url,
+        })
+        return
+      }
 
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Value By Year')
+      if (navigator?.clipboard) {
+        await navigator.clipboard.writeText(cleanMarkdown)
+      }
+    } catch {
+      // ignore
+    }
+  }
 
-    const date = new Date().toISOString().split('T')[0]
-    const fileName = `portfolio-growth-${date}.xlsx`
-
-    XLSX.writeFile(wb, fileName)
+  const handleExportPdf = () => {
+    triggerHaptic('light')
+    if (typeof window === 'undefined') return
+    window.print()
   }
 
   const calculateGrowth = useMemo(() => {
@@ -312,6 +341,51 @@ export function GrowthMode() {
     
     return { finalValue, totalContributions, totalProfit, yearData, yearsToTarget }
   }, [state, frequencyMultiplier])
+
+  const handleExportExcel = () => {
+    triggerHaptic('light')
+    if (!calculateGrowth?.yearData || calculateGrowth.yearData.length === 0) return
+
+    const summaryRows = [
+      { Key: 'Mode', Value: 'Growth (Deterministic)' },
+      { Key: 'Starting Balance', Value: state.startingBalance },
+      { Key: 'Annual Return %', Value: state.annualReturn },
+      { Key: 'Duration Years', Value: state.duration },
+      { Key: 'Contribution Amount', Value: state.periodicAddition },
+      { Key: 'Frequency', Value: state.frequency },
+      { Key: 'Target Value', Value: state.targetValue || 'N/A' },
+      { Key: 'Final Value', Value: calculateGrowth.finalValue },
+      { Key: 'Total Contributions', Value: calculateGrowth.totalContributions },
+      { Key: 'Total Profit', Value: calculateGrowth.totalProfit },
+    ]
+
+    const wsSummary = XLSX.utils.json_to_sheet(summaryRows)
+    ;(wsSummary as any)['!cols'] = [{ wch: 20 }, { wch: 20 }]
+
+    const excelData = calculateGrowth.yearData.map(row => ({
+      Year: row.year,
+      'Starting Value': row.startingValue,
+      'Contributions': row.contributions,
+      'Ending Value': row.endingValue,
+    }))
+
+    const wsData = XLSX.utils.json_to_sheet(excelData)
+    ;(wsData as any)['!cols'] = [
+      { wch: 10 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 20 },
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
+    XLSX.utils.book_append_sheet(wb, wsData, 'Value By Year')
+
+    const date = new Date().toISOString().split('T')[0]
+    const fileName = `portfolio-growth-deterministic-${date}.xlsx`
+
+    XLSX.writeFile(wb, fileName)
+  }
   
   const isProfitNegative = (calculateGrowth?.totalProfit ?? 0) < 0
   const achievedMilestones = useMemo(() => {
@@ -463,12 +537,61 @@ export function GrowthMode() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0 }}
           >
-          <Card className="border-primary/20">
+          <Card className="border-primary/20 print-section">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                Projected Results
-              </CardTitle>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2 shrink-0">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                    Projected Results
+                </CardTitle>
+
+                <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 text-xs sm:text-sm print:hidden">
+                  <motion.button
+                    type="button"
+                    onClick={handleShareLink}
+                    whileHover={{ scale: 1.05, y: -1 }}
+                    whileTap={{ scale: 0.96, y: 0 }}
+                    className="inline-flex items-center gap-1 rounded-full border border-[#3B82F6]/50 
+                    bg-[#3B82F6]/10 px-2.5 py-1.5 font-medium text-[#3B82F6]
+                    shadow-sm shadow-[#3B82F6]/20
+                    transition-colors duration-150
+                    hover:bg-[#3B82F6]/15 hover:border-[#3B82F6]"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    <span>Share Results</span>
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    onClick={handleExportPdf}
+                    whileHover={{ scale: 1.05, y: -1 }}
+                    whileTap={{ scale: 0.96, y: 0 }}
+                    className="inline-flex items-center gap-1 rounded-full border border-red-400/50 
+                              bg-red-500/10 px-2.5 py-1.5 font-medium text-red-300
+                              shadow-sm shadow-red-500/20
+                              transition-colors duration-150
+                              hover:bg-red-500/15 hover:border-red-400"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span>PDF</span>
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    onClick={handleExportExcel}
+                    whileHover={{ scale: 1.05, y: -1 }}
+                    whileTap={{ scale: 0.96, y: 0 }}
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-400/50 
+                              bg-emerald-500/10 px-2.5 py-1.5 font-medium text-emerald-300
+                              shadow-sm shadow-emerald-500/20
+                              transition-colors duration-150
+                              hover:bg-emerald-500/15 hover:border-emerald-400"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    <span>Excel</span>
+                  </motion.button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -626,21 +749,10 @@ export function GrowthMode() {
           >
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  Value By Year
-                </CardTitle>
-                <Button 
-                  onClick={exportToExcel} 
-                  variant="outline" 
-                  size="sm"
-                  className="gap-2"
-                >
-                  <Download className="h-4 w-4" />
-                  Export to Excel
-                </Button>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Value By Year
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border overflow-x-auto">

@@ -26,6 +26,9 @@ import {
   CheckCircle2,
   XCircle,
   Download,
+  Share2,
+  FileText,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 import { WithdrawalChart } from '@/components/withdrawal-chart'
@@ -33,6 +36,7 @@ import { MonteCarloSimulator } from '@/components/monte-carlo-simulator'
 import { DonationSection } from '@/components/donation-section'
 import { motion } from 'framer-motion'
 import * as XLSX from 'xlsx'
+import { triggerHaptic } from '@/hooks/use-haptics'
 
 interface WithdrawalState {
   startingBalance: number
@@ -96,7 +100,7 @@ export function WithdrawalMode() {
   // Changed to useLocalStorage to persist the toggle state
   const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('withdrawal-show-monte-carlo', false)
 
-  // FIXED: Added guard clause and updated dependencies
+  // Load state from URL if sharing link is used
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -106,42 +110,67 @@ export function WithdrawalMode() {
       if (!mcParam) return
 
       const decoded = JSON.parse(decodeURIComponent(atob(mcParam)))
-      if (decoded?.mode === 'withdrawal' && !useMonteCarloMode) {
-        setUseMonteCarloMode(true)
+      if (decoded?.mode === 'withdrawal') {
+        if (decoded.type === 'deterministic' && decoded.params) {
+          // Restore deterministic state
+          setUseMonteCarloMode(false)
+          setState(decoded.params)
+           // Clean URL
+           window.history.replaceState(null, '', window.location.pathname)
+        } else if (decoded.type !== 'deterministic' && !useMonteCarloMode) {
+          // Default to MC
+          setUseMonteCarloMode(true)
+        }
       }
     } catch {
       // ignore
     }
-  }, [useMonteCarloMode, setUseMonteCarloMode])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const exportToExcel = () => {
-    if (!calculateWithdrawal?.yearData || calculateWithdrawal.yearData.length === 0) return
+  const buildShareUrl = () => {
+    if (typeof window === 'undefined') return ''
+    const url = new URL(window.location.href)
+    const payload = {
+      mode: 'withdrawal',
+      type: 'deterministic',
+      params: state,
+    }
+    const encoded = typeof btoa !== 'undefined' ? btoa(encodeURIComponent(JSON.stringify(payload))) : ''
+    if (encoded) url.searchParams.set('mc', encoded)
+    return url.toString()
+  }
 
-    const excelData = calculateWithdrawal.yearData.map(row => ({
-      Year: row.year,
-      'Starting Balance': row.startingBalance,
-      'Withdrawals': row.withdrawals,
-      'Ending Balance': row.endingBalance,
-      'Sustainable': row.isSustainable ? 'Yes' : 'No',
-    }))
+  const handleShareLink = async () => {
+    triggerHaptic('light')
+    const url = buildShareUrl()
+    if (!url) return
 
-    const ws = XLSX.utils.json_to_sheet(excelData)
+    try {
+      const shareText = 'Check my results in Portfolio Simulator.'
+      const cleanMarkdown = `[Check my results](${url})`
 
-    ws['!cols'] = [
-      { wch: 10 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 15 },
-    ]
+      if (typeof navigator !== 'undefined' && (navigator as any).share) {
+        await (navigator as any).share({
+          title: 'Portfolio Simulator',
+          text: shareText,
+          url,
+        })
+        return
+      }
 
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Balance By Year')
+      if (navigator?.clipboard) {
+        await navigator.clipboard.writeText(cleanMarkdown)
+      }
+    } catch {
+      // ignore
+    }
+  }
 
-    const date = new Date().toISOString().split('T')[0]
-    const fileName = `portfolio-withdrawal-${date}.xlsx`
-
-    XLSX.writeFile(wb, fileName)
+  const handleExportPdf = () => {
+    triggerHaptic('light')
+    if (typeof window === 'undefined') return
+    window.print()
   }
 
   const calculateWithdrawal = useMemo(() => {
@@ -210,6 +239,53 @@ export function WithdrawalMode() {
       yearData,
     }
   }, [state])
+
+  const handleExportExcel = () => {
+    triggerHaptic('light')
+    if (!calculateWithdrawal?.yearData || calculateWithdrawal.yearData.length === 0) return
+
+    const summaryRows = [
+        { Key: 'Mode', Value: 'Withdrawal (Deterministic)' },
+        { Key: 'Starting Balance', Value: state.startingBalance },
+        { Key: 'Annual Return %', Value: state.annualReturn },
+        { Key: 'Duration Years', Value: state.duration },
+        { Key: 'Withdrawal Amount', Value: state.periodicWithdrawal },
+        { Key: 'Inflation Adj %', Value: state.inflationAdjustment },
+        { Key: 'Frequency', Value: state.frequency },
+        { Key: 'Ending Balance', Value: calculateWithdrawal.endingBalance },
+        { Key: 'Total Withdrawn', Value: calculateWithdrawal.totalWithdrawn },
+        { Key: 'Sustainable', Value: calculateWithdrawal.isSustainable ? 'Yes' : 'No' },
+      ]
+  
+      const wsSummary = XLSX.utils.json_to_sheet(summaryRows)
+      ;(wsSummary as any)['!cols'] = [{ wch: 20 }, { wch: 20 }]
+
+    const excelData = calculateWithdrawal.yearData.map(row => ({
+      Year: row.year,
+      'Starting Balance': row.startingBalance,
+      'Withdrawals': row.withdrawals,
+      'Ending Balance': row.endingBalance,
+      'Sustainable': row.isSustainable ? 'Yes' : 'No',
+    }))
+
+    const wsData = XLSX.utils.json_to_sheet(excelData)
+    ;(wsData as any)['!cols'] = [
+      { wch: 10 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 15 },
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
+    XLSX.utils.book_append_sheet(wb, wsData, 'Balance By Year')
+
+    const date = new Date().toISOString().split('T')[0]
+    const fileName = `portfolio-withdrawal-deterministic-${date}.xlsx`
+
+    XLSX.writeFile(wb, fileName)
+  }
 
   const sustainabilityColor = calculateWithdrawal?.isSustainable
     ? 'text-emerald-500'
@@ -434,12 +510,61 @@ export function WithdrawalMode() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0 }}
           >
-          <Card>
+          <Card className="print-section">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingDown className="h-5 w-5 text-primary" />
-                Withdrawal Results
-              </CardTitle>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2 shrink-0">
+                  <TrendingDown className="h-5 w-5 text-primary" />
+                  Withdrawal Results
+                </CardTitle>
+
+                <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 text-xs sm:text-sm print:hidden">
+                  <motion.button
+                    type="button"
+                    onClick={handleShareLink}
+                    whileHover={{ scale: 1.05, y: -1 }}
+                    whileTap={{ scale: 0.96, y: 0 }}
+                    className="inline-flex items-center gap-1 rounded-full border border-[#3B82F6]/50 
+                    bg-[#3B82F6]/10 px-2.5 py-1.5 font-medium text-[#3B82F6]
+                    shadow-sm shadow-[#3B82F6]/20
+                    transition-colors duration-150
+                    hover:bg-[#3B82F6]/15 hover:border-[#3B82F6]"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    <span>Share Results</span>
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    onClick={handleExportPdf}
+                    whileHover={{ scale: 1.05, y: -1 }}
+                    whileTap={{ scale: 0.96, y: 0 }}
+                    className="inline-flex items-center gap-1 rounded-full border border-red-400/50 
+                              bg-red-500/10 px-2.5 py-1.5 font-medium text-red-300
+                              shadow-sm shadow-red-500/20
+                              transition-colors duration-150
+                              hover:bg-red-500/15 hover:border-red-400"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span>PDF</span>
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    onClick={handleExportExcel}
+                    whileHover={{ scale: 1.05, y: -1 }}
+                    whileTap={{ scale: 0.96, y: 0 }}
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-400/50 
+                              bg-emerald-500/10 px-2.5 py-1.5 font-medium text-emerald-300
+                              shadow-sm shadow-emerald-500/20
+                              transition-colors duration-150
+                              hover:bg-emerald-500/15 hover:border-emerald-400"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    <span>Excel</span>
+                  </motion.button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -505,21 +630,10 @@ export function WithdrawalMode() {
           >
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  Balance By Year
-                </CardTitle>
-                <Button 
-                  onClick={exportToExcel} 
-                  variant="outline" 
-                  size="sm"
-                  className="gap-2"
-                >
-                  <Download className="h-4 w-4" />
-                  Export to Excel
-                </Button>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Balance By Year
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
