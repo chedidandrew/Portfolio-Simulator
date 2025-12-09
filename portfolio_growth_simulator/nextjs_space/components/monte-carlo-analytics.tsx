@@ -2,8 +2,8 @@
 
 import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts'
-import { Percent, TrendingUpDown, ShieldAlert } from 'lucide-react'
+import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts'
+import { Percent, TrendingDown, ShieldAlert, Wallet } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
 import { formatCurrency } from '@/lib/utils'
@@ -153,6 +153,52 @@ const LossProbabilitiesTooltip = ({ active, payload }: any) => {
   )
 }
 
+/* ------------------------------------------------------------------ */
+/* NEW: Investment Breakdown Tooltip                                  */
+/* ------------------------------------------------------------------ */
+const InvestmentTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload || !payload.length) return null
+  
+  const data = payload[0].payload
+  const total = data.total
+  const initial = data.initial
+  const contributions = data.contributions
+
+  return (
+    <div className="bg-card border border-border rounded-lg shadow-lg p-3 space-y-1.5 text-xs">
+      <p className="text-sm font-semibold text-foreground">
+        Year {label}
+      </p>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-sm bg-blue-500" />
+            <span className="text-muted-foreground">Initial Principal</span>
+          </div>
+          <span className="font-semibold text-foreground">
+            {formatCurrency(initial)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-sm bg-emerald-500" />
+            <span className="text-muted-foreground">Cumulative Contributions</span>
+          </div>
+          <span className="font-semibold text-foreground">
+            {formatCurrency(contributions)}
+          </span>
+        </div>
+        <div className="pt-1 mt-1 border-t border-border flex items-center justify-between gap-4">
+          <span className="font-bold text-foreground">Total Invested</span>
+          <span className="font-bold text-foreground">
+            {formatCurrency(total)}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ---------------------------------------------------------------------- */
 /* 1. Annualized Return Percentiles (CAGR over time)                      */
 /* ---------------------------------------------------------------------- */
@@ -228,7 +274,7 @@ export function ReturnProbabilitiesChart({ data, isDark }: AnalyticsProps) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUpDown className="h-5 w-5 text-violet-400" />
+            <TrendingDown className="h-5 w-5 text-violet-400" />
             Probability of Annual Returns
           </CardTitle>
         </CardHeader>
@@ -326,6 +372,89 @@ export function LossProbabilitiesChart({ data, isDark }: AnalyticsProps) {
           </div>
           <p className="text-xs text-muted-foreground mt-3 text-center">
             Shows how likely your portfolio is to experience a specific loss magnitude, either at any point or at year end.
+          </p>
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+}
+
+/* ---------------------------------------------------------------------- */
+/* 4. NEW: Investment Breakdown Chart                                     */
+/* ---------------------------------------------------------------------- */
+
+export function InvestmentBreakdownChart({ data, isDark }: AnalyticsProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.6 }}
+      className="print-chart-page"
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wallet className="h-5 w-5 text-blue-500" />
+            Investment Breakdown
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 40 }}>
+                <defs>
+                  <linearGradient id="colorInitial" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorContrib" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis 
+                  dataKey="year" 
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#71717a' }}
+                  label={{
+                    value: 'Years invested',
+                    position: 'insideBottom',
+                    offset: -15,
+                    fontSize: 11,
+                    fill: isDark ? '#a1a1aa' : '#71717a',
+                  }}
+                />
+                <YAxis 
+                  tickLine={false}
+                  tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`}
+                  tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#71717a' }}
+                />
+                <Tooltip content={<InvestmentTooltip />} />
+                <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} />
+                
+                <Area 
+                  type="monotone" 
+                  dataKey="initial" 
+                  stackId="1" 
+                  stroke="#3b82f6" 
+                  fill="url(#colorInitial)" 
+                  name="Initial Principal" 
+                  strokeWidth={2}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="contributions" 
+                  stackId="1" 
+                  stroke="#10b981" 
+                  fill="url(#colorContrib)" 
+                  name="Cumulative Contributions" 
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="text-xs text-muted-foreground mt-3 text-center">
+            Shows the cumulative total of your own money invested over time (Initial Deposit + Monthly Contributions).
           </p>
         </CardContent>
       </Card>

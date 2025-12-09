@@ -12,7 +12,12 @@ import { MonteCarloHistogram } from '@/components/monte-carlo-histogram'
 import { motion } from 'framer-motion'
 import seedrandom from 'seedrandom'
 import { MonteCarloMaxDrawdownHistogram } from '@/components/monte-carlo-max-drawdown'
-import { AnnualReturnsChart, ReturnProbabilitiesChart, LossProbabilitiesChart } from '@/components/monte-carlo-analytics'
+import { 
+  AnnualReturnsChart, 
+  ReturnProbabilitiesChart, 
+  LossProbabilitiesChart,
+  InvestmentBreakdownChart 
+} from '@/components/monte-carlo-analytics'
 import { useTheme } from 'next-themes'
 import * as XLSX from 'xlsx'
 import { useLocalStorage } from '@/hooks/use-local-storage'
@@ -122,7 +127,6 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
   const [isSimulating, setIsSimulating] = useState(false)
 
   // Calculate total invested capital for the multiplier effect
-  // FIXED: Now accounts for inflation compounding annually
   const totalInvested = useMemo(() => {
     const initial = params.initialValue || 0;
     
@@ -351,7 +355,6 @@ const handleExportExcel = () => {
     window.print()
   }
 
-  // FIXED: Added guard clause to prevent infinite loops if setParams is unstable
   useEffect(() => {
     if (profile !== 'custom') {
       const targetReturn = PRESET_PROFILES[profile].expectedReturn
@@ -576,10 +579,6 @@ const handleExportExcel = () => {
                 value={params?.numPaths?.toString?.() ?? '500'}
                 onValueChange={(value) => setParams({ ...params, numPaths: Number(value) })}
               >
-                {/* CHANGE: Added 'print:hidden' to SelectTrigger. 
-                  This hides the interactive dropdown button in print view, 
-                  leaving only the plain text 'Selected: 500' below it. 
-                */}
                 <SelectTrigger id="mc-paths" className="print:hidden">
                   <SelectValue />
                 </SelectTrigger>
@@ -618,7 +617,7 @@ const handleExportExcel = () => {
           <Button
             onClick={() => runSimulation(undefined, `monte-carlo-${Date.now()}-${Math.random()}`)}
             disabled={isSimulating}
-            className="w-full sm:w-auto print:hidden" // HIDDEN IN PRINT
+            className="w-full sm:w-auto print:hidden" 
           >
             <Zap className="h-4 w-4 mr-2" />
             {isSimulating ? 'Simulating...' : 'Run New Simulation'}
@@ -811,19 +810,26 @@ const handleExportExcel = () => {
                     Key Insights
                   </Label>
                   <div className="space-y-2 text-sm">
+                    {/* Insight 1: Total Invested */}
                     <div className="p-3 bg-muted/50 rounded-lg">
                       <p>
-                        <span className="font-semibold">In 10% of scenarios</span>, your portfolio finished below{' '}
-                        <span className="text-orange-500 font-bold">
-                          {formatSmartCurrency(simulationResults?.p10)}
+                        <span className="font-semibold">Total Invested:</span> Over {params.duration} years, you invested a total of{' '}
+                        <span className="text-indigo-500 font-bold">
+                          {formatSmartCurrency(totalInvested)}
                         </span>
                       </p>
                     </div>
+
+                    {/* Insight 2: Typical Outcome with Colored Values */}
                     <div className="p-3 bg-muted/50 rounded-lg">
                       <p>
-                        <span className="font-semibold">In 50% of scenarios</span>, your portfolio finished above{' '}
-                        <span className="text-primary font-bold">
-                          {formatSmartCurrency(simulationResults?.median)}
+                        <span className="font-semibold">Typical Outcome:</span> There is a 50% chance your balance ends between{' '}
+                        <span className="text-orange-500 font-bold">
+                          {formatSmartCurrency(simulationResults?.p25)}
+                        </span>
+                        {' '}and{' '}
+                        <span className="text-emerald-500 font-bold">
+                          {formatSmartCurrency(simulationResults?.p75)}
                         </span>
                       </p>
                     </div>
@@ -845,7 +851,6 @@ const handleExportExcel = () => {
                       </p>
                     </div>
                     <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                      {/* FIXED: Display "Success Rate" (Solvency) for withdrawal, "Profit Probability" (Growth) for growth */}
                       <p>
                         <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                           {mode === 'withdrawal' ? 'Success Rate:' : 'Profit Probability:'}
@@ -885,6 +890,11 @@ const handleExportExcel = () => {
             data={simulationResults?.maxDrawdowns ?? []} 
             logScale={logScales.drawdown}
             onLogScaleChange={(val) => setLogScales(prev => ({ ...prev, drawdown: val }))}
+          />
+
+          <InvestmentBreakdownChart 
+            data={simulationResults?.investmentData ?? []} 
+            isDark={isDark} 
           />
 
           <AnnualReturnsChart 
@@ -988,8 +998,10 @@ function performMonteCarloSimulation(
     let pureValue = initialValue // New: Track pure asset performance
     let lowestValue = initialValue
     let currentCashflowPerStep = cashflowPerStep
-    let totalInvestedSoFar = initialValue
     
+    // NEW: Track the total principal invested for this path
+    let totalInvestedSoFar = initialValue
+
     for (let step = 1; step <= totalTimeSteps; step++) {
       // Calculate growth factor once for this step
       const growthFactor = Math.exp(drift + diffusion * normalRandom())
@@ -1000,6 +1012,7 @@ function performMonteCarloSimulation(
 
       if (mode === 'growth') {
         currentValue += currentCashflowPerStep
+        // NEW: Add contribution to total invested
         totalInvestedSoFar += currentCashflowPerStep
       } else {
         currentValue -= currentCashflowPerStep
@@ -1080,6 +1093,37 @@ function performMonteCarloSimulation(
     })
   }
 
+  // --- NEW: GENERATE INVESTMENT DATA ---
+  const investmentData = []
+  let simInvInitial = initialValue
+  let simInvContrib = 0
+  let simInvCashflow = cashflowPerStep
+
+  // Push Year 0
+  investmentData.push({
+    year: 0,
+    initial: simInvInitial,
+    contributions: 0,
+    total: simInvInitial,
+  })
+
+  for (let y = 1; y <= duration; y++) {
+    // Add 12 months of contributions (only if growth mode)
+    const yearContribution = mode === 'growth' ? simInvCashflow * 12 : 0
+    
+    simInvContrib += yearContribution
+    
+    investmentData.push({
+      year: y,
+      initial: simInvInitial,
+      contributions: simInvContrib,
+      total: simInvInitial + simInvContrib
+    })
+
+    // Apply inflation for next year (matches simulation logic)
+    simInvCashflow *= inflationFactor
+  }
+
   const lossThresholds = [0, 2.5, 5, 10, 15, 20, 30, 50]
   const lossProbData = lossThresholds.map(threshold => {
     const countEnd = endingValues.filter(val => {
@@ -1148,6 +1192,7 @@ function performMonteCarloSimulation(
     maxDrawdowns, // Return unsorted array for export
     annualReturnsData,
     lossProbData,
+    investmentData, // NEW: Return this
     chartData,
     mean,
     median,
