@@ -536,6 +536,11 @@ const handleExportExcel = () => {
                   <SelectItem value="100000">100,000 scenarios</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Explicit value for print */}
+              <p className="hidden print:block text-xs text-muted-foreground">
+                Selected: {(params?.numPaths ?? 500).toLocaleString()}
+              </p>
             </div>
             {mode === 'growth' && (
               <div className="space-y-2">

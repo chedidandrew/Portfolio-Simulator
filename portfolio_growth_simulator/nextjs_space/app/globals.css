@@ -134,8 +134,16 @@
     --border: 0 0% 100%;
   }
 
-  html, body, .bg-black, .bg-zinc-900, .bg-slate-900, .bg-background, .bg-card, .bg-muted {
-    background-color: white !important;
+  html,
+  body,
+  .bg-black,
+  .bg-zinc-900,
+  .bg-slate-900,
+  .bg-background,
+  .bg-card,
+  .bg-muted {
+    background: white !important;
+    background-image: none !important;
     color: black !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -144,7 +152,7 @@
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
   /* 2. HIDE UI ELEMENTS (Includes fix for Black Bars) */
-  button, nav, [role="tablist"], .no-print, .switch-container,
+  nav, [role="tablist"], .no-print, .switch-container,
   input[type="checkbox"], button[role="switch"], 
   .fixed.top-0, /* <--- THIS REMOVES THE BLACK BARS */
   .flex.items-center.justify-end.gap-2 button {
@@ -173,6 +181,25 @@
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important; 
+  }
+
+  .bg-gradient-to-b,
+  .bg-gradient-to-r,
+  .bg-gradient-to-l,
+  .bg-gradient-to-t,
+  [class*="bg-gradient-to-"],
+  [class*="from-background"],
+  [class*="via-background"],
+  [class*="to-muted"],
+  [class*="from-primary"],
+  [class*="from-blue-500"],
+  [class*="from-emerald-500"],
+  [class*="from-orange-500"],
+  [class*="from-purple-500"],
+  [class*="from-rose-500"],
+  [class*="from-amber-500"] {
+    background: white !important;
+    background-image: none !important;
   }
 
   /* 5. PAGE BREAKS & TITLE FIXES */
