@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts'
-import { Percent, TrendingDown, ShieldAlert, Wallet } from 'lucide-react'
+import { Percent, TrendingUpDown, ShieldAlert, Wallet } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
 import { formatCurrency } from '@/lib/utils'
@@ -270,7 +270,7 @@ export function ReturnProbabilitiesChart({ data, isDark }: AnalyticsProps) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingDown className="h-5 w-5 text-violet-400" />
+            <TrendingUpDown className="h-5 w-5 text-violet-400" />
             Probability of Annual Returns
           </CardTitle>
         </CardHeader>

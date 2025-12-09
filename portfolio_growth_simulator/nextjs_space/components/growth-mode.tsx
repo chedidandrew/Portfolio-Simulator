@@ -52,9 +52,9 @@ const MILESTONES = [
   { value: 1000000000000, label: 'Trillionaire!',          icon: '👽' },
   { value: 2500000000000, label: 'Quarter Trillionaire+',  icon: '🌠' },
   { value: 5000000000000, label: 'Half Trillionaire+',     icon: '🚁' },
-  { value: 10000000000000, label: 'Keep Dreaming...', icon: '💤' },
 
   // --- THE QUADRILLIONS (10^15) ---
+  { value: 10000000000000, label: 'Keep Dreaming...', icon: '💤' },
   { value: 25000000000000, label: 'US Debt Payoff', icon: '🇺🇸' },
   { value: 50000000000000, label: 'Global Economy Owner', icon: '🌐' },
   { value: 1e15, label: 'Quadrillionaire', icon: '🤖' },
@@ -73,7 +73,6 @@ const MILESTONES = [
   { value: 5e21, label: 'Milky Way Landlord', icon: '🛸' },
 
   // --- THE SEPTILLIONS (10^24) ---
-  // (1 Mole is 6.022 x 10^23, so let's reference that)
   { value: 6.02e23, label: 'A Mole of Dollars', icon: '🧪' },
   { value: 1e24, label: 'Septillionaire', icon: '🍷' },
   { value: 5e24, label: 'Galactic Emperor', icon: '👑' },
@@ -518,7 +517,7 @@ export function GrowthMode() {
                     value={state?.annualReturn ?? 0}
                     onChange={(value) => setState({ ...state, annualReturn: value })}
                     min={-100}
-                    max={60}
+                    max={100}
                     maxErrorMessage="Now you are just being too greedy :)"
                   />
                 </div>

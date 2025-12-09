@@ -1,5 +1,3 @@
-// chedidandrew/portfolio-simulator/Portfolio-Simulator-main/portfolio_growth_simulator/nextjs_space/lib/utils.ts
-
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
  
