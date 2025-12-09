@@ -17,6 +17,7 @@ import { useTheme } from 'next-themes'
 import * as XLSX from 'xlsx'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 import { triggerHaptic } from '@/hooks/use-haptics'
+import { roundToCents } from '@/lib/utils'
 
 interface MonteCarloSimulatorProps {
   mode: 'growth' | 'withdrawal'
@@ -221,24 +222,24 @@ const handleExportExcel = () => {
 
   const summaryRows = [
     { Key: 'Mode', Value: mode },
-    { Key: 'Initial Value', Value: params.initialValue },
-    { Key: 'Total Invested', Value: totalInvested },
+    { Key: 'Initial Value', Value: roundToCents(params.initialValue) },
+    { Key: 'Total Invested', Value: roundToCents(totalInvested) },
     { Key: 'Expected Return %', Value: params.expectedReturn },
     { Key: 'Volatility %', Value: params.volatility },
     { Key: 'Duration Years', Value: params.duration },
-    { Key: 'Monthly Cashflow', Value: params.cashflowAmount },
+    { Key: 'Monthly Cashflow', Value: roundToCents(params.cashflowAmount) },
     { Key: 'Inflation Adjustment %', Value: params.inflationAdjustment ?? 0 },
     { Key: 'Number Of Scenarios', Value: numPathsUsed },
-    { Key: 'Mean Ending Value', Value: mean },
-    { Key: 'Median Ending Value', Value: median },
-    { Key: 'P5 Ending Value', Value: p5 },
-    { Key: 'P10 Ending Value', Value: p10 },
-    { Key: 'P25 Ending Value', Value: p25 },
-    { Key: 'P75 Ending Value', Value: p75 },
-    { Key: 'P90 Ending Value', Value: p90 },
-    { Key: 'P95 Ending Value', Value: p95 },
-    { Key: 'Best Ending Value', Value: best },
-    { Key: 'Worst Ending Value', Value: worst },
+    { Key: 'Mean Ending Value', Value: roundToCents(mean) },
+    { Key: 'Median Ending Value', Value: roundToCents(median) },
+    { Key: 'P5 Ending Value', Value: roundToCents(p5) },
+    { Key: 'P10 Ending Value', Value: roundToCents(p10) },
+    { Key: 'P25 Ending Value', Value: roundToCents(p25) },
+    { Key: 'P75 Ending Value', Value: roundToCents(p75) },
+    { Key: 'P90 Ending Value', Value: roundToCents(p90) },
+    { Key: 'P95 Ending Value', Value: roundToCents(p95) },
+    { Key: 'Best Ending Value', Value: roundToCents(best) },
+    { Key: 'Worst Ending Value', Value: roundToCents(worst) },
     { Key: 'Random Seed', Value: rngSeed ?? '' },
   ]
 
@@ -250,11 +251,11 @@ const handleExportExcel = () => {
 
     const percentileRows = (chartData ?? []).map((row: any) => ({
       Year: row.year,
-      'P10': row.p10,
-      'P25': row.p25,
-      'Median (P50)': row.p50,
-      'P75': row.p75,
-      'P90': row.p90,
+      'P10': roundToCents(row.p10),
+      'P25': roundToCents(row.p25),
+      'Median (P50)': roundToCents(row.p50),
+      'P75': roundToCents(row.p75),
+      'P90': roundToCents(row.p90),
     }))
     const wsPercentiles = XLSX.utils.json_to_sheet(percentileRows)
     ;(wsPercentiles as any)['!cols'] = [
@@ -268,19 +269,19 @@ const handleExportExcel = () => {
 
     const annualRows = (annualReturnsData ?? []).map((row: any) => ({
       Year: row.year,
-      'CAGR P10 %': row.p10,
-      'CAGR P25 %': row.p25,
-      'CAGR Median %': row.median,
-      'CAGR P75 %': row.p75,
-      'CAGR P90 %': row.p90,
-      'Prob ≥ 5%': row.prob5,
-      'Prob ≥ 8%': row.prob8,
-      'Prob ≥ 10%': row.prob10,
-      'Prob ≥ 12%': row.prob12,
-      'Prob ≥ 15%': row.prob15,
-      'Prob ≥ 20%': row.prob20,
-      'Prob ≥ 25%': row.prob25,
-      'Prob ≥ 30%': row.prob30,
+      'CAGR P10 %': roundToCents(row.p10),
+      'CAGR P25 %': roundToCents(row.p25),
+      'CAGR Median %': roundToCents(row.median),
+      'CAGR P75 %': roundToCents(row.p75),
+      'CAGR P90 %': roundToCents(row.p90),
+      'Prob ≥ 5%': roundToCents(row.prob5),
+      'Prob ≥ 8%': roundToCents(row.prob8),
+      'Prob ≥ 10%': roundToCents(row.prob10),
+      'Prob ≥ 12%': roundToCents(row.prob12),
+      'Prob ≥ 15%': roundToCents(row.prob15),
+      'Prob ≥ 20%': roundToCents(row.prob20),
+      'Prob ≥ 25%': roundToCents(row.prob25),
+      'Prob ≥ 30%': roundToCents(row.prob30),
     }))
     const wsAnnual = XLSX.utils.json_to_sheet(annualRows)
     ;(wsAnnual as any)['!cols'] = [
@@ -300,7 +301,7 @@ const handleExportExcel = () => {
 
     const endingRows = (endingValues ?? []).map((v: number, idx: number) => ({
       Scenario: idx + 1,
-      'Ending Value': v,
+      'Ending Value': roundToCents(v),
     }))
     const wsEnding = XLSX.utils.json_to_sheet(endingRows)
     ;(wsEnding as any)['!cols'] = [
@@ -310,7 +311,7 @@ const handleExportExcel = () => {
 
     const ddRows = (maxDrawdowns ?? []).map((d: number, idx: number) => ({
       Scenario: idx + 1,
-      'Max Drawdown %': d * 100,
+      'Max Drawdown %': roundToCents(d * 100),
     }))
     const wsDrawdowns = XLSX.utils.json_to_sheet(ddRows)
     ;(wsDrawdowns as any)['!cols'] = [
@@ -320,8 +321,8 @@ const handleExportExcel = () => {
 
     const lossRows = (lossProbData ?? []).map((row: any) => ({
       'Loss Threshold': row.threshold,
-      'End of Period Loss %': row.endPeriod,
-      'Intra period Loss %': row.intraPeriod,
+      'End of Period Loss %': roundToCents(row.endPeriod),
+      'Intra period Loss %': roundToCents(row.intraPeriod),
     }))
     const wsLoss = XLSX.utils.json_to_sheet(lossRows)
     ;(wsLoss as any)['!cols'] = [

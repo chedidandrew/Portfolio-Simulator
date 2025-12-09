@@ -17,6 +17,7 @@ import { DonationSection } from '@/components/donation-section'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as XLSX from 'xlsx'
 import { triggerHaptic } from '@/hooks/use-haptics'
+import { roundToCents } from '@/lib/utils'
 
 interface GrowthState {
   startingBalance: number
@@ -348,15 +349,15 @@ export function GrowthMode() {
 
     const summaryRows = [
       { Key: 'Mode', Value: 'Growth (Deterministic)' },
-      { Key: 'Starting Balance', Value: state.startingBalance },
+      { Key: 'Starting Balance', Value: roundToCents(state.startingBalance) },
       { Key: 'Annual Return %', Value: state.annualReturn },
       { Key: 'Duration Years', Value: state.duration },
-      { Key: 'Contribution Amount', Value: state.periodicAddition },
+      { Key: 'Contribution Amount', Value: roundToCents(state.periodicAddition) },
       { Key: 'Frequency', Value: state.frequency },
-      { Key: 'Target Value', Value: state.targetValue || 'N/A' },
-      { Key: 'Final Value', Value: calculateGrowth.finalValue },
-      { Key: 'Total Contributions', Value: calculateGrowth.totalContributions },
-      { Key: 'Total Profit', Value: calculateGrowth.totalProfit },
+      { Key: 'Target Value', Value: roundToCents(state.targetValue) || 'N/A' },
+      { Key: 'Final Value', Value: roundToCents(calculateGrowth.finalValue) },
+      { Key: 'Total Contributions', Value: roundToCents(calculateGrowth.totalContributions) },
+      { Key: 'Total Profit', Value: roundToCents(calculateGrowth.totalProfit) },
     ]
 
     const wsSummary = XLSX.utils.json_to_sheet(summaryRows)
@@ -364,9 +365,9 @@ export function GrowthMode() {
 
     const excelData = calculateGrowth.yearData.map(row => ({
       Year: row.year,
-      'Starting Value': row.startingValue,
-      'Contributions': row.contributions,
-      'Ending Value': row.endingValue,
+      'Starting Value': roundToCents(row.startingValue),
+      'Contributions': roundToCents(row.contributions),
+      'Ending Value': roundToCents(row.endingValue),
     }))
 
     const wsData = XLSX.utils.json_to_sheet(excelData)
