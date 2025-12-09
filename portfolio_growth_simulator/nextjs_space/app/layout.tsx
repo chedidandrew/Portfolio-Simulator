@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import Script from 'next/script'
+import { PwaInstallPrompt } from '@/components/pwa-install-prompt'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -70,7 +71,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           />
           <span className="print-header__title">Portfolio Simulator</span>
         </header>
-
         {children}
       </ThemeProvider>
         <Script

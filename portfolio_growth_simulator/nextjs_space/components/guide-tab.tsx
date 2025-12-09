@@ -1,7 +1,6 @@
 'use client'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   BookOpen,
@@ -40,9 +39,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
         className="text-center space-y-3"
       >
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-2">
-          <TrendingUp className="h-10 w-10 text-primary"
-          strokeWidth={2.5}
-          />
+          <TrendingUp className="h-10 w-10 text-primary" strokeWidth={2.5} />
         </div>
         <h2 className="text-3xl font-bold">Welcome to Portfolio Simulator</h2>
         <p className="text-muted-foreground max-w-2xl mx-auto">
@@ -395,7 +392,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
               <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-900 text-white text-xs font-bold shrink-0 dark:bg-gray-700">1</span>
               <div>
                 <p className="font-semibold text-foreground dark:text-white">Open in Safari</p>
-                <p className="text-muted-foreground">Make sure you're viewing this page in Safari browser (not Chrome or other browsers)</p>
+                <p className="text-muted-foreground">Make sure you're viewing this page in Safari browser</p>
               </div>
             </li>
             <li className="flex items-start gap-3">
@@ -430,7 +427,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
           {/* Light gray box, dark gray text */}
           <div className="mt-4 p-3 bg-gray-100 rounded-lg dark:bg-zinc-800"> 
             <p className="text-xs text-gray-700 dark:text-gray-300">
-              🎉 Once installed, you can launch Portfolio Simulator directly from your home screen like any other app and saves your settings when you close the app!
+              🎉 Once installed, you can launch Portfolio Simulator directly from your home screen like any other app and saves your parameters when you close the app!
             </p>
           </div>
         </CardContent>
@@ -459,7 +456,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
               <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold shrink-0">1</span>
               <div>
                 <p className="font-semibold">Open in Chrome</p>
-                <p className="text-muted-foreground">Android PWA installs only work in Chrome or Samsung Internet</p>
+                <p className="text-muted-foreground">Android PWA installs work best in Chrome</p>
               </div>
             </li>
 
@@ -474,8 +471,8 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
             <li className="flex items-start gap-3">
               <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold shrink-0">3</span>
               <div>
-                <p className="font-semibold">Select "Add to Home screen"</p>
-                <p className="text-muted-foreground">You may see "Install App" depending on your browser</p>
+                <p className="font-semibold">Select "Add to Home screen" or "Install App"</p>
+                <p className="text-muted-foreground">The option name depends on your Android version</p>
               </div>
             </li>
 
@@ -609,10 +606,10 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <LaptopMinimalCheck className="h-5 w-5 text-[#FF7139]" />
-              Install on Mozilla Firefox
+              Install on Firefox (Windows)
             </CardTitle>
             <CardDescription>
-              Install this app as a standalone window using Firefox on desktop
+              Install this app as a standalone window on Windows
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -620,31 +617,31 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
               <li className="flex items-start gap-3">
                 <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FF7139] text-white text-xs font-bold shrink-0">1</span>
                 <div>
-                  <p className="font-semibold">Open in Mozilla Firefox</p>
-                  <p className="text-muted-foreground">Make sure you are using the latest Firefox version</p>
+                  <p className="font-semibold">Open in Firefox</p>
+                  <p className="text-muted-foreground">This feature is currently available on Firefox for Windows</p>
                 </div>
               </li>
 
               <li className="flex items-start gap-3">
                 <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FF7139] text-white text-xs font-bold shrink-0">2</span>
                 <div>
-                  <p className="font-semibold">Look for the Install prompt</p>
-                  <p className="text-muted-foreground">If available, Firefox will show an install or "Add to applications" option in the address bar or menu</p>
+                  <p className="font-semibold">Open the Menu</p>
+                  <p className="text-muted-foreground">Click the three lines (≡) in the top right corner</p>
                 </div>
               </li>
 
               <li className="flex items-start gap-3">
                 <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FF7139] text-white text-xs font-bold shrink-0">3</span>
                 <div>
-                  <p className="font-semibold">Confirm installation</p>
-                  <p className="text-muted-foreground">Portfolio Simulator will open in its own window like an app</p>
+                  <p className="font-semibold">Select "Install" or "Use as App"</p>
+                  <p className="text-muted-foreground">This will pin the app to your taskbar in its own window</p>
                 </div>
               </li>
             </ol>
 
             <div className="mt-4 p-3 bg-background/50 rounded-lg">
               <p className="text-xs text-muted-foreground">
-                🦊 Firefox support can vary by platform. If you do not see an install option, use Chrome, Edge, or Brave instead.
+                🦊 <strong>Mac & Linux users:</strong> Firefox does not support app installation on your platform yet. Please use Chrome or Edge for the best experience.
               </p>
             </div>
           </CardContent>
