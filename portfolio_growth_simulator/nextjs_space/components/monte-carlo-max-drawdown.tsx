@@ -9,6 +9,7 @@ import { useTheme } from 'next-themes'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { triggerHaptic } from '@/hooks/use-haptics'
+import { formatCompactNumber } from '@/lib/utils'
 
 interface MonteCarloMaxDrawdownProps {
   data: number[] // max drawdown as fraction 0 to 1
@@ -172,6 +173,8 @@ export function MonteCarloMaxDrawdownHistogram({ data, logScale, onLogScaleChang
                       ? 'hsl(240, 5%, 64.9%)'
                       : 'hsl(240, 3.8%, 46.1%)',
                   }}
+                  // Updated to use compact number formatting (e.g. 10k)
+                  tickFormatter={(val) => formatCompactNumber(val)}
                   scale={logScale ? 'log' : 'linear'}
                   domain={logScale ? [LOG_Y_FLOOR, 'auto'] : [0, 'auto']}
                   allowDataOverflow={false}

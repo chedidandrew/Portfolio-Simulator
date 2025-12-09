@@ -22,23 +22,12 @@ import { useTheme } from 'next-themes'
 import * as XLSX from 'xlsx'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 import { triggerHaptic } from '@/hooks/use-haptics'
-import { roundToCents } from '@/lib/utils'
+import { roundToCents, formatCurrency } from '@/lib/utils'
+import { SimulationParams } from '@/lib/types'
 
 interface MonteCarloSimulatorProps {
   mode: 'growth' | 'withdrawal'
   initialValues: any
-}
-
-interface SimulationParams {
-  initialValue: number
-  expectedReturn: number
-  volatility: number
-  duration: number
-  cashflowAmount: number
-  cashflowFrequency: 'yearly' | 'monthly'
-  inflationAdjustment?: number
-  numPaths: number
-  portfolioGoal?: number
 }
 
 interface LogScaleSettings {
@@ -72,28 +61,6 @@ const PRESET_PROFILES = {
     volatility: 10,
     description: 'Define your own parameters',
   },
-}
-
-const formatSmartCurrency = (value: number | undefined) => {
-  if (value === undefined || value === null) return '$0';
-  
-  const absoluteValue = Math.abs(value);
-
-  if (absoluteValue < 100_000_000) {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(value);
-  }
-
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    notation: "compact",
-    compactDisplay: "short",
-    maximumFractionDigits: 1, 
-  }).format(value);
 }
 
 export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulatorProps) {
@@ -135,16 +102,24 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
         return initial;
     }
 
-    // In growth mode, calculate contributions with inflation
-    const years = params.duration;
+    // In growth mode, calculate contributions with inflation, handling fractional years
+    const durationYears = params.duration;
     const inflationRate = (params.inflationAdjustment ?? 0) / 100;
     let currentMonthlyContribution = params.cashflowAmount;
     let totalContributions = 0;
 
-    for (let i = 0; i < years; i++) {
+    const fullYears = Math.floor(durationYears);
+    const remainingFraction = durationYears - fullYears;
+
+    for (let i = 0; i < fullYears; i++) {
         totalContributions += currentMonthlyContribution * 12;
         // Contributions increase by inflation rate at the end of each year
         currentMonthlyContribution *= (1 + inflationRate);
+    }
+
+    // Add contributions for the fractional remaining year
+    if (remainingFraction > 0) {
+      totalContributions += currentMonthlyContribution * 12 * remainingFraction;
     }
     
     return initial + totalContributions;
@@ -222,12 +197,16 @@ const handleExportExcel = () => {
     annualReturnsData,
     lossProbData,
     numPathsUsed,
+    investmentData,
   } = simulationResults
+
+  // Logic for the invested label: 'Total Invested' for growth, 'Starting Balance' for withdrawal
+  const investedLabel = mode === 'withdrawal' ? 'Starting Balance' : 'Total Invested';
 
   const summaryRows = [
     { Key: 'Mode', Value: mode },
     { Key: 'Initial Value', Value: roundToCents(params.initialValue) },
-    { Key: 'Total Invested', Value: roundToCents(totalInvested) },
+    { Key: investedLabel, Value: roundToCents(totalInvested) },
     { Key: 'Expected Return %', Value: params.expectedReturn },
     { Key: 'Volatility %', Value: params.volatility },
     { Key: 'Duration Years', Value: params.duration },
@@ -303,6 +282,20 @@ const handleExportExcel = () => {
       { wch: 13 },
     ]
 
+    const investmentRows = (investmentData ?? []).map((row: any) => ({
+      Year: row.year,
+      'Initial Principal': roundToCents(row.initial),
+      'Cumulative Contributions': roundToCents(row.contributions),
+      'Total Invested': roundToCents(row.total),
+    }))
+    const wsInvestment = XLSX.utils.json_to_sheet(investmentRows)
+    ;(wsInvestment as any)['!cols'] = [
+      { wch: 8 },
+      { wch: 18 },
+      { wch: 22 },
+      { wch: 18 },
+    ]
+
     const endingRows = (endingValues ?? []).map((v: number, idx: number) => ({
       Scenario: idx + 1,
       'Ending Value': roundToCents(v),
@@ -339,6 +332,7 @@ const handleExportExcel = () => {
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
     XLSX.utils.book_append_sheet(wb, wsPercentiles, 'Yearly Percentiles')
     XLSX.utils.book_append_sheet(wb, wsAnnual, 'Annual Returns')
+    XLSX.utils.book_append_sheet(wb, wsInvestment, 'Investment Breakdown')
     XLSX.utils.book_append_sheet(wb, wsEnding, 'Ending Values')
     XLSX.utils.book_append_sheet(wb, wsDrawdowns, 'Max Drawdowns')
     XLSX.utils.book_append_sheet(wb, wsLoss, 'Loss Probabilities')
@@ -590,9 +584,15 @@ const handleExportExcel = () => {
                   <SelectItem value="5000">5,000 scenarios</SelectItem>
                   <SelectItem value="10000">10,000 scenarios</SelectItem>
                   <SelectItem value="50000">50,000 scenarios</SelectItem>
-                  <SelectItem value="100000">100,000 scenarios</SelectItem>
+                  <SelectItem value="100000">100,000 scenarios (Slow)</SelectItem>
                 </SelectContent>
               </Select>
+              
+              {params?.numPaths === 100000 && (
+                <p className="text-[10px] text-orange-500 font-medium animate-pulse pt-1 print:hidden">
+                  Warning: 100,000 paths might freeze the browser UI for a few seconds on slower devices.
+                </p>
+              )}
 
               {/* Explicit value for print */}
               <p className="hidden print:block text-xs text-muted-foreground">
@@ -696,7 +696,7 @@ const handleExportExcel = () => {
                 >
                   <p className="text-xs text-muted-foreground">Median Outcome</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary break-words leading-tight">
-                    {formatSmartCurrency(simulationResults?.median)}
+                    {formatCurrency(simulationResults?.median)}
                   </p>
                 </motion.div>
 
@@ -708,7 +708,7 @@ const handleExportExcel = () => {
                 >
                   <p className="text-xs text-muted-foreground">Mean Outcome</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-500 break-words leading-tight">
-                    {formatSmartCurrency(simulationResults?.mean)}
+                    {formatCurrency(simulationResults?.mean)}
                   </p>
                 </motion.div>
 
@@ -720,7 +720,7 @@ const handleExportExcel = () => {
                 >
                   <p className="text-xs text-muted-foreground">Best Case (95%)</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-emerald-500 break-words leading-tight">
-                    {formatSmartCurrency(simulationResults?.p95)}
+                    {formatCurrency(simulationResults?.p95)}
                   </p>
                 </motion.div>
 
@@ -732,7 +732,7 @@ const handleExportExcel = () => {
                 >
                   <p className="text-xs text-muted-foreground">Worst Case (5%)</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-orange-500 break-words leading-tight">
-                    {formatSmartCurrency(simulationResults?.p5)}
+                    {formatCurrency(simulationResults?.p5)}
                   </p>
                 </motion.div>
               </div>
@@ -743,42 +743,42 @@ const handleExportExcel = () => {
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">10th percentile</span>
                     <span className="font-bold text-lg leading-tight truncate">
-                      {formatSmartCurrency(simulationResults?.p10)}
+                      {formatCurrency(simulationResults?.p10)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">25th percentile</span>
                     <span className="font-bold text-lg leading-tight truncate">
-                      {formatSmartCurrency(simulationResults?.p25)}
+                      {formatCurrency(simulationResults?.p25)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">75th percentile</span>
                     <span className="font-bold text-lg leading-tight truncate">
-                      {formatSmartCurrency(simulationResults?.p75)}
+                      {formatCurrency(simulationResults?.p75)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">90th percentile</span>
                     <span className="font-bold text-lg leading-tight truncate">
-                      {formatSmartCurrency(simulationResults?.p90)}
+                      {formatCurrency(simulationResults?.p90)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">Best outcome</span>
                     <span className="font-bold text-lg leading-tight truncate text-emerald-500">
-                      {formatSmartCurrency(simulationResults?.best)}
+                      {formatCurrency(simulationResults?.best)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">Worst outcome</span>
                     <span className="font-bold text-lg leading-tight truncate text-orange-500">
-                      {formatSmartCurrency(simulationResults?.worst)}
+                      {formatCurrency(simulationResults?.worst)}
                     </span>
                   </div>
                 </div>
@@ -815,7 +815,7 @@ const handleExportExcel = () => {
                       <p>
                         <span className="font-semibold">Total Invested:</span> Over {params.duration} years, you invested a total of{' '}
                         <span className="text-indigo-500 font-bold">
-                          {formatSmartCurrency(totalInvested)}
+                          {formatCurrency(totalInvested)}
                         </span>
                       </p>
                     </div>
@@ -825,11 +825,11 @@ const handleExportExcel = () => {
                       <p>
                         <span className="font-semibold">Typical Outcome:</span> There is a 50% chance your balance ends between{' '}
                         <span className="text-orange-500 font-bold">
-                          {formatSmartCurrency(simulationResults?.p25)}
+                          {formatCurrency(simulationResults?.p25)}
                         </span>
                         {' '}and{' '}
                         <span className="text-emerald-500 font-bold">
-                          {formatSmartCurrency(simulationResults?.p75)}
+                          {formatCurrency(simulationResults?.p75)}
                         </span>
                       </p>
                     </div>

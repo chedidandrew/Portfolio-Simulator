@@ -6,7 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } fro
 import { BarChart3 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatCompactNumber } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { triggerHaptic } from '@/hooks/use-haptics'
@@ -15,70 +15,6 @@ interface MonteCarloHistogramProps {
   data: number[]
   logScale: boolean
   onLogScaleChange: (val: boolean) => void
-}
-
-const LOG_Y_FLOOR = 1
-
-// Format numbers for Y axis (frequency counts)
-const formatNumber = (value: number): string => {
-  const absValue = Math.abs(value)
-  if (absValue >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(1)}M`
-  } else if (absValue >= 1_000) {
-    return `${(value / 1_000).toFixed(1)}k`
-  }
-  return value.toString()
-}
-
-// Clean short currency for X axis labels
-const formatCurrencyShort = (value: number): string => {
-  const abs = Math.abs(value)
-
-  // Less than 100: increments of 10
-  if (abs < 100) {
-    const step = Math.round(value / 10) * 10
-    return `$${step}`
-  }
-
-  // 100 to < 10k: increments of 100
-  if (abs < 10_000) {
-    const step = Math.round(value / 100) * 100
-    return `$${step}`
-  }
-
-  // 10k to < 100k: increments of 1k
-  if (abs < 100_000) {
-    const step = Math.round(value / 1_000) * 1_000
-    return `$${(step / 1_000).toString().replace(/\.0$/, '')}K`
-  }
-
-  // 100k to < 1M: increments of 10k
-  if (abs < 1_000_000) {
-    const step = Math.round(value / 10_000) * 10_000
-    return `$${(step / 1_000).toString().replace(/\.0$/, '')}K`
-  }
-
-  // 1M to < 10M: increments of 100k
-  if (abs < 10_000_000) {
-    const step = Math.round(value / 100_000) * 100_000
-    return `$${(step / 1_000_000).toString().replace(/\.0$/, '')}M`
-  }
-
-  // 10M to < 100M: increments of 1M
-  if (abs < 100_000_000) {
-    const step = Math.round(value / 1_000_000) * 1_000_000
-    return `$${(step / 1_000_000).toString().replace(/\.0$/, '')}M`
-  }
-
-  // 100M to < 1B: increments of 10M
-  if (abs < 1_000_000_000) {
-    const step = Math.round(value / 10_000_000) * 10_000_000
-    return `$${(step / 1_000_000).toString().replace(/\.0$/, '')}M`
-  }
-
-  // 1B+: increments of 100M
-  const step = Math.round(value / 100_000_000) * 100_000_000
-  return `$${(step / 1_000_000_000).toString().replace(/\.0$/, '')}B`
 }
 
 // Custom tooltip component that matches app theme
@@ -139,6 +75,9 @@ export function MonteCarloHistogram({ data, logScale, onLogScaleChange }: MonteC
     const min = Math.min(...data)
     const max = Math.max(...data)
     
+    // Use central formatter for labels (supports T, Q, Qi, etc.)
+    const formatLabel = (val: number) => formatCurrency(val, true, 0)
+
     if (logScale && min > 0) {
       // Logarithmic binning on portfolio values
       const numBins = 30
@@ -162,7 +101,7 @@ export function MonteCarloHistogram({ data, logScale, onLogScaleChange }: MonteC
         if (rangeStart > p99Value && i > 0) {
           bins.push({
             rangeStart: p99Value,
-            rangeLabel: `> ${formatCurrencyShort(p99Value)}`,
+            rangeLabel: `> ${formatLabel(p99Value)}`,
             count: 0,
             isOutlier: true,
           })
@@ -171,7 +110,7 @@ export function MonteCarloHistogram({ data, logScale, onLogScaleChange }: MonteC
         
         bins.push({
           rangeStart,
-          rangeLabel: formatCurrencyShort(rangeStart),
+          rangeLabel: formatLabel(rangeStart),
           count: 0,
         })
       }
@@ -206,7 +145,7 @@ export function MonteCarloHistogram({ data, logScale, onLogScaleChange }: MonteC
         const start = min + i * binWidth
         return {
           rangeStart: start,
-          rangeLabel: formatCurrencyShort(start),
+          rangeLabel: formatLabel(start),
           count: 0,
         }
       })
@@ -300,6 +239,8 @@ export function MonteCarloHistogram({ data, logScale, onLogScaleChange }: MonteC
                         ? 'hsl(240, 5%, 64.9%)'
                         : 'hsl(240, 3.8%, 46.1%)',
                     }}
+                    // Updated to use compact number formatting (e.g. 10k)
+                    tickFormatter={(val) => formatCompactNumber(val)}
                     scale={logScale ? 'log' : 'linear'}
                     domain={logScale ? [1, 'auto'] : [0, 'auto']}
                     allowDataOverflow={false}

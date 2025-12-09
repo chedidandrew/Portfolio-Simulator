@@ -91,16 +91,6 @@ function logSafe(value: number): number {
   return value > LOG_FLOOR ? value : LOG_FLOOR
 }
 
-// Format Y-axis ticks compactly (e.g., $60M instead of $60.00M)
-const formatYAxis = (value: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    notation: 'compact',
-    maximumFractionDigits: 1, 
-  }).format(value)
-}
-
 export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: MonteCarloChartProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -186,7 +176,8 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
                   }}
                   scale={logScale ? 'log' : 'linear'}
                   domain={logScale ? ['auto', 'auto'] : [0, 'auto']}
-                  tickFormatter={formatYAxis}
+                  // Use central formatCurrency (compact) for consistent large numbers
+                  tickFormatter={(val) => formatCurrency(val, true, 1)}
                 />
                 <Tooltip content={(props) => <CustomTooltip {...props} mode={mode} />} />
                 <Legend
@@ -195,7 +186,6 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
                   formatter={(value: string) => PERCENTILE_LABELS[value] ?? value}
                 />
 
-                {/* Five percentile lines only */}
                 <Line
                   type="monotone"
                   dataKey="p90"
@@ -245,7 +235,7 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
             </ResponsiveContainer>
           </div>
           <p className="text-xs text-muted-foreground mt-3 text-center">
-            Shows the range of possible portfolio values each year using up to 100,000 of simulated market outcomes, from optimistic to pessimistic scenarios.
+            Shows the range of possible portfolio values each year using up to 100,000 simulated market outcomes, from optimistic to pessimistic scenarios.
           </p>
         </CardContent>
       </Card>

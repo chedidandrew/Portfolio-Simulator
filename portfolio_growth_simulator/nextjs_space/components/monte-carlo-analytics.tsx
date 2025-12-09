@@ -15,7 +15,6 @@ interface AnalyticsProps {
 
 /* ------------------------------------------------------------------ */
 /* Shared tooltip components for analytics charts                     */
-/* Matches style of Scenario Paths / Ending Values / Max Drawdown     */
 /* ------------------------------------------------------------------ */
 
 const AnnualReturnsTooltip = ({ active, payload, label, mode }: any) => {
@@ -153,9 +152,6 @@ const LossProbabilitiesTooltip = ({ active, payload }: any) => {
   )
 }
 
-/* ------------------------------------------------------------------ */
-/* NEW: Investment Breakdown Tooltip                                  */
-/* ------------------------------------------------------------------ */
 const InvestmentTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload || !payload.length) return null
   
@@ -426,7 +422,8 @@ export function InvestmentBreakdownChart({ data, isDark }: AnalyticsProps) {
                 />
                 <YAxis 
                   tickLine={false}
-                  tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`}
+                  // Fixed: Use central formatCurrency instead of hardcoded 'k'
+                  tickFormatter={(val) => formatCurrency(val, false, 0)}
                   tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#71717a' }}
                 />
                 <Tooltip content={<InvestmentTooltip />} />

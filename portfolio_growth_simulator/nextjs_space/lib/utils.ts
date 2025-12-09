@@ -1,3 +1,5 @@
+// chedidandrew/portfolio-simulator/Portfolio-Simulator-main/portfolio_growth_simulator/nextjs_space/lib/utils.ts
+
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
  
@@ -15,25 +17,25 @@ export function formatDuration(seconds: number): string {
 
 /**
  * Rounds a number to 2 decimal places (cents) for Excel export
+ * Uses Number.EPSILON to ensure accurate rounding for floating point numbers
  */
 export function roundToCents(value: number | undefined | null): number {
   if (value === undefined || value === null) return 0
-  return Math.round(value * 100) / 100
+  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 /**
- * Format a number as currency with human-readable suffixes (k, M, B, T)
+ * Format a number as currency with human-readable suffixes (k, M, B, T, etc.)
  * @param value - The number to format
  * @param showDollarSign - Whether to prepend $ (default: true)
- * @param decimals - Number of decimal places (default: 2)
- * @returns Formatted string like "$12.35M", "$950k", "$1.2B"
+ * @param decimals - Number of decimal places (default: 2 for suffixes, 0 for < 1000)
  */
 export function formatCurrency(
-  value: number,
+  value: number | undefined | null,
   showDollarSign: boolean = true,
   decimals: number = 2
 ): string {
-  if (!Number.isFinite(value)) {
+  if (value === undefined || value === null || !Number.isFinite(value)) {
     return showDollarSign ? '$0' : '0'
   }
 
@@ -67,5 +69,20 @@ export function formatCurrency(
   }
 
   // Less than 1k, show integer dollars
-  return `${sign}${dollarSign}${absValue.toFixed(0)}`
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+/**
+ * Formats large integers compactly (e.g. 1.5k, 2M) without currency symbols.
+ * Useful for chart axes representing counts/frequency.
+ */
+export function formatCompactNumber(value: number): string {
+  return Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
 }

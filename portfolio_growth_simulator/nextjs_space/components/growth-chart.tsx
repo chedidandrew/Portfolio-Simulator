@@ -73,15 +73,6 @@ function logSafe(value: number): number {
   return value > LOG_FLOOR ? value : LOG_FLOOR
 }
 
-const formatYAxis = (value: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    notation: 'compact',
-    maximumFractionDigits: 1, 
-  }).format(value)
-}
-
 export function GrowthChart({ data }: GrowthChartProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -173,7 +164,7 @@ export function GrowthChart({ data }: GrowthChartProps) {
                 <YAxis
                   tickLine={false}
                   tick={{ fontSize: 10, fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)' }}
-                  tickFormatter={formatYAxis}
+                  tickFormatter={(value) => formatCurrency(value, false, 1)}
                   scale={useLogScale ? 'log' : 'linear'}
                   domain={useLogScale ? ['auto', 'auto'] : [0, 'auto']}
                   allowDataOverflow={false}

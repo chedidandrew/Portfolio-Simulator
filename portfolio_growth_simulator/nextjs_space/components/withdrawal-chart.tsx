@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Area, AreaChart, ReferenceLine } from 'recharts'
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from 'recharts'
 import { TrendingDown } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
@@ -75,15 +75,6 @@ const LOG_FLOOR = 1
 function logSafe(value: number): number {
   if (!Number.isFinite(value)) return LOG_FLOOR
   return value > LOG_FLOOR ? value : LOG_FLOOR
-}
-
-const formatYAxis = (value: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    notation: 'compact',
-    maximumFractionDigits: 1, 
-  }).format(value)
 }
 
 export function WithdrawalChart({ data }: WithdrawalChartProps) {
@@ -178,7 +169,7 @@ export function WithdrawalChart({ data }: WithdrawalChartProps) {
                 <YAxis
                   tickLine={false}
                   tick={{ fontSize: 10, fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)' }}
-                  tickFormatter={formatYAxis}
+                  tickFormatter={(value) => formatCurrency(value, false, 1)}
                   scale={useLogScale ? 'log' : 'linear'}
                   domain={useLogScale ? ['auto', 'auto'] : [0, 'auto']}
                   allowDataOverflow={false}

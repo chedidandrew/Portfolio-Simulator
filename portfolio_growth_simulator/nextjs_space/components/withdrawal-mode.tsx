@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo, useEffect } from 'react'
+import { useMemo, useEffect } from 'react'
 import {
   Card,
   CardContent,
@@ -16,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import {
   DollarSign,
@@ -25,7 +24,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
-  Download,
   Share,
   FileText,
   FileSpreadsheet,
@@ -37,15 +35,8 @@ import { DonationSection } from '@/components/donation-section'
 import { motion } from 'framer-motion'
 import * as XLSX from 'xlsx'
 import { triggerHaptic } from '@/hooks/use-haptics'
-
-interface WithdrawalState {
-  startingBalance: number
-  annualReturn: number
-  duration: number
-  periodicWithdrawal: number
-  inflationAdjustment: number
-  frequency: 'yearly' | 'quarterly' | 'monthly' | 'weekly'
-}
+import { roundToCents, formatCurrency } from '@/lib/utils'
+import { WithdrawalState } from '@/lib/types'
 
 interface YearData {
   year: number
@@ -60,28 +51,6 @@ const FREQUENCY_MULTIPLIER: Record<WithdrawalState['frequency'], number> = {
   quarterly: 4,
   monthly: 12,
   weekly: 52,
-}
-
-const formatSmartCurrency = (value: number | undefined) => {
-  if (value === undefined || value === null) return '$0';
-  
-  const absoluteValue = Math.abs(value);
-
-  if (absoluteValue < 100_000_000) {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(value);
-  }
-
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    notation: "compact",
-    compactDisplay: "short",
-    maximumFractionDigits: 1, 
-  }).format(value);
 }
 
 export function WithdrawalMode() {
@@ -246,14 +215,14 @@ export function WithdrawalMode() {
 
     const summaryRows = [
         { Key: 'Mode', Value: 'Withdrawal (Deterministic)' },
-        { Key: 'Starting Balance', Value: state.startingBalance },
+        { Key: 'Starting Balance', Value: roundToCents(state.startingBalance) },
         { Key: 'Annual Return %', Value: state.annualReturn },
         { Key: 'Duration Years', Value: state.duration },
-        { Key: 'Withdrawal Amount', Value: state.periodicWithdrawal },
+        { Key: 'Withdrawal Amount', Value: roundToCents(state.periodicWithdrawal) },
         { Key: 'Inflation Adj %', Value: state.inflationAdjustment },
         { Key: 'Frequency', Value: state.frequency },
-        { Key: 'Ending Balance', Value: calculateWithdrawal.endingBalance },
-        { Key: 'Total Withdrawn', Value: calculateWithdrawal.totalWithdrawn },
+        { Key: 'Ending Balance', Value: roundToCents(calculateWithdrawal.endingBalance) },
+        { Key: 'Total Withdrawn', Value: roundToCents(calculateWithdrawal.totalWithdrawn) },
         { Key: 'Sustainable', Value: calculateWithdrawal.isSustainable ? 'Yes' : 'No' },
       ]
   
@@ -262,9 +231,9 @@ export function WithdrawalMode() {
 
     const excelData = calculateWithdrawal.yearData.map(row => ({
       Year: row.year,
-      'Starting Balance': row.startingBalance,
-      'Withdrawals': row.withdrawals,
-      'Ending Balance': row.endingBalance,
+      'Starting Balance': roundToCents(row.startingBalance),
+      'Withdrawals': roundToCents(row.withdrawals),
+      'Ending Balance': roundToCents(row.endingBalance),
       'Sustainable': row.isSustainable ? 'Yes' : 'No',
     }))
 
@@ -584,7 +553,7 @@ export function WithdrawalMode() {
                   <p
                     className={`text-lg sm:text-xl md:text-2xl font-bold ${sustainabilityColor} break-words leading-tight`}
                   >
-                    {formatSmartCurrency(calculateWithdrawal?.endingBalance)}
+                    {formatCurrency(calculateWithdrawal?.endingBalance)}
                   </p>
                 </motion.div>
                 <motion.div
@@ -598,7 +567,7 @@ export function WithdrawalMode() {
                     Total Withdrawn
                   </p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-500 break-words leading-tight">
-                    {formatSmartCurrency(calculateWithdrawal?.totalWithdrawn)}
+                    {formatCurrency(calculateWithdrawal?.totalWithdrawn)}
                   </p>
                 </motion.div>
                 <motion.div

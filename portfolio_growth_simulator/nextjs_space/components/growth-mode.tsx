@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { DollarSign, TrendingUp, Calendar, Target, Award, Share, FileText, FileSpreadsheet } from 'lucide-react'
@@ -17,16 +16,8 @@ import { DonationSection } from '@/components/donation-section'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as XLSX from 'xlsx'
 import { triggerHaptic } from '@/hooks/use-haptics'
-import { roundToCents } from '@/lib/utils'
-
-interface GrowthState {
-  startingBalance: number
-  annualReturn: number
-  duration: number
-  periodicAddition: number
-  frequency: 'yearly' | 'quarterly' | 'monthly' | 'weekly'
-  targetValue?: number
-}
+import { roundToCents, formatCurrency } from '@/lib/utils'
+import { GrowthState } from '@/lib/types'
 
 interface YearData {
   year: number
@@ -173,28 +164,6 @@ const ConfettiBurst = ({
   )
 }
 
-const formatSmartCurrency = (value: number | undefined) => {
-  if (value === undefined || value === null) return '$0';
-  
-  const absoluteValue = Math.abs(value);
-
-  if (absoluteValue < 100_000_000) {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(value);
-  }
-
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    notation: "compact",
-    compactDisplay: "short",
-    maximumFractionDigits: 1, 
-  }).format(value);
-}
-
 export function GrowthMode() {
   const [state, setState] = useLocalStorage<GrowthState>('growth-mode-state', {
     startingBalance: 10000,
@@ -202,7 +171,8 @@ export function GrowthMode() {
     duration: 30,
     periodicAddition: 500,
     frequency: 'monthly',
-    targetValue: 500000
+    targetValue: 500000,
+    inflationAdjustment: 0, // Default to 0 to match previous behavior
   })
 
   // Changed to useLocalStorage to persist the toggle state
@@ -297,22 +267,31 @@ export function GrowthMode() {
   }
 
   const calculateGrowth = useMemo(() => {
-    const { startingBalance, annualReturn, duration, periodicAddition, frequency } = state
+    const { startingBalance, annualReturn, duration, periodicAddition, frequency, inflationAdjustment } = state
     const periods = frequencyMultiplier[frequency]
     const ratePerPeriod = Math.pow(1 + annualReturn / 100, 1 / periods) - 1
     const totalPeriods = duration * periods
     
+    // Inflation adjustment factor per year
+    const inflationFactor = 1 + (inflationAdjustment / 100);
+
     const yearData: YearData[] = []
     let currentValue = startingBalance
     
+    // We need to track the current periodic addition which might change yearly
+    let currentPeriodicAddition = periodicAddition;
+    let runningTotalContributions = startingBalance;
+
     for (let year = 1; year <= duration; year++) {
       const startingValue = currentValue
       let yearContributions = 0
       
       for (let period = 0; period < periods; period++) {
-        currentValue = currentValue * (1 + ratePerPeriod) + periodicAddition
-        yearContributions += periodicAddition
+        currentValue = currentValue * (1 + ratePerPeriod) + currentPeriodicAddition
+        yearContributions += currentPeriodicAddition
       }
+      
+      runningTotalContributions += yearContributions;
       
       yearData.push({
         year,
@@ -320,23 +299,30 @@ export function GrowthMode() {
         contributions: yearContributions,
         endingValue: currentValue,
       })
+
+      // Increase contribution for the NEXT year by inflation rate
+      currentPeriodicAddition *= inflationFactor;
     }
     
     const finalValue = currentValue
-    const totalContributions = startingBalance + (periodicAddition * totalPeriods)
+    const totalContributions = runningTotalContributions
     const totalProfit = finalValue - totalContributions
     
     let yearsToTarget = null
     if (state.targetValue && state.targetValue > startingBalance) {
       let tempValue = startingBalance
+      let tempPeriodicAddition = periodicAddition
+      
       for (let year = 1; year <= 100; year++) {
         for (let period = 0; period < periods; period++) {
-          tempValue = tempValue * (1 + ratePerPeriod) + periodicAddition
+          tempValue = tempValue * (1 + ratePerPeriod) + tempPeriodicAddition
         }
         if (tempValue >= state.targetValue) {
           yearsToTarget = year
           break
         }
+        // Apply inflation to the simulation for target
+        tempPeriodicAddition *= inflationFactor;
       }
     }
     
@@ -354,6 +340,7 @@ export function GrowthMode() {
       { Key: 'Duration Years', Value: state.duration },
       { Key: 'Contribution Amount', Value: roundToCents(state.periodicAddition) },
       { Key: 'Frequency', Value: state.frequency },
+      { Key: 'Inflation Adjustment %', Value: state.inflationAdjustment },
       { Key: 'Target Value', Value: roundToCents(state.targetValue) || 'N/A' },
       { Key: 'Final Value', Value: roundToCents(calculateGrowth.finalValue) },
       { Key: 'Total Contributions', Value: roundToCents(calculateGrowth.totalContributions) },
@@ -517,6 +504,18 @@ export function GrowthMode() {
                   </Select>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="inflation">Inflation Adjustment (%)</Label>
+                  <NumericInput
+                    id="inflation"
+                    step={0.1}
+                    value={state?.inflationAdjustment ?? 0}
+                    onChange={(value) => setState({ ...state, inflationAdjustment: value })}
+                    min={-50}
+                    max={50}
+                    maxErrorMessage="Hyperinflation much? :)"
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="target-value">Target Value (Optional)</Label>
                   <NumericInput
                     id="target-value"
@@ -605,7 +604,7 @@ export function GrowthMode() {
                 >
                   <p className="text-xs text-muted-foreground">Final Portfolio Value</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary break-words leading-tight">
-                    {formatSmartCurrency(calculateGrowth?.finalValue)}
+                    {formatCurrency(calculateGrowth?.finalValue)}
                   </p>
                 </motion.div>
 
@@ -618,7 +617,7 @@ export function GrowthMode() {
                 >
                   <p className="text-xs text-muted-foreground">Total Contributions</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-500 break-words leading-tight">
-                    {formatSmartCurrency(calculateGrowth?.totalContributions)}
+                    {formatCurrency(calculateGrowth?.totalContributions)}
                   </p>
                 </motion.div>
 
@@ -640,7 +639,7 @@ export function GrowthMode() {
                       isProfitNegative ? 'text-destructive' : 'text-emerald-500'
                     }`}
                   >
-                    {formatSmartCurrency(calculateGrowth?.totalProfit)}
+                    {formatCurrency(calculateGrowth?.totalProfit)}
                   </p>
                 </motion.div>
 

@@ -1,28 +1,30 @@
-export type Expense = {
-  id: string
-  amount: number
-  category: string
-  description: string
-  date: Date
+export interface GrowthState {
+  startingBalance: number
+  annualReturn: number
+  duration: number
+  periodicAddition: number
+  frequency: 'yearly' | 'quarterly' | 'monthly' | 'weekly'
+  targetValue?: number
+  inflationAdjustment: number
 }
 
-export type ExpenseFormData = Omit<Expense, 'id' | 'date'> & {
-  date: string
+export interface WithdrawalState {
+  startingBalance: number
+  annualReturn: number
+  duration: number
+  periodicWithdrawal: number
+  inflationAdjustment: number
+  frequency: 'yearly' | 'quarterly' | 'monthly' | 'weekly'
 }
 
-export const EXPENSE_CATEGORIES = [
-  'Food',
-  'Transportation',
-  'Housing',
-  'Utilities',
-  'Entertainment',
-  'Healthcare',
-  'Shopping',
-  'Education',
-  'Other'
-] as const
-
-export type DateRange = {
-  from: Date | undefined
-  to: Date | undefined
+export interface SimulationParams {
+  initialValue: number
+  expectedReturn: number
+  volatility: number
+  duration: number
+  cashflowAmount: number
+  cashflowFrequency: 'yearly' | 'monthly'
+  inflationAdjustment?: number
+  numPaths: number
+  portfolioGoal?: number
 }
