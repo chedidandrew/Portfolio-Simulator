@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 export function PwaInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
-  const [isVisible, setIsVisible] = useState(false)
+  const [isVisible, setIsVisible] = useState(true)
 
   useEffect(() => {
     const handler = (e: any) => {

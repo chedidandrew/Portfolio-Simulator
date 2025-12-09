@@ -857,7 +857,7 @@ const handleExportExcel = () => {
                             : simulationResults?.profitableRate?.toFixed?.(1)
                           }%
                         </span>{' '}
-                        chance of {mode === 'withdrawal' ? 'not running out of money' : 'ending with more money than you started with'}.
+                        chance of {mode === 'withdrawal' ? 'not running out of money' : 'making a profit on your total investment'}.
                       </p>
                     </div>
                   </div>
@@ -988,7 +988,8 @@ function performMonteCarloSimulation(
     let pureValue = initialValue // New: Track pure asset performance
     let lowestValue = initialValue
     let currentCashflowPerStep = cashflowPerStep
-
+    let totalInvestedSoFar = initialValue
+    
     for (let step = 1; step <= totalTimeSteps; step++) {
       // Calculate growth factor once for this step
       const growthFactor = Math.exp(drift + diffusion * normalRandom())
@@ -999,6 +1000,7 @@ function performMonteCarloSimulation(
 
       if (mode === 'growth') {
         currentValue += currentCashflowPerStep
+        totalInvestedSoFar += currentCashflowPerStep
       } else {
         currentValue -= currentCashflowPerStep
         currentValue = Math.max(0, currentValue)
@@ -1026,7 +1028,7 @@ function performMonteCarloSimulation(
     lowestValues.push(lowestValue)
 
     if (portfolioGoal && currentValue >= portfolioGoal) pathsReachingGoal++
-    if (currentValue > initialValue) pathsProfitable++
+    if (currentValue > totalInvestedSoFar) pathsProfitable++
     if (currentValue > 0) pathsSolvent++
 
     let peak = yearlyValues[0]
