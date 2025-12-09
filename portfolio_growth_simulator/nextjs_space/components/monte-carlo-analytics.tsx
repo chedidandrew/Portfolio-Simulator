@@ -14,8 +14,8 @@ interface AnalyticsProps {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Shared tooltip components for analytics charts                     */
-/*  Matches style of Scenario Paths / Ending Values / Max Drawdown     */
+/* Shared tooltip components for analytics charts                     */
+/* Matches style of Scenario Paths / Ending Values / Max Drawdown     */
 /* ------------------------------------------------------------------ */
 
 const AnnualReturnsTooltip = ({ active, payload, label, mode }: any) => {
@@ -205,7 +205,7 @@ export function AnnualReturnsChart({ data, isDark }: AnalyticsProps) {
             </ResponsiveContainer>
           </div>
           <p className="text-xs text-muted-foreground mt-3 text-center">
-            Shows the expected compound annual return each year across percentile ranges from optimistic to pessimistic outcomes.
+            Shows the expected compound annual return (excluding contributions) each year across percentile ranges from optimistic to pessimistic outcomes.
           </p>
         </CardContent>
       </Card>
@@ -266,7 +266,7 @@ export function ReturnProbabilitiesChart({ data, isDark }: AnalyticsProps) {
             </ResponsiveContainer>
           </div>
           <p className="text-xs text-muted-foreground mt-3 text-center">
-            Shows the probability each year of achieving return thresholds such as 5, 8, 10, 12, 15, or 20 percent annualized.
+            Shows the probability each year of achieving return thresholds such as 5, 8, 10, 12, 15, or 20 percent annualized (based on pure asset performance).
           </p>
         </CardContent>
       </Card>

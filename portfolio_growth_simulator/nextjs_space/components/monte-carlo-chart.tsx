@@ -120,7 +120,10 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
     [data, logScale],
   )
 
-  const handleLogScaleChange = (checked: boolean) => { triggerHaptic('light') onLogScaleChange(checked) }
+  const handleLogScaleChange = (checked: boolean) => { 
+    triggerHaptic('light'); 
+    onLogScaleChange(checked); 
+  }
   
   return (
     <motion.div

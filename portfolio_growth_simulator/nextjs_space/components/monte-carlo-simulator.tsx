@@ -30,6 +30,7 @@ interface SimulationParams {
   duration: number
   cashflowAmount: number
   cashflowFrequency: 'yearly' | 'monthly'
+  inflationAdjustment?: number
   numPaths: number
   portfolioGoal?: number
 }
@@ -102,6 +103,7 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
     duration: initialValues?.duration ?? 30,
     cashflowAmount: mode === 'growth' ? (initialValues?.periodicAddition ?? 500) : (initialValues?.periodicWithdrawal ?? 3000),
     cashflowFrequency: 'monthly',
+    inflationAdjustment: initialValues?.inflationAdjustment ?? 0,
     numPaths: 500,
     portfolioGoal: mode === 'growth' ? 1000000 : undefined,
   })
@@ -117,6 +119,15 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
 
   const [simulationResults, setSimulationResults] = useLocalStorage<any>( `mc-results-${mode}`, null)
   const [isSimulating, setIsSimulating] = useState(false)
+
+  // Calculate total invested capital for the multiplier effect
+  const totalInvested = useMemo(() => {
+    const initial = params.initialValue || 0;
+    const contributions = mode === 'growth' 
+      ? (params.cashflowAmount * 12 * params.duration) 
+      : 0;
+    return initial + contributions;
+  }, [params.initialValue, params.cashflowAmount, params.duration, mode]);
 
   const buildShareUrl = () => {
     if (typeof window === 'undefined') return ''
@@ -195,10 +206,12 @@ const handleExportExcel = () => {
   const summaryRows = [
     { Key: 'Mode', Value: mode },
     { Key: 'Initial Value', Value: params.initialValue },
+    { Key: 'Total Invested', Value: totalInvested },
     { Key: 'Expected Return %', Value: params.expectedReturn },
     { Key: 'Volatility %', Value: params.volatility },
     { Key: 'Duration Years', Value: params.duration },
     { Key: 'Monthly Cashflow', Value: params.cashflowAmount },
+    { Key: 'Inflation Adjustment %', Value: params.inflationAdjustment ?? 0 },
     { Key: 'Number Of Scenarios', Value: numPathsUsed },
     { Key: 'Mean Ending Value', Value: mean },
     { Key: 'Median Ending Value', Value: median },
@@ -245,7 +258,9 @@ const handleExportExcel = () => {
       'CAGR P75 %': row.p75,
       'CAGR P90 %': row.p90,
       'Prob ≥ 5%': row.prob5,
+      'Prob ≥ 8%': row.prob8,
       'Prob ≥ 10%': row.prob10,
+      'Prob ≥ 12%': row.prob12,
       'Prob ≥ 15%': row.prob15,
       'Prob ≥ 20%': row.prob20,
       'Prob ≥ 25%': row.prob25,
@@ -260,6 +275,8 @@ const handleExportExcel = () => {
       { wch: 12 },
       { wch: 12 },
       { wch: 12 },
+      { wch: 13 },
+      { wch: 13 },
       { wch: 13 },
       { wch: 13 },
       { wch: 13 },
@@ -465,7 +482,7 @@ const handleExportExcel = () => {
                 id="mc-initial"
                 value={params?.initialValue ?? 0}
                 onChange={(value) => setParams({ ...params, initialValue: value })}
-                min={0}
+                min={1}
                 max={10000000000}
                 maxErrorMessage="Now you are just being too greedy :)"
               />
@@ -520,6 +537,24 @@ const handleExportExcel = () => {
                 maxErrorMessage="Now you are just being too greedy :)"
               />
             </div>
+            {mode === 'withdrawal' && (
+              <div className="space-y-2">
+                <Label htmlFor="mc-inflation">
+                  Inflation Adjustment (%)
+                </Label>
+                <NumericInput
+                  id="mc-inflation"
+                  step={0.1}
+                  value={params?.inflationAdjustment ?? 0}
+                  onChange={(value) =>
+                    setParams({ ...params, inflationAdjustment: value })
+                  }
+                  min={-50}
+                  max={50}
+                  maxErrorMessage="Hyperinflation much? :)"
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="mc-paths">Number of Scenarios</Label>
               <Select
@@ -790,7 +825,7 @@ const handleExportExcel = () => {
                       <p>
                         <span className="font-semibold text-blue-600 dark:text-blue-400">The Multiplier Effect:</span> In the best case scenario, your money grew by a factor of{' '}
                         <span className="font-bold">
-                          {((simulationResults?.best ?? 0) / (params.initialValue || 1)).toFixed(1)}x
+                          {((simulationResults?.best ?? 0) / (totalInvested || 1)).toFixed(1)}x
                         </span>.
                       </p>
                     </div>
@@ -874,6 +909,9 @@ function performMonteCarloSimulation(
   mode: 'growth' | 'withdrawal',
   seed?: string
 ) {
+  if (params.initialValue <= 0) {
+    throw new Error('Initial portfolio value must be greater than zero.')
+  }
   const {
     initialValue,
     expectedReturn,
@@ -881,6 +919,7 @@ function performMonteCarloSimulation(
     duration,
     cashflowAmount,
     cashflowFrequency,
+    inflationAdjustment = 0,
     numPaths,
     portfolioGoal,
   } = params
@@ -895,6 +934,7 @@ function performMonteCarloSimulation(
   const drift = (mu - 0.5 * sigma * sigma) * dt
   const diffusion = sigma * Math.sqrt(dt)
   const cashflowPerStep = cashflowFrequency === 'monthly' ? cashflowAmount : cashflowAmount / 12
+  const inflationFactor = 1 + inflationAdjustment / 100
   const rng = seedrandom(seed ?? `monte-carlo-${Date.now()}-${Math.random()}`)
 
   // Helper for normal random
@@ -922,14 +962,15 @@ function performMonteCarloSimulation(
     const yearlyValues: number[] = [initialValue]
     let currentValue = initialValue
     let lowestValue = initialValue
+    let currentCashflowPerStep = cashflowPerStep
 
     for (let step = 1; step <= totalTimeSteps; step++) {
       currentValue = currentValue * Math.exp(drift + diffusion * normalRandom())
 
       if (mode === 'growth') {
-        currentValue += cashflowPerStep
+        currentValue += currentCashflowPerStep
       } else {
-        currentValue -= cashflowPerStep
+        currentValue -= currentCashflowPerStep
         currentValue = Math.max(0, currentValue)
       }
 
@@ -938,6 +979,9 @@ function performMonteCarloSimulation(
       if (step % timeStepsPerYear === 0) {
         const yearIndex = step / timeStepsPerYear
         yearlyValues.push(currentValue)
+        
+        // Increase cashflow by inflation annually
+        currentCashflowPerStep *= inflationFactor
         
         if (yearIndex > 0) {
           const cagr = Math.pow(currentValue / initialValue, 1 / yearIndex) - 1
@@ -978,6 +1022,8 @@ function performMonteCarloSimulation(
     const count12 = cagrs.filter(v => v >= 12).length
     const count15 = cagrs.filter(v => v >= 15).length
     const count20 = cagrs.filter(v => v >= 20).length
+    const count25 = cagrs.filter(v => v >= 25).length
+    const count30 = cagrs.filter(v => v >= 30).length
 
 
     annualReturnsData.push({
@@ -994,6 +1040,8 @@ function performMonteCarloSimulation(
       prob12: (count12 / numPaths) * 100,
       prob15: (count15 / numPaths) * 100,
       prob20: (count20 / numPaths) * 100,
+      prob25: (count25 / numPaths) * 100,
+      prob30: (count30 / numPaths) * 100,
     })
   }
 
