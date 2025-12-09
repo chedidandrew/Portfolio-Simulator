@@ -195,7 +195,7 @@ export function AnnualReturnsChart({ data, isDark }: AnalyticsProps) {
                   tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#71717a' }}
                 />
                 <Tooltip content={<AnnualReturnsTooltip mode="cagr" />} />
-                <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11 }} />
+                <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} />
                 <Line type="monotone" dataKey="p90" stroke="#0f766e" name="90th Percentile" dot={false} strokeWidth={2} />
                 <Line type="monotone" dataKey="p75" stroke="#14b8a6" name="75th Percentile" dot={false} strokeWidth={2} />
                 <Line type="monotone" dataKey="median" stroke="#06b6d4" name="50th Percentile (Median)" dot={false} strokeWidth={3} />
@@ -255,7 +255,7 @@ export function ReturnProbabilitiesChart({ data, isDark }: AnalyticsProps) {
                   tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#71717a' }}
                 />
                 <Tooltip content={<ReturnProbabilitiesTooltip mode="probability" />} />
-                <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11 }} />
+                <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} />
                 <Line type="monotone" dataKey="prob5" stroke="#7e22ce" name="≥ 5% CAGR" dot={false} strokeWidth={2} />
                 <Line type="monotone" dataKey="prob8" stroke="#8b5cf6" name="≥ 8% CAGR" dot={false} strokeWidth={2} />
                 <Line type="monotone" dataKey="prob10" stroke="#6366f1" name="≥ 10% CAGR" dot={false} strokeWidth={2} />
@@ -318,7 +318,7 @@ export function LossProbabilitiesChart({ data, isDark }: AnalyticsProps) {
                   cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
                   content={<LossProbabilitiesTooltip />}
                 />
-                <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11 }} />
+                <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} />
                 <Bar dataKey="intraPeriod" name="At any point (Intra-period)" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="endPeriod" name="At the end (Final Balance)" fill="#ef4444" radius={[4, 4, 0, 0]} />
               </BarChart>

@@ -437,7 +437,7 @@ export function DonationSection() {
         <div className="p-2 bg-white border border-zinc-200 rounded-lg">
           <QRCodeSVG
             value={donationPopupUrl}
-            size={100}
+            size={200}
             bgColor="#ffffff"
             fgColor="#000000"
             level="M"
@@ -445,7 +445,7 @@ export function DonationSection() {
           />
         </div>
         <p className="mt-2 text-[10px] text-zinc-500">
-          Scan to support & view interactive results
+          Scan to help keep this app free
         </p>
       </div>
     </>

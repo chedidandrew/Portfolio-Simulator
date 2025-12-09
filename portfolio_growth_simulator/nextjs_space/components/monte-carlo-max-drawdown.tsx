@@ -8,6 +8,7 @@ import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { triggerHaptic } from '@/hooks/use-haptics'
 
 interface MonteCarloMaxDrawdownProps {
   data: number[] // max drawdown as fraction 0 to 1
@@ -99,6 +100,11 @@ export function MonteCarloMaxDrawdownHistogram({ data, logScale, onLogScaleChang
     return bins.filter(bin => bin.count > 0)
   }, [data, logScale])
 
+  const handleLogScaleChange = (checked: boolean) => {
+      triggerHaptic('light')
+      onLogScaleChange(checked)
+    }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -117,7 +123,7 @@ export function MonteCarloMaxDrawdownHistogram({ data, logScale, onLogScaleChang
               <Switch
                 id="log-scale-max-dd"
                 checked={logScale}
-                onCheckedChange={onLogScaleChange}
+                onCheckedChange={handleLogScaleChange}
               />
               <Label htmlFor="log-scale-max-dd" className="text-sm cursor-pointer">
                 Log scale
@@ -185,7 +191,7 @@ export function MonteCarloMaxDrawdownHistogram({ data, logScale, onLogScaleChang
                 <Tooltip content={<CustomTooltip />} />
                 <Legend
                   verticalAlign="top"
-                  wrapperStyle={{ fontSize: 11 }}
+                  wrapperStyle={{ fontSize: 11, marginTop: '-10px' }}
                 />
                 <Bar
                   dataKey="count"

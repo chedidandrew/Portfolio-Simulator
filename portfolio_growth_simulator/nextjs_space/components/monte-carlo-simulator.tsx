@@ -16,6 +16,7 @@ import { AnnualReturnsChart, ReturnProbabilitiesChart, LossProbabilitiesChart } 
 import { useTheme } from 'next-themes'
 import * as XLSX from 'xlsx'
 import { useLocalStorage } from '@/hooks/use-local-storage'
+import { triggerHaptic } from '@/hooks/use-haptics'
 
 interface MonteCarloSimulatorProps {
   mode: 'growth' | 'withdrawal'
@@ -142,6 +143,7 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
   }
 
   const handleShareLink = async () => {
+    triggerHaptic('light')
     if (!simulationResults) return
     const url = buildShareUrl()
     if (!url) return
@@ -168,6 +170,7 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
   }
 
 const handleExportExcel = () => {
+  triggerHaptic('light')
   if (!simulationResults) return
 
   const {
@@ -311,6 +314,7 @@ const handleExportExcel = () => {
   }
 
   const handleExportPdf = () => {
+    triggerHaptic('light')
     if (typeof window === 'undefined') return
     window.print()
   }

@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { useLocalStorage } from '@/hooks/use-local-storage'
+import { triggerHaptic } from '@/hooks/use-haptics'
 
 interface YearData {
   year: number
@@ -90,6 +91,11 @@ export function WithdrawalChart({ data }: WithdrawalChartProps) {
   const isDark = theme === 'dark'
   const [useLogScale, setUseLogScale] = useLocalStorage('withdrawal-chart-log-scale', false)
   
+  const handleLogScaleChange = (checked: boolean) => {
+      triggerHaptic('light')
+      setUseLogScale(checked)
+    }
+
   const chartData = useMemo(() => {
     return data?.map?.(item => {
       const rawBalance = Math.round(item?.endingBalance ?? 0)
@@ -125,7 +131,7 @@ export function WithdrawalChart({ data }: WithdrawalChartProps) {
               <Switch
                 id="log-scale-withdrawal"
                 checked={useLogScale}
-                onCheckedChange={setUseLogScale}
+                onCheckedChange={handleLogScaleChange}
               />
               <Label htmlFor="log-scale-withdrawal" className="text-sm cursor-pointer">
                 Log scale
@@ -180,7 +186,7 @@ export function WithdrawalChart({ data }: WithdrawalChartProps) {
                 <Tooltip content={<CustomTooltip />} />
                 <Legend
                   verticalAlign="top"
-                  wrapperStyle={{ fontSize: 11 }}
+                  wrapperStyle={{ fontSize: 11, marginTop: '-10px' }}
                   formatter={(value) => value === 'balance' ? 'Portfolio Balance' : value === 'withdrawn' ? 'Annual Withdrawal' : ''}
                 />
                 <Area

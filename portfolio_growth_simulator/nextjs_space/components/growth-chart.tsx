@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { useLocalStorage } from '@/hooks/use-local-storage'
+import { triggerHaptic } from '@/hooks/use-haptics'
 
 interface YearData {
   year: number
@@ -85,7 +86,12 @@ export function GrowthChart({ data }: GrowthChartProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const [useLogScale, setUseLogScale] = useLocalStorage('growth-chart-log-scale', false)
-  
+
+  const handleLogScaleChange = (checked: boolean) => {
+      triggerHaptic('light')
+      setUseLogScale(checked)
+    }
+
   const chartData = useMemo(() => {
     let cumulativeContributions = 0
     return data?.map?.((item, index) => {
@@ -120,7 +126,7 @@ export function GrowthChart({ data }: GrowthChartProps) {
               <Switch
                 id="log-scale-growth"
                 checked={useLogScale}
-                onCheckedChange={setUseLogScale}
+                onCheckedChange={handleLogScaleChange}
               />
               <Label htmlFor="log-scale-growth" className="text-sm cursor-pointer">
                 Log scale
@@ -175,7 +181,7 @@ export function GrowthChart({ data }: GrowthChartProps) {
                 <Tooltip content={<CustomTooltip />} />
                 <Legend
                   verticalAlign="top"
-                  wrapperStyle={{ fontSize: 11 }}
+                  wrapperStyle={{ fontSize: 11, marginTop: '-10px' }}
                 />
                 <Area
                   type="monotone"

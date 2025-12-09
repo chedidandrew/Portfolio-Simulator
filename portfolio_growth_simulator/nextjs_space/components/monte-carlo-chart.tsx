@@ -9,6 +9,7 @@ import { useTheme } from 'next-themes'
 import { formatCurrency } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { triggerHaptic } from '@/hooks/use-haptics'
 
 interface MonteCarloChartProps {
   data: any[]
@@ -119,6 +120,8 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
     [data, logScale],
   )
 
+  const handleLogScaleChange = (checked: boolean) => { triggerHaptic('light') onLogScaleChange(checked) }
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -137,7 +140,7 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
               <Switch
                 id="log-scale-montecarlo"
                 checked={logScale}
-                onCheckedChange={onLogScaleChange}
+                onCheckedChange={handleLogScaleChange}
               />
               <Label htmlFor="log-scale-montecarlo" className="text-sm cursor-pointer">
                 Log scale
@@ -185,7 +188,7 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
                 <Tooltip content={(props) => <CustomTooltip {...props} mode={mode} />} />
                 <Legend
                   verticalAlign="top"
-                  wrapperStyle={{ fontSize: 11 }}
+                  wrapperStyle={{ fontSize: 11, marginTop: '-10px' }}
                   formatter={(value: string) => PERCENTILE_LABELS[value] ?? value}
                 />
 

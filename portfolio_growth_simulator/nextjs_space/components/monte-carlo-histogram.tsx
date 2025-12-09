@@ -9,6 +9,7 @@ import { useTheme } from 'next-themes'
 import { formatCurrency } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { triggerHaptic } from '@/hooks/use-haptics'
 
 interface MonteCarloHistogramProps {
   data: number[]
@@ -126,6 +127,11 @@ export function MonteCarloHistogram({ data, logScale, onLogScaleChange }: MonteC
 
   const singleValue = isSingleValue ? data[0] : null
 
+  const handleLogScaleChange = (checked: boolean) => {
+      triggerHaptic('light')
+      onLogScaleChange(checked)
+    }
+
   const histogramData = useMemo(() => {
     if (!data || data.length === 0) return []
     if (isSingleValue) return []
@@ -234,7 +240,7 @@ export function MonteCarloHistogram({ data, logScale, onLogScaleChange }: MonteC
               <Switch
                 id="log-scale"
                 checked={logScale}
-                onCheckedChange={onLogScaleChange}
+                onCheckedChange={handleLogScaleChange}
               />
               <Label htmlFor="log-scale" className="text-sm cursor-pointer">
                 Log scale
@@ -313,7 +319,7 @@ export function MonteCarloHistogram({ data, logScale, onLogScaleChange }: MonteC
                   <Tooltip content={<CustomTooltip />} />
                   <Legend
                     verticalAlign="top"
-                    wrapperStyle={{ fontSize: 11 }}
+                    wrapperStyle={{ fontSize: 11, marginTop: '-10px' }}
                   />
                   <Bar
                     dataKey="count"
