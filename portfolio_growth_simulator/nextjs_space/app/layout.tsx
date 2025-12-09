@@ -72,6 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <span className="print-header__title">Portfolio Simulator</span>
         </header>
         {children}
+        <PwaInstallPrompt />
       </ThemeProvider>
         <Script
           id="register-sw"

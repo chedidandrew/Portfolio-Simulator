@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { X, Smartphone } from 'lucide-react'
+import { X, ArrowDownToLine } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export function PwaInstallPrompt() {
@@ -58,7 +58,7 @@ export function PwaInstallPrompt() {
               <X className="h-4 w-4" />
             </Button>
             <Button size="sm" onClick={handleInstallClick}>
-              <Smartphone className="h-4 w-4 mr-2" />
+              <ArrowDownToLine className="h-4 w-4 mr-2" />
               Install
             </Button>
           </div>
