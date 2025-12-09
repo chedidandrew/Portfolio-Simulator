@@ -281,7 +281,6 @@ const handleExportExcel = () => {
       { wch: 13 },
       { wch: 13 },
       { wch: 13 },
-      { wch: 13 },
     ]
 
     const endingRows = (endingValues ?? []).map((v: number, idx: number) => ({
@@ -961,11 +960,17 @@ function performMonteCarloSimulation(
   for (let path = 0; path < numPaths; path++) {
     const yearlyValues: number[] = [initialValue]
     let currentValue = initialValue
+    let pureValue = initialValue // New: Track pure asset performance
     let lowestValue = initialValue
     let currentCashflowPerStep = cashflowPerStep
 
     for (let step = 1; step <= totalTimeSteps; step++) {
-      currentValue = currentValue * Math.exp(drift + diffusion * normalRandom())
+      // Calculate growth factor once for this step
+      const growthFactor = Math.exp(drift + diffusion * normalRandom())
+
+      // Apply growth to both tracked values
+      currentValue = currentValue * growthFactor
+      pureValue = pureValue * growthFactor // Pure value only grows by market return
 
       if (mode === 'growth') {
         currentValue += currentCashflowPerStep
@@ -984,7 +989,8 @@ function performMonteCarloSimulation(
         currentCashflowPerStep *= inflationFactor
         
         if (yearIndex > 0) {
-          const cagr = Math.pow(currentValue / initialValue, 1 / yearIndex) - 1
+          // Calculate CAGR using pureValue (pure asset performance) instead of account balance
+          const cagr = Math.pow(pureValue / initialValue, 1 / yearIndex) - 1
           annualCAGRs[yearIndex].push(cagr * 100)
         }
       }
