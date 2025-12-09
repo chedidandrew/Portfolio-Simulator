@@ -522,7 +522,11 @@ const handleExportExcel = () => {
                 value={params?.numPaths?.toString?.() ?? '500'}
                 onValueChange={(value) => setParams({ ...params, numPaths: Number(value) })}
               >
-                <SelectTrigger id="mc-paths">
+                {/* CHANGE: Added 'print:hidden' to SelectTrigger. 
+                  This hides the interactive dropdown button in print view, 
+                  leaving only the plain text 'Selected: 500' below it. 
+                */}
+                <SelectTrigger id="mc-paths" className="print:hidden">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

@@ -122,16 +122,19 @@
 }
 
 @media print {
-  /* 1. RESET COLORS */
-  :root, .dark {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 0%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
-    --primary: 142.1 76.2% 36.3%;
-    --muted: 0 0% 100%;
-    --muted-foreground: 0 0% 40%;
-    --border: 0 0% 100%;
+  /* 1. RESET COLORS & FORCE LIGHT SCHEME */
+  :root, html, body, .dark {
+    --background: 0 0% 100% !important;
+    --foreground: 0 0% 0% !important;
+    --card: 0 0% 100% !important;
+    --card-foreground: 0 0% 0% !important;
+    --primary: 142.1 76.2% 36.3% !important;
+    --muted: 0 0% 100% !important;
+    --muted-foreground: 0 0% 40% !important;
+    --border: 0 0% 100% !important;
+    
+    /* CRITICAL: Forces the browser to treat the print canvas as light mode */
+    color-scheme: light !important; 
   }
 
   html,
@@ -142,6 +145,7 @@
   .bg-background,
   .bg-card,
   .bg-muted {
+    background-color: white !important;
     background: white !important;
     background-image: none !important;
     color: black !important;
@@ -149,12 +153,21 @@
     padding: 0 !important;
   }
 
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  /* Ensures strict white background even if specific dark classes are used */
+  [class*="dark:bg-"] {
+     background-color: white !important;
+  }
+
+  * { 
+    -webkit-print-color-adjust: exact !important; 
+    print-color-adjust: exact !important; 
+  }
 
   /* 2. HIDE UI ELEMENTS (Includes fix for Black Bars) */
   nav, [role="tablist"], .no-print, .switch-container,
   input[type="checkbox"], button[role="switch"], 
-  .fixed.top-0, /* <--- THIS REMOVES THE BLACK BARS */
+  .fixed.top-0, /* <--- Hides Sticky Header */
+  .sticky, .fixed, /* <--- Hides any other fixed/sticky elements */
   .flex.items-center.justify-end.gap-2 button {
     display: none !important;
   }
@@ -183,6 +196,7 @@
     border-radius: 0 !important; 
   }
 
+  /* Reset gradients */
   .bg-gradient-to-b,
   .bg-gradient-to-r,
   .bg-gradient-to-l,
@@ -209,8 +223,6 @@
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     display: block !important;
-    
-    /* FIX FOR CUT-OFF TITLES: Use padding instead of margin at the top */
     margin-top: 0 !important;
     margin-bottom: 20px !important;
     padding-top: 20px !important; 
