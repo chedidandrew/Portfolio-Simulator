@@ -530,7 +530,7 @@ export function WithdrawalMode() {
                       onCheckedChange={setShowFullPrecision}
                     />
                     <Label htmlFor="precision-toggle-withdrawal" className="font-normal cursor-pointer">
-                      Full Precision
+                      Expand
                     </Label>
                   </div>
 

@@ -55,7 +55,7 @@ export const UNITS = [
   { value: 1e150, suffix: 'Nqd', name: 'Novemquadragintillion' }, { value: 1e147, suffix: 'Oqd', name: 'Octoquadragintillion' }, { value: 1e144, suffix: 'Sqd', name: 'Septenquadragintillion' },
   { value: 1e141, suffix: 'Xqd', name: 'Sexquadragintillion' }, { value: 1e138, suffix: 'Qqd', name: 'Quinquadragintillion' }, { value: 1e135, suffix: 'Qtqd', name: 'Quattuorquadragintillion' },
   { value: 1e132, suffix: 'Tqd', name: 'Trequadragintillion' }, { value: 1e129, suffix: 'Dqd', name: 'Duoquadragintillion' }, { value: 1e126, suffix: 'Uqd', name: 'Unquadragintillion' },
-  { value: 1e123, suffix: 'Qd', name: 'Quadragintillion' },
+  { value: 1e123, suffix: 'Qdg', name: 'Quadragintillion' },
 
   // 30s - Trigintillions
   { value: 1e120, suffix: 'Ntg', name: 'Novemtrigintillion' }, { value: 1e117, suffix: 'Otg', name: 'Octotrigintillion' }, { value: 1e114, suffix: 'Stg', name: 'Septentrigintillion' },
@@ -81,8 +81,8 @@ export const UNITS = [
   { value: 1e60,  suffix: 'Nd', name: 'Novemdecillion' },
   { value: 1e57,  suffix: 'Od', name: 'Octodecillion' },
   { value: 1e54,  suffix: 'Sd', name: 'Septendecillion' },
-  { value: 1e51,  suffix: 'Sx', name: 'Sexdecillion' },
-  { value: 1e48,  suffix: 'Qd', name: 'Quindecillion' },
+  { value: 1e51,  suffix: 'Sxd', name: 'Sexdecillion' },
+  { value: 1e48,  suffix: 'Qnd', name: 'Quindecillion' },
   { value: 1e45,  suffix: 'Qt', name: 'Quattuordecillion' },
   { value: 1e42,  suffix: 'Td', name: 'Tredecillion' },
   { value: 1e39,  suffix: 'Dd', name: 'Duodecillion' },
@@ -93,7 +93,7 @@ export const UNITS = [
   { value: 1e24,  suffix: 'Sp', name: 'Septillion' },
   { value: 1e21,  suffix: 'Sx', name: 'Sextillion' },
   { value: 1e18,  suffix: 'Qi', name: 'Quintillion' },
-  { value: 1e15,  suffix: 'Q', name: 'Quadrillion' },
+  { value: 1e15,  suffix: 'Qa', name: 'Quadrillion' },
   { value: 1e12,  suffix: 'T', name: 'Trillion' },
   { value: 1e9,   suffix: 'B', name: 'Billion' },
   { value: 1e6,   suffix: 'M', name: 'Million' },

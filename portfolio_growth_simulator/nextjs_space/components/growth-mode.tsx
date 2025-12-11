@@ -16,8 +16,9 @@ import { DonationSection } from '@/components/donation-section'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as XLSX from 'xlsx'
 import { triggerHaptic } from '@/hooks/use-haptics'
-import { roundToCents, formatCurrency } from '@/lib/utils'
+import { roundToCents, formatCurrency, getLargeNumberName } from '@/lib/utils'
 import { GrowthState } from '@/lib/types'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface YearData {
   year: number
@@ -173,7 +174,7 @@ const MILESTONES = [
   // The absurd
   { value: 1e130, label: 'You are the Simulation', icon: '👾' },
   { value: 1e140, label: '404: Economy Not Found', icon: '🚫' },
-  { value: 1e150, label: 'Money is now meaningless', icon: '🚮' },
+  { value: 1e150, label: 'Money buys happiness', icon: '🙂' },
   { value: 1e160, label: 'Your wallet has an event horizon', icon: '🕳️' },
   { value: 1e180, label: 'Admin Access Granted', icon: '🔑' },
   { value: 1e200, label: 'Buying Heaven & Hell', icon: '⚖️' },
@@ -323,10 +324,32 @@ export function GrowthMode() {
   }[]>([])
 
   // Helper for formatting result cards: Full Precision if toggled AND < 100M
+  // REPLACED: Updated to return tooltip component
   const formatResult = (val: number | undefined) => {
     if (val === undefined) return '$0'
-    const shouldUseCompact = (val >= 1e100) || !showFullPrecision
-    return formatCurrency(val, true, 2, shouldUseCompact)
+
+    const shouldUseCompact = val >= 1e100 || !showFullPrecision
+    const formatted = formatCurrency(val, true, 2, shouldUseCompact)
+    const fullName = getLargeNumberName(val)
+
+    if (shouldUseCompact && fullName) {
+      return (
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help decoration-dotted decoration-foreground/30 underline-offset-4 hover:underline">
+                {formatted}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="bg-card text-foreground border-border rounded-lg shadow-lg p-3 text-xs">
+              <p>{fullName}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    }
+
+    return formatted
   }
 
   // Load state from URL if sharing link is used
@@ -672,7 +695,7 @@ export function GrowthMode() {
                     value={state?.targetValue ?? ''}
                     onChange={(value) => setState({ ...state, targetValue: value || undefined })}
                     min={0}
-                    max={1_000_000_000_000_000_000_000}
+                    max={1_000_000_000_000_000_000}
                     maxErrorMessage="What are you trying to buy, the moon? 🌝"
                   />
                 </div>
@@ -702,7 +725,7 @@ export function GrowthMode() {
                       onCheckedChange={setShowFullPrecision}
                     />
                     <Label htmlFor="precision-toggle" className="font-normal cursor-pointer">
-                      Full Precision
+                      Expand
                     </Label>
                   </div>
 
@@ -764,9 +787,9 @@ export function GrowthMode() {
                   className="min-w-0 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-4 space-y-1"
                 >
                   <p className="text-xs text-muted-foreground">Final Portfolio Value</p>
-                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary break-words leading-tight">
+                  <div className="text-lg sm:text-xl md:text-2xl font-bold text-primary break-words leading-tight">
                     {formatResult(calculateGrowth?.finalValue)}
-                  </p>
+                  </div>
                 </motion.div>
 
                 <motion.div
@@ -778,9 +801,9 @@ export function GrowthMode() {
                   className="min-w-0 bg-gradient-to-br from-blue-500/10 to-blue-500/5 rounded-lg p-4 space-y-1"
                 >
                   <p className="text-xs text-muted-foreground">Total Contributions</p>
-                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-500 break-words leading-tight">
+                  <div className="text-lg sm:text-xl md:text-2xl font-bold text-blue-500 break-words leading-tight">
                     {formatResult(calculateGrowth?.totalContributions)}
-                  </p>
+                  </div>
                 </motion.div>
 
                 <motion.div
@@ -797,13 +820,13 @@ export function GrowthMode() {
                 >
                   <p className="text-xs text-muted-foreground">Total Profit</p>
 
-                  <p
+                  <div
                     className={`text-lg sm:text-xl md:text-2xl font-bold break-words leading-tight ${
                       isProfitNegative ? 'text-destructive' : 'text-emerald-500'
                     }`}
                   >
                     {formatResult(calculateGrowth?.totalProfit)}
-                  </p>
+                  </div>
                 </motion.div>
 
               </div>

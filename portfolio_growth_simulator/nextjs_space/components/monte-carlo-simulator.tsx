@@ -684,7 +684,7 @@ const handleExportExcel = () => {
                       onCheckedChange={setShowFullPrecision}
                     />
                     <Label htmlFor="precision-toggle-mc" className="font-normal cursor-pointer">
-                      Full Precision
+                      Expand
                     </Label>
                   </div>
 
