@@ -211,55 +211,55 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
     }
   }
 
-const handleExportExcel = () => {
-  triggerHaptic('light')
-  if (!simulationResults) return
+  // Refactored logic to generate excel from a results object directly
+  const generateExcel = (results: any) => {
+    if (!results) return
 
-  const {
-    mean,
-    median,
-    p5,
-    p10,
-    p25,
-    p75,
-    p90,
-    p95,
-    best,
-    worst,
-    chartData,
-    endingValues,
-    maxDrawdowns,
-    annualReturnsData,
-    lossProbData,
-    numPathsUsed,
-    investmentData,
-  } = simulationResults
+    const {
+      mean,
+      median,
+      p5,
+      p10,
+      p25,
+      p75,
+      p90,
+      p95,
+      best,
+      worst,
+      chartData,
+      endingValues,
+      maxDrawdowns,
+      annualReturnsData,
+      lossProbData,
+      numPathsUsed,
+      investmentData,
+    } = results
 
-  // Logic for the invested label: 'Total Invested' for growth, 'Starting Balance' for withdrawal
-  const investedLabel = mode === 'withdrawal' ? 'Starting Balance' : 'Total Invested';
+    // Logic for the invested label: 'Total Invested' for growth, 'Starting Balance' for withdrawal
+    const investedLabel = mode === 'withdrawal' ? 'Starting Balance' : 'Total Invested';
 
-  const summaryRows = [
-    { Key: 'Mode', Value: mode },
-    { Key: 'Initial Value', Value: roundToCents(params.initialValue) },
-    { Key: investedLabel, Value: roundToCents(totalInvested) },
-    { Key: 'Expected Return %', Value: params.expectedReturn },
-    { Key: 'Volatility %', Value: params.volatility },
-    { Key: 'Duration Years', Value: params.duration },
-    { Key: 'Monthly Cashflow', Value: roundToCents(params.cashflowAmount) },
-    { Key: 'Inflation Adjustment %', Value: params.inflationAdjustment ?? 0 },
-    { Key: 'Number Of Scenarios', Value: numPathsUsed },
-    { Key: 'Mean Ending Value', Value: roundToCents(mean) },
-    { Key: 'Median Ending Value', Value: roundToCents(median) },
-    { Key: 'P5 Ending Value', Value: roundToCents(p5) },
-    { Key: 'P10 Ending Value', Value: roundToCents(p10) },
-    { Key: 'P25 Ending Value', Value: roundToCents(p25) },
-    { Key: 'P75 Ending Value', Value: roundToCents(p75) },
-    { Key: 'P90 Ending Value', Value: roundToCents(p90) },
-    { Key: 'P95 Ending Value', Value: roundToCents(p95) },
-    { Key: 'Best Ending Value', Value: roundToCents(best) },
-    { Key: 'Worst Ending Value', Value: roundToCents(worst) },
-    { Key: 'Random Seed', Value: rngSeed ?? '' },
-  ]
+    const summaryRows = [
+      { Key: 'Mode', Value: mode },
+      { Key: 'Initial Value', Value: roundToCents(params.initialValue) },
+      { Key: investedLabel, Value: roundToCents(totalInvested) },
+      { Key: 'Expected Return %', Value: params.expectedReturn },
+      { Key: 'Volatility %', Value: params.volatility },
+      { Key: 'Duration Years', Value: params.duration },
+      { Key: 'Monthly Cashflow', Value: roundToCents(params.cashflowAmount) },
+      { Key: 'Inflation Adjustment %', Value: params.inflationAdjustment ?? 0 },
+      { Key: 'Number Of Scenarios', Value: numPathsUsed },
+      { Key: 'Mean Ending Value', Value: roundToCents(mean) },
+      { Key: 'Median Ending Value', Value: roundToCents(median) },
+      { Key: 'P5 Ending Value', Value: roundToCents(p5) },
+      { Key: 'P10 Ending Value', Value: roundToCents(p10) },
+      { Key: 'P25 Ending Value', Value: roundToCents(p25) },
+      { Key: 'P75 Ending Value', Value: roundToCents(p75) },
+      { Key: 'P90 Ending Value', Value: roundToCents(p90) },
+      { Key: 'P95 Ending Value', Value: roundToCents(p95) },
+      { Key: 'Best Ending Value', Value: roundToCents(best) },
+      { Key: 'Worst Ending Value', Value: roundToCents(worst) },
+      { Key: 'Random Seed', Value: rngSeed ?? '' },
+    ]
 
     const wsSummary = XLSX.utils.json_to_sheet(summaryRows)
     ;(wsSummary as any)['!cols'] = [
@@ -378,10 +378,22 @@ const handleExportExcel = () => {
     XLSX.writeFile(wb, fileName)
   }
 
+  const handleExportExcel = () => {
+    triggerHaptic('light')
+    // Run simulation first to ensure data matches current inputs
+    runSimulation(undefined, undefined, undefined, (results) => {
+       generateExcel(results)
+    })
+  }
+
   const handleExportPdf = () => {
     triggerHaptic('light')
     if (typeof window === 'undefined') return
-    window.print()
+    // Run simulation first to ensure data matches current inputs
+    runSimulation(undefined, undefined, undefined, () => {
+        // Wait briefly for DOM to update with new results before printing
+        setTimeout(() => window.print(), 100)
+    })
   }
 
   useEffect(() => {
@@ -400,7 +412,12 @@ const handleExportExcel = () => {
     }
   }, [profile, setParams, params.expectedReturn, params.volatility])
 
-  const runSimulation = (overrideParams?: SimulationParams, seedOverride?: string, preservedLogScales?: LogScaleSettings) => {
+  const runSimulation = (
+    overrideParams?: SimulationParams, 
+    seedOverride?: string, 
+    preservedLogScales?: LogScaleSettings,
+    onComplete?: (results: any) => void
+  ) => {
     const simParams = overrideParams ?? params
     const seed = seedOverride ?? rngSeed ?? `monte-carlo-${Date.now()}-${Math.random()}`
 
@@ -424,6 +441,10 @@ const handleExportExcel = () => {
 
       setSimulationResults(results)
       setIsSimulating(false)
+      
+      if (onComplete) {
+        onComplete(results)
+      }
     }, 100)
   }
 
@@ -511,7 +532,8 @@ const handleExportExcel = () => {
 
             {/* Print-only view of selected profile */}
             <div className="hidden print:block text-sm">
-              <span className="font-semibold">Selected Profile:</span> {PRESET_PROFILES[profile].name} ({PRESET_PROFILES[profile].expectedReturn}% Return, {PRESET_PROFILES[profile].volatility}% Volatility)
+              <span className="font-semibold">Selected Profile:</span> {PRESET_PROFILES[profile].name}
+              {profile !== 'custom' && ` (${PRESET_PROFILES[profile].expectedReturn}% Return, ${PRESET_PROFILES[profile].volatility}% Volatility)`}
             </div>
             
             <p className="text-xs text-muted-foreground mt-2 print:hidden">
@@ -849,7 +871,7 @@ const handleExportExcel = () => {
                   <Target className="h-6 w-6 text-primary" />
                   <div className="flex-1">
                     <p className="font-semibold">
-                      {simulationResults?.goalProbability?.toFixed?.(1) ?? '0'}% chance of reaching ${params.portfolioGoal.toLocaleString()}
+                      {simulationResults?.goalProbability?.toFixed?.(1) ?? '0'}% chance of reaching ${(simulationResults?.portfolioGoalSnapshot ?? params.portfolioGoal).toLocaleString()}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       In {simulationResults?.pathsReachingGoal ?? 0} out of{' '}
@@ -1268,5 +1290,6 @@ function performMonteCarloSimulation(
     recommendLogLinear,
     recommendLogHistogram,
     recommendLogDrawdown,
+    portfolioGoalSnapshot: portfolioGoal
   }
 }
