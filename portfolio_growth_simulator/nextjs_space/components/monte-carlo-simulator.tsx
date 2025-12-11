@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Dices, TrendingUp, AlertCircle, Target, Zap, Share, FileText, FileSpreadsheet, Lightbulb } from 'lucide-react'
+import { Dices, DollarSign, AlertCircle, Target, Zap, Share, FileText, FileSpreadsheet, Lightbulb } from 'lucide-react'
 import { MonteCarloChart } from '@/components/monte-carlo-chart'
 import { MonteCarloHistogram } from '@/components/monte-carlo-histogram'
 import { motion } from 'framer-motion'
@@ -482,7 +482,6 @@ const handleExportExcel = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Dices className="h-5 w-5 text-primary" />
             Monte Carlo Simulation
           </CardTitle>
           <CardDescription>
@@ -524,7 +523,13 @@ const handleExportExcel = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Simulation Parameters</CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 shrink-0 -ml-1">
+              <DollarSign className="h-5 w-5 text-violet-500" />
+              <CardTitle>Simulation Parameters</CardTitle>
+            </div>
+            {/* right side content if any */}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -671,7 +676,7 @@ const handleExportExcel = () => {
           <CardHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="flex items-center gap-2 shrink-0">
-                <TrendingUp className="h-5 w-5 text-primary" />
+                <Dices className="h-5 w-5 text-violet-500" />
                 Simulation Results
               </CardTitle>
 
@@ -895,7 +900,7 @@ const handleExportExcel = () => {
                   <div className="space-y-2 text-sm">
                     <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                       <p>
-                        <span className="font-semibold text-blue-600 dark:text-blue-400">The Multiplier Effect:</span> In the best case scenario, your money grew by a factor of{' '}
+                        <span className="font-semibold text-blue-600 dark:text-blue-400">The Multiplier Effect:</span> In the best outcome scenario, your money grew by a factor of{' '}
                         <span className="font-bold">
                           {((simulationResults?.best ?? 0) / (totalInvested || 1)).toFixed(1)}x
                         </span>.

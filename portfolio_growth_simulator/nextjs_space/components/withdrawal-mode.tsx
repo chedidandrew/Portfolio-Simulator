@@ -27,6 +27,7 @@ import {
   Share,
   FileText,
   FileSpreadsheet,
+  Dices,
 } from 'lucide-react'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 import { WithdrawalChart } from '@/components/withdrawal-chart'
@@ -317,9 +318,12 @@ export function WithdrawalMode() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label className="text-base font-semibold">
-                Monte Carlo Simulation
-              </Label>
+              <div className="flex items-center gap-2">
+                <Dices className="h-4 w-4 text-violet-500" />
+                <Label className="text-base font-semibold">
+                  Monte Carlo Simulation
+                </Label>
+              </div>
               <p className="text-sm text-muted-foreground">
                 Model portfolio sustainability with randomized scenarios
               </p>
@@ -345,7 +349,7 @@ export function WithdrawalMode() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
+                <DollarSign className="h-5 w-5 text-blue-500" />
                 Withdrawal Parameters
               </CardTitle>
               <CardDescription>
@@ -518,7 +522,7 @@ export function WithdrawalMode() {
             <CardHeader>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle className="flex items-center gap-2 shrink-0">
-                  <TrendingDown className="h-5 w-5 text-primary" />
+                  <TrendingDown className="h-5 w-5 text-blue-500" />
                   Withdrawal Results
                 </CardTitle>
 
@@ -646,7 +650,7 @@ export function WithdrawalMode() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" />
+                <Calendar className="h-5 w-5 text-blue-500" />
                 Balance By Year
               </CardTitle>
             </CardHeader>

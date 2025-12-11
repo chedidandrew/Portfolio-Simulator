@@ -115,7 +115,7 @@ export function WithdrawalChart({ data }: WithdrawalChartProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-primary" />
+              <TrendingDown className="h-5 w-5 text-blue-500" />
               Portfolio Balance Over Time
             </CardTitle>
             <div className="flex items-center gap-2">

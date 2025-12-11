@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { DollarSign, TrendingUp, Calendar, Target, Award, Share, FileText, FileSpreadsheet } from 'lucide-react'
+import { DollarSign, TrendingUp, Calendar, Target, Award, Share, FileText, FileSpreadsheet, Dices } from 'lucide-react'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 import { GrowthChart } from '@/components/growth-chart'
 import { MonteCarloSimulator } from '@/components/monte-carlo-simulator'
@@ -580,7 +580,12 @@ export function GrowthMode() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label className="text-base font-semibold">Monte Carlo Simulation</Label>
+              <div className="flex items-center gap-2">
+                <Dices className="h-4 w-4 text-violet-500" />
+                <Label className="text-base font-semibold">
+                  Monte Carlo Simulation
+                </Label>
+              </div>
               <p className="text-sm text-muted-foreground">
                 Model market volatility with randomized scenarios
               </p>

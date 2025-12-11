@@ -126,7 +126,10 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
-              <ChartSpline className="h-5 w-5 text-primary" />
+              <ChartSpline 
+                className="h-5 w-5" 
+                style={{ color: "hsl(165, 65%, 48%)" }} 
+              />
               Scenario Paths with Percentile Bands
             </CardTitle>
             <div className="flex items-center gap-2">
