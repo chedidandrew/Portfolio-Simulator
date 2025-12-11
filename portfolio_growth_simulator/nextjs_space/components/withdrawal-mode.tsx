@@ -35,8 +35,9 @@ import { DonationSection } from '@/components/donation-section'
 import { motion } from 'framer-motion'
 import * as XLSX from 'xlsx'
 import { triggerHaptic } from '@/hooks/use-haptics'
-import { roundToCents, formatCurrency } from '@/lib/utils'
+import { roundToCents, formatCurrency, getLargeNumberName } from '@/lib/utils'
 import { WithdrawalState } from '@/lib/types'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface YearData {
   year: number
@@ -46,11 +47,11 @@ interface YearData {
   isSustainable: boolean
 }
 
-const FREQUENCY_MULTIPLIER: Record<WithdrawalState['frequency'], number> = {
-  yearly: 1,
-  quarterly: 4,
-  monthly: 12,
+const FREQUENCY_MULTIPLIER: Record<string, number> = {
   weekly: 52,
+  monthly: 12,
+  quarterly: 4,
+  yearly: 1,
 }
 
 export function WithdrawalMode() {
@@ -66,15 +67,36 @@ export function WithdrawalMode() {
     },
   )
 
-  // Changed to useLocalStorage to persist the toggle state
   const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('withdrawal-show-monte-carlo', false)
   const [showFullPrecision, setShowFullPrecision] = useLocalStorage('withdrawal-show-full-precision', false)
 
-  // Helper for formatting result cards: Full Precision if toggled AND < 100M
-  const formatResult = (val: number | undefined) => {
+  // Renders the formatted currency. If the value is > 1M and compact mode is on,
+  // it wraps the value in a tooltip showing the full name (e.g., "1.50 Quinquagintillion").
+  const renderFormattedResult = (val: number | undefined) => {
     if (val === undefined) return '$0'
-    const shouldUseCompact = (val >= 1e100) || !showFullPrecision
-    return formatCurrency(val, true, 2, shouldUseCompact)
+
+    const shouldUseCompact = val >= 1e100 || !showFullPrecision
+    const formatted = formatCurrency(val, true, 2, shouldUseCompact)
+    const fullName = getLargeNumberName(val)
+
+    if (shouldUseCompact && fullName) {
+      return (
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help decoration-dotted decoration-foreground/30 underline-offset-4 hover:underline">
+                {formatted}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="bg-card text-foreground border-border rounded-lg shadow-lg p-3 text-xs">
+              <p>{fullName}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    }
+
+    return formatted
   }
 
   // Load state from URL if sharing link is used
@@ -577,7 +599,7 @@ export function WithdrawalMode() {
                   <p
                     className={`text-lg sm:text-xl md:text-2xl font-bold ${sustainabilityColor} break-words leading-tight`}
                   >
-                    {formatResult(calculateWithdrawal?.endingBalance)}
+                    {renderFormattedResult(calculateWithdrawal?.endingBalance)}
                   </p>
                 </motion.div>
                 <motion.div
@@ -591,7 +613,7 @@ export function WithdrawalMode() {
                     Total Withdrawn
                   </p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-500 break-words leading-tight">
-                    {formatResult(calculateWithdrawal?.totalWithdrawn)}
+                    {renderFormattedResult(calculateWithdrawal?.totalWithdrawn)}
                   </p>
                 </motion.div>
                 <motion.div

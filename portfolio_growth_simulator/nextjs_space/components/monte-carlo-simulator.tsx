@@ -23,8 +23,9 @@ import { useTheme } from 'next-themes'
 import * as XLSX from 'xlsx'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 import { triggerHaptic } from '@/hooks/use-haptics'
-import { roundToCents, formatCurrency } from '@/lib/utils'
+import { roundToCents, formatCurrency, getLargeNumberName } from '@/lib/utils'
 import { SimulationParams } from '@/lib/types'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface MonteCarloSimulatorProps {
   mode: 'growth' | 'withdrawal'
@@ -97,11 +98,33 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
   // Use local storage for full precision preference per mode
   const [showFullPrecision, setShowFullPrecision] = useLocalStorage('mc-show-full-precision-' + mode, false)
 
-  // Helper for formatting result cards: Full Precision if toggled AND < 100M
-  const formatResult = (val: number | undefined) => {
+  // Helper for formatting result cards: full precision if toggled and value is not astronomically large.
+  // Returns JSX when compact so we can show a hover tooltip.
+  const renderFormattedResult = (val: number | undefined) => {
     if (val === undefined) return '$0'
-    const shouldUseCompact = (val >= 1e100) || !showFullPrecision
-    return formatCurrency(val, true, 2, shouldUseCompact)
+
+    const shouldUseCompact = val >= 1e100 || !showFullPrecision
+    const formatted = formatCurrency(val, true, 2, shouldUseCompact)
+    const fullName = getLargeNumberName(val)
+
+    if (shouldUseCompact && fullName) {
+      return (
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help decoration-dotted decoration-foreground/30 underline-offset-4 hover:underline">
+                {formatted}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="bg-card text-foreground border-border rounded-lg shadow-lg p-3 text-xs">
+              <p>{fullName}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    }
+
+    return formatted
   }
 
   // Calculate total invested capital for the multiplier effect
@@ -724,7 +747,7 @@ const handleExportExcel = () => {
                 >
                   <p className="text-xs text-muted-foreground">Median Outcome</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary break-words leading-tight">
-                    {formatResult(simulationResults?.median)}
+                    {renderFormattedResult(simulationResults?.median)}
                   </p>
                 </motion.div>
 
@@ -736,7 +759,7 @@ const handleExportExcel = () => {
                 >
                   <p className="text-xs text-muted-foreground">Mean Outcome</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-500 break-words leading-tight">
-                    {formatResult(simulationResults?.mean)}
+                    {renderFormattedResult(simulationResults?.mean)}
                   </p>
                 </motion.div>
 
@@ -748,7 +771,7 @@ const handleExportExcel = () => {
                 >
                   <p className="text-xs text-muted-foreground">Best Case (95%)</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-emerald-500 break-words leading-tight">
-                    {formatResult(simulationResults?.p95)}
+                    {renderFormattedResult(simulationResults?.p95)}
                   </p>
                 </motion.div>
 
@@ -760,7 +783,7 @@ const handleExportExcel = () => {
                 >
                   <p className="text-xs text-muted-foreground">Worst Case (5%)</p>
                   <p className="text-lg sm:text-xl md:text-2xl font-bold text-orange-500 break-words leading-tight">
-                    {formatResult(simulationResults?.p5)}
+                    {renderFormattedResult(simulationResults?.p5)}
                   </p>
                 </motion.div>
               </div>
@@ -771,42 +794,42 @@ const handleExportExcel = () => {
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">10th percentile</span>
                     <span className="font-bold text-lg leading-tight truncate">
-                      {formatResult(simulationResults?.p10)}
+                      {renderFormattedResult(simulationResults?.p10)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">25th percentile</span>
                     <span className="font-bold text-lg leading-tight truncate">
-                      {formatResult(simulationResults?.p25)}
+                      {renderFormattedResult(simulationResults?.p25)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">75th percentile</span>
                     <span className="font-bold text-lg leading-tight truncate">
-                      {formatResult(simulationResults?.p75)}
+                      {renderFormattedResult(simulationResults?.p75)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">90th percentile</span>
                     <span className="font-bold text-lg leading-tight truncate">
-                      {formatResult(simulationResults?.p90)}
+                      {renderFormattedResult(simulationResults?.p90)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">Best outcome</span>
                     <span className="font-bold text-lg leading-tight truncate text-emerald-500">
-                      {formatResult(simulationResults?.best)}
+                      {renderFormattedResult(simulationResults?.best)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1 p-3 bg-muted rounded min-w-0">
                     <span className="text-muted-foreground text-xs">Worst outcome</span>
                     <span className="font-bold text-lg leading-tight truncate text-orange-500">
-                      {formatResult(simulationResults?.worst)}
+                      {renderFormattedResult(simulationResults?.worst)}
                     </span>
                   </div>
                 </div>
@@ -843,7 +866,7 @@ const handleExportExcel = () => {
                       <p>
                         <span className="font-semibold">Total Invested:</span> Over {params.duration} years, you invested a total of{' '}
                         <span className="text-indigo-500 font-bold">
-                          {formatResult(totalInvested)}
+                          {renderFormattedResult(totalInvested)}
                         </span>
                       </p>
                     </div>
@@ -853,11 +876,11 @@ const handleExportExcel = () => {
                       <p>
                         <span className="font-semibold">Typical Outcome:</span> There is a 50% chance your balance ends between{' '}
                         <span className="text-orange-500 font-bold">
-                          {formatResult(simulationResults?.p25)}
+                          {renderFormattedResult(simulationResults?.p25)}
                         </span>
                         {' '}and{' '}
                         <span className="text-emerald-500 font-bold">
-                          {formatResult(simulationResults?.p75)}
+                          {renderFormattedResult(simulationResults?.p75)}
                         </span>
                       </p>
                     </div>
