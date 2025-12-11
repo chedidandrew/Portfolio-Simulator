@@ -100,7 +100,7 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
   // Helper for formatting result cards: Full Precision if toggled AND < 100M
   const formatResult = (val: number | undefined) => {
     if (val === undefined) return '$0'
-    const shouldUseCompact = (val >= 100_000_000_000_000_000_000_000_000_000_000_000_000) || !showFullPrecision
+    const shouldUseCompact = (val >= 1e100) || !showFullPrecision
     return formatCurrency(val, true, 2, shouldUseCompact)
   }
 

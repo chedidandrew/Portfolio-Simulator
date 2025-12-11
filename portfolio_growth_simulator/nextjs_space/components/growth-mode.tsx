@@ -41,17 +41,17 @@ const MILESTONES = [
   { value: 100000000, label: 'Money is no object', icon: '💰' },
   { value: 500000000, label: 'Half Billion Club', icon: '🌍' },
   { value: 1000000000, label: 'Billionaire!', icon: '🌌' },
-  { value: 2000000000,  label: 'Two Billion Level',        icon: '🛰️' },
-  { value: 5000000000,  label: 'Five Billion Level',       icon: '🪐' },
-  { value: 10000000000, label: 'Ten Billion Titan',        icon: '👾' },
+  { value: 2000000000, label: 'Two Billion Level', icon: '🛰️' },
+  { value: 5000000000, label: 'Five Billion Level', icon: '🪐' },
+  { value: 10000000000, label: 'Ten Billion Titan', icon: '👾' },
   { value: 25000000000, label: 'Quarter-Centibillionaire', icon: '⚡' },
-  { value: 50000000000, label: 'Half-Centibillionaire',    icon: '🌋' },
-  { value: 100000000000, label: 'Centibillionaire+',       icon: '🎡' },
-  { value: 250000000000, label: 'Quarter Trillion',        icon: '🏗️' },
-  { value: 500000000000, label: 'Half Trillion',           icon: '🧭' },
-  { value: 1000000000000, label: 'Trillionaire!',          icon: '👽' },
-  { value: 2500000000000, label: 'Quarter Trillionaire+',  icon: '🌠' },
-  { value: 5000000000000, label: 'Half Trillionaire+',     icon: '🚁' },
+  { value: 50000000000, label: 'Half-Centibillionaire', icon: '🌋' },
+  { value: 100000000000, label: 'Centibillionaire+', icon: '🎡' },
+  { value: 250000000000, label: 'Quarter Trillion', icon: '🌠' },
+  { value: 500000000000, label: 'Half Trillion', icon: '🧭' },
+  { value: 1000000000000, label: 'Trillionaire!', icon: '👽' },
+  { value: 2500000000000, label: 'Compound interest is OP', icon: '📈' },
+  { value: 5000000000000, label: 'Half Trillionaire+', icon: '🚁' },
 
   // --- THE QUADRILLIONS (10^15) ---
   { value: 10000000000000, label: 'Keep Dreaming...', icon: '💤' },
@@ -79,7 +79,7 @@ const MILESTONES = [
 
   // --- THE OCTILLIONS (10^27) ---
   { value: 1e25, label: 'Bribing Black Holes', icon: '🕳️' },
-  { value: 1e26, label: 'Buying the Multiverse', icon: '🌀' },
+  { value: 1e26, label: 'Buying the Universe', icon: '🌀' },
   { value: 1e27, label: 'Octillionaire', icon: '🐙' },
   { value: 5e27, label: 'Atoms in the Human Body', icon: '🧬' },
 
@@ -93,11 +93,103 @@ const MILESTONES = [
   { value: 1e32, label: 'Integer Overflow Error', icon: '⚠️' },
   { value: 1e33, label: 'You Broke Mathematics', icon: '✖️' },
   { value: 1e34, label: 'Please Stop Clicking', icon: '🛑' },
-  { value: 1e35, label: 'Buying Heaven & Hell', icon: '⚖️' },
+  { value: 1e35, label: 'Needs A Bigger Number Type', icon: '🧮' },
   { value: 1e36, label: 'The Simulation Crashing', icon: '🖥️' },
-  { value: 1e37, label: 'Undecillionaire (Get a life)', icon: '💀' },
-  { value: 1e38, label: 'Okay, you win. Happy?', icon: '🏳️' },
-];
+  { value: 1e37, label: 'Undecillionaire', icon: '🧊' },
+  { value: 1e38, label: 'Please Go Outside Immediately', icon: '🚪' },
+
+  // --- THE DUODECILLIONS (10^39) ---
+  { value: 1e39, label: 'Duodecillionaire (Seek Help)', icon: '🛋️' },
+  { value: 3e39, label: 'Owns Several Universes', icon: '🌌' },
+  { value: 5e39, label: 'Too Rich To Render', icon: '🧾' },
+
+  // --- THE TREDECILLIONS (10^42) ---
+  { value: 1e42, label: 'Tredecillionaire', icon: '🧠' },
+  { value: 5e42, label: 'Wallet Needs Its Own Server', icon: '🗄️' },
+
+  // --- THE QUATTUORDECILLIONS (10^45) ---
+  { value: 1e45, label: 'Quattuordecillionaire', icon: '📚' },
+  { value: 5e45, label: 'Owns Every Timeline', icon: '⏳' },
+
+  // --- THE QUINDECILLIONS (10^48) ---
+  { value: 1e48, label: 'Quindecillionaire', icon: '🎭' },
+  { value: 5e48, label: 'Can Tip Type III civilizations For Fun', icon: '💸' },
+
+  // --- THE SEXDECILLIONS (10^51) ---
+  { value: 1e51, label: 'Sexdecillionaire', icon: '🔥' },
+  { value: 5e51, label: 'Central Bank Of Reality', icon: '🏛️' },
+
+  // --- THE SEPTENDECILLIONS (10^54) ---
+  { value: 1e54, label: 'Septendecillionaire', icon: '🛰️' },
+  { value: 5e54, label: 'Bored Of Owning the multiverse', icon: '😐' },
+
+  // --- THE OCTODECILLIONS (10^57) ---
+  { value: 1e57, label: 'Octodecillionaire', icon: '🧬' },
+  { value: 5e57, label: 'Buys Laws Of Physics', icon: '📜' },
+
+  // --- THE NOVEMDECILLIONS (10^60) ---
+  { value: 1e60, label: 'Novemdecillionaire', icon: '🧨' },
+  { value: 5e60, label: 'You Broke The Simulator UI', icon: '👁️' },
+
+  // --- THE VIGINTILLIONS (10^63) ---
+  { value: 1e63, label: 'Vigintillionaire (Get a life)', icon: '💀' },
+  { value: 3e63, label: 'Why are you still clicking?', icon: '🖱️' },
+  { value: 5e63, label: 'Okay, you win. Happy?', icon: '🏳️' },
+  { value: 1e64, label: 'Ran out of emojis to give you'},
+  { value: 3e64, label: 'At'},
+  { value: 5e64, label: 'least'},
+  { value: 1e65, label: 'save'},
+  { value: 3e65, label: 'some'},
+  { value: 5e65, label: 'milestones'},
+  { value: 1e66, label: 'for'},
+  { value: 3e66, label: 'everyone'},
+  { value: 5e66, label: 'else'},
+  { value: 1e67, label: '.'},
+  { value: 3e67, label: '.'},
+  { value: 5e67, label: '.'},
+  { value: 1e68, label: '*sigh*'},
+  { value: 1e68, label: 'Last one'},
+  { value: 1e69, label: '.'},
+  { value: 3e69, label: '.'},
+  { value: 5e69, label: '.'},
+  // --- THE EXPANDED INSANITY (10^70+) ---
+  { value: 1e70, label: 'Lol (I lied)', icon: '🤥' },
+  { value: 1e72, label: 'Buying the Writer’s Room', icon: '✍️' },
+  { value: 1e75, label: 'Hostile Takeover of String Theory', icon: '🤝' },
+  { value: 1e78, label: 'Owning the Existance itself', icon: '🔵' },
+  
+  // 10^80 is roughly the number of atoms in the observable universe
+  { value: 1e80, label: 'Owned Every Possibility in Existence', icon: '⚛️' },
+  { value: 1e85, label: 'Renting all laws of the Multiverse', icon: '🏘️' },
+  { value: 1e90, label: 'Bribing Mathematics and Physics Itself', icon: '🍎' },
+  { value: 1e95, label: 'downloading_more_ram.exe', icon: '💾' },
+
+  // GOOGOL (10^100)
+  { value: 1e100, label: 'GOOGOLNAIRE', icon: '🔎' },
+  { value: 1e105, label: 'Google is now your subsidiary', icon: '📉' },
+  { value: 1e110, label: 'Deleting the number 0', icon: '0️⃣' },
+  { value: 1e120, label: 'Buying the concept of Math', icon: '➗' },
+  
+  // The absurd
+  { value: 1e130, label: 'You are the Simulation', icon: '👾' },
+  { value: 1e140, label: '404: Economy Not Found', icon: '🚫' },
+  { value: 1e150, label: 'Money is now meaningless', icon: '🚮' },
+  { value: 1e160, label: 'Your wallet has an event horizon', icon: '🕳️' },
+  { value: 1e180, label: 'Admin Access Granted', icon: '🔑' },
+  { value: 1e200, label: 'Buying Heaven & Hell', icon: '⚖️' },
+  
+  // Approaching limits
+  { value: 1e250, label: 'JavaScript is crying', icon: '😭' },
+  { value: 1e280, label: 'Buffer Overflow Imminent', icon: '🌊' },
+  { value: 1e300, label: 'The End is Nigh', icon: '🔚' },
+
+  // CENTILLION (10^303)
+  { value: 1e303, label: 'CENTILLIONAIRE', icon: '💯' },
+  
+  // MAX_VALUE is ~1.79e308
+  { value: 1.7e308, label: '(1 = 0) GAME OVER ', icon: '🎮' },
+  { value: Infinity, label: 'TO INFINITY AND BEYOND', icon: '🚀' },
+]
 
 const milestoneVariants = {
   hidden: { scale: 0, opacity: 0, y: 10 },
@@ -106,7 +198,7 @@ const milestoneVariants = {
     opacity: 1,
     y: 0,
     transition: {
-      delay: 0.05 * index,
+      delay: 0.1 * index,
       type: 'spring',
       stiffness: 260,
       damping: 18,
@@ -233,7 +325,7 @@ export function GrowthMode() {
   // Helper for formatting result cards: Full Precision if toggled AND < 100M
   const formatResult = (val: number | undefined) => {
     if (val === undefined) return '$0'
-    const shouldUseCompact = (val >= 100_000_000_000_000_000_000_000_000_000_000_000_000) || !showFullPrecision
+    const shouldUseCompact = (val >= 1e100) || !showFullPrecision
     return formatCurrency(val, true, 2, shouldUseCompact)
   }
 
@@ -505,7 +597,7 @@ export function GrowthMode() {
                     value={state?.startingBalance ?? 0}
                     onChange={(value) => setState({ ...state, startingBalance: value })}
                     min={0}
-                    max={1000000000}
+                    max={1_000_000_000}
                     maxErrorMessage="Now you are just being too greedy :)"
                   />
                 </div>
@@ -517,7 +609,7 @@ export function GrowthMode() {
                     value={state?.annualReturn ?? 0}
                     onChange={(value) => setState({ ...state, annualReturn: value })}
                     min={-100}
-                    max={100}
+                    max={100000}
                     maxErrorMessage="Now you are just being too greedy :)"
                   />
                 </div>
@@ -539,7 +631,7 @@ export function GrowthMode() {
                     value={state?.periodicAddition ?? 0}
                     onChange={(value) => setState({ ...state, periodicAddition: value })}
                     min={0}
-                    max={10000000}
+                    max={10_000_000}
                     maxErrorMessage="Now you are just being too greedy :)"
                   />
                 </div>
@@ -580,8 +672,8 @@ export function GrowthMode() {
                     value={state?.targetValue ?? ''}
                     onChange={(value) => setState({ ...state, targetValue: value || undefined })}
                     min={0}
-                    max={100000000000}
-                    maxErrorMessage="Now you are just being too greedy :)"
+                    max={1_000_000_000_000_000_000_000}
+                    maxErrorMessage="What are you trying to buy, the moon? 🌝"
                   />
                 </div>
               </div>
@@ -665,7 +757,8 @@ export function GrowthMode() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
                 <motion.div
-                  key={calculateGrowth?.finalValue}
+                  // FIX: use static key so the element is reused instead of remounted
+                  key="metric-final-value"
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   className="min-w-0 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-4 space-y-1"
@@ -677,7 +770,8 @@ export function GrowthMode() {
                 </motion.div>
 
                 <motion.div
-                  key={calculateGrowth?.totalContributions}
+                  // FIX: static key
+                  key="metric-total-contributions"
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.1 }}
@@ -690,7 +784,8 @@ export function GrowthMode() {
                 </motion.div>
 
                 <motion.div
-                  key={calculateGrowth?.totalProfit}
+                  // FIX: static key
+                  key="metric-total-profit"
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.2 }}
