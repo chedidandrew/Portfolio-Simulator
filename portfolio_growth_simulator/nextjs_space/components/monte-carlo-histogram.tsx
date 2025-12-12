@@ -267,7 +267,7 @@ export function MonteCarloHistogram({ data, logScale, onLogScaleChange }: MonteC
                     fill="hsl(142, 70%, 45%)"
                     name="Number of Scenarios"
                     radius={[4, 4, 0, 0]}
-                    animationDuration={500}
+                    animationDuration={200}
                   />
                 </BarChart>
               </ResponsiveContainer>

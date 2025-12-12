@@ -201,7 +201,7 @@ export function MonteCarloMaxDrawdownHistogram({ data, logScale, onLogScaleChang
                   fill="#FFA500"
                   name="Number of scenarios"
                   radius={[4, 4, 0, 0]}
-                  animationDuration={500}
+                  animationDuration={200}
                 />
               </BarChart>
             </ResponsiveContainer>

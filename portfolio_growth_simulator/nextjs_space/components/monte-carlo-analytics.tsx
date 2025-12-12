@@ -204,7 +204,7 @@ export function AnnualReturnsChart({ data, isDark }: AnalyticsProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.3 }}
+      transition={{ duration: 0.2, delay: 0.3 }}
       className="print-chart-page"
     >
       <Card>
@@ -264,7 +264,7 @@ export function ReturnProbabilitiesChart({ data, isDark }: AnalyticsProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.4 }}
+      transition={{ duration: 0.2, delay: 0.4 }}
       className="print-chart-page"
     >
       <Card>
@@ -325,7 +325,7 @@ export function LossProbabilitiesChart({ data, isDark }: AnalyticsProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.5 }}
+      transition={{ duration: 0.2, delay: 0.5 }}
       className="print-chart-page"
     >
       <Card>
@@ -384,7 +384,7 @@ export function InvestmentBreakdownChart({ data, isDark }: AnalyticsProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.6 }}
+      transition={{ duration: 0.2, delay: 0.6 }}
       className="print-chart-page"
     >
       <Card>

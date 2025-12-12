@@ -382,7 +382,10 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
     triggerHaptic('light')
     // Run simulation first to ensure data matches current inputs
     runSimulation(undefined, undefined, undefined, (results) => {
-       generateExcel(results)
+       // Wait slightly for the UI to update visually before downloading
+       setTimeout(() => {
+         generateExcel(results)
+       }, 500)
     })
   }
 
@@ -391,8 +394,8 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
     if (typeof window === 'undefined') return
     // Run simulation first to ensure data matches current inputs
     runSimulation(undefined, undefined, undefined, () => {
-        // Wait briefly for DOM to update with new results before printing
-        setTimeout(() => window.print(), 100)
+        // Wait for charts and animations to fully complete (2s) before printing
+        setTimeout(() => window.print(), 2000)
     })
   }
 
@@ -1023,6 +1026,7 @@ function performMonteCarloSimulation(
   if (params.initialValue <= 0) {
     throw new Error('Initial portfolio value must be greater than zero.')
   }
+
   const {
     initialValue,
     expectedReturn,
@@ -1044,41 +1048,58 @@ function performMonteCarloSimulation(
   const mu = Math.log(1 + r)
   const drift = mu * dt
   const diffusion = sigma * Math.sqrt(dt)
-  const cashflowPerStep = cashflowFrequency === 'monthly' ? cashflowAmount : cashflowAmount / 12
+  const cashflowPerStep =
+    cashflowFrequency === 'monthly' ? cashflowAmount : cashflowAmount / 12
   const inflationFactor = 1 + inflationAdjustment / 100
-  const rng = seedrandom(seed ?? `monte-carlo-${Date.now()}-${Math.random()}`)
+  const rng = seedrandom(
+    seed ?? `monte-carlo-${Date.now()}-${Math.random()}`
+  )
 
   // Helper for normal random
   function normalRandom(): number {
-    let u = 0, v = 0
+    let u = 0,
+      v = 0
     while (u === 0) u = rng()
     while (v === 0) v = rng()
     return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)
   }
 
-  const paths: number[][] = []
+  // 1) Distributions per year across all paths
+  const yearDistributions: number[][] = Array.from(
+    { length: duration + 1 },
+    () => []
+  )
+
+  // 2) Ending stats per path
   const endingValues: number[] = []
   const maxDrawdowns: number[] = []
-  const annualCAGRs: number[][] = [] // [YearIndex][ScenarioIndex] -> CAGR
   const lowestValues: number[] = [] // Lowest value ever reached for each scenario
-  
-  let pathsReachingGoal = 0
-  let pathsProfitable = 0 // > initialValue
-  let pathsSolvent = 0    // > 0
 
+  // 3) Annual CAGR distribution per year
+  const annualCAGRs: number[][] = []
   for (let y = 0; y <= duration; y++) {
     annualCAGRs[y] = []
   }
 
+  let pathsReachingGoal = 0
+  let pathsProfitable = 0 // > total invested
+  let pathsSolvent = 0 // > 0
+
   for (let path = 0; path < numPaths; path++) {
-    const yearlyValues: number[] = [initialValue]
     let currentValue = initialValue
-    let pureValue = initialValue // New: Track pure asset performance
+    let pureValue = initialValue // Track pure asset performance
     let lowestValue = initialValue
     let currentCashflowPerStep = cashflowPerStep
-    
-    // NEW: Track the total principal invested for this path
+
+    // Track total principal invested for this path
     let totalInvestedSoFar = initialValue
+
+    // Track drawdown on the fly
+    let peak = currentValue
+    let maxDrawdownForPath = 0
+
+    // Store Year 0 value
+    yearDistributions[0].push(currentValue)
 
     for (let step = 1; step <= totalTimeSteps; step++) {
       // Calculate growth factor once for this step
@@ -1090,7 +1111,6 @@ function performMonteCarloSimulation(
 
       if (mode === 'growth') {
         currentValue += currentCashflowPerStep
-        // NEW: Add contribution to total invested
         totalInvestedSoFar += currentCashflowPerStep
       } else {
         currentValue -= currentCashflowPerStep
@@ -1099,13 +1119,23 @@ function performMonteCarloSimulation(
 
       if (currentValue < lowestValue) lowestValue = currentValue
 
+      // Max drawdown on the fly (no need to store full path)
+      if (currentValue > peak) peak = currentValue
+      if (peak > 0) {
+        const dd = (peak - currentValue) / peak
+        if (dd > maxDrawdownForPath) maxDrawdownForPath = dd
+      }
+
+      // Store end-of-year statistics only
       if (step % timeStepsPerYear === 0) {
         const yearIndex = step / timeStepsPerYear
-        yearlyValues.push(currentValue)
-        
+
+        // Store this year's portfolio value for percentile chart
+        yearDistributions[yearIndex].push(currentValue)
+
         // Increase cashflow by inflation annually
         currentCashflowPerStep *= inflationFactor
-        
+
         if (yearIndex > 0) {
           // Calculate CAGR using pureValue (pure asset performance) instead of account balance
           const cagr = Math.pow(pureValue / initialValue, 1 / yearIndex) - 1
@@ -1113,44 +1143,32 @@ function performMonteCarloSimulation(
         }
       }
     }
-    
-    paths.push(yearlyValues)
+
     endingValues.push(currentValue)
     lowestValues.push(lowestValue)
+    maxDrawdowns.push(maxDrawdownForPath)
 
     if (portfolioGoal && currentValue >= portfolioGoal) pathsReachingGoal++
     if (currentValue > totalInvestedSoFar) pathsProfitable++
     if (currentValue > 0) pathsSolvent++
-
-    let peak = yearlyValues[0]
-    let maxDrawdown = 0
-    for (const value of yearlyValues) {
-      if (value > peak) peak = value
-      if (peak > 0) {
-        const drawdown = (peak - value) / peak
-        if (drawdown > maxDrawdown) maxDrawdown = drawdown
-      }
-    }
-    maxDrawdowns.push(maxDrawdown)
   }
 
   // Create sorted copies for percentile calculations so we don't mutate original arrays
   const sortedEndingValues = [...endingValues].sort((a, b) => a - b)
-  
+
   const annualReturnsData = []
   for (let year = 1; year <= duration; year++) {
     const cagrs = annualCAGRs[year]
     cagrs.sort((a, b) => a - b)
 
-    const count5  = cagrs.filter(v => v >= 5).length
-    const count8  = cagrs.filter(v => v >= 8).length
-    const count10 = cagrs.filter(v => v >= 10).length
-    const count12 = cagrs.filter(v => v >= 12).length
-    const count15 = cagrs.filter(v => v >= 15).length
-    const count20 = cagrs.filter(v => v >= 20).length
-    const count25 = cagrs.filter(v => v >= 25).length
-    const count30 = cagrs.filter(v => v >= 30).length
-
+    const count5 = cagrs.filter((v) => v >= 5).length
+    const count8 = cagrs.filter((v) => v >= 8).length
+    const count10 = cagrs.filter((v) => v >= 10).length
+    const count12 = cagrs.filter((v) => v >= 12).length
+    const count15 = cagrs.filter((v) => v >= 15).length
+    const count20 = cagrs.filter((v) => v >= 20).length
+    const count25 = cagrs.filter((v) => v >= 25).length
+    const count30 = cagrs.filter((v) => v >= 30).length
 
     annualReturnsData.push({
       year,
@@ -1160,8 +1178,8 @@ function performMonteCarloSimulation(
       p75: calculatePercentile(cagrs, 0.75),
       p90: calculatePercentile(cagrs, 0.9),
 
-      prob5:  (count5  / numPaths) * 100,
-      prob8:  (count8  / numPaths) * 100,
+      prob5: (count5 / numPaths) * 100,
+      prob8: (count8 / numPaths) * 100,
       prob10: (count10 / numPaths) * 100,
       prob12: (count12 / numPaths) * 100,
       prob15: (count15 / numPaths) * 100,
@@ -1171,7 +1189,7 @@ function performMonteCarloSimulation(
     })
   }
 
-  // --- NEW: GENERATE INVESTMENT DATA ---
+  // --- INVESTMENT DATA (unchanged) ---
   const investmentData = []
   let simInvInitial = initialValue
   let simInvContrib = 0
@@ -1188,42 +1206,44 @@ function performMonteCarloSimulation(
   for (let y = 1; y <= duration; y++) {
     // Add 12 months of contributions (only if growth mode)
     const yearContribution = mode === 'growth' ? simInvCashflow * 12 : 0
-    
+
     simInvContrib += yearContribution
-    
+
     investmentData.push({
       year: y,
       initial: simInvInitial,
       contributions: simInvContrib,
-      total: simInvInitial + simInvContrib
+      total: simInvInitial + simInvContrib,
     })
 
     // Apply inflation for next year (matches simulation logic)
     simInvCashflow *= inflationFactor
   }
 
+  // --- LOSS PROBABILITIES (unchanged) ---
   const lossThresholds = [0, 2.5, 5, 10, 15, 20, 30, 50]
-  const lossProbData = lossThresholds.map(threshold => {
-    const countEnd = endingValues.filter(val => {
+  const lossProbData = lossThresholds.map((threshold) => {
+    const countEnd = endingValues.filter((val) => {
       if (val >= initialValue) return false
-      const lossPct = (initialValue - val) / initialValue * 100
+      const lossPct = ((initialValue - val) / initialValue) * 100
       return lossPct >= threshold
     }).length
 
-    const countIntra = lowestValues.filter(val => {
-      const lossPct = (initialValue - val) / initialValue * 100
+    const countIntra = lowestValues.filter((val) => {
+      const lossPct = ((initialValue - val) / initialValue) * 100
       return lossPct >= threshold
     }).length
 
     return {
       threshold: `>= ${threshold}%`,
       endPeriod: (countEnd / numPaths) * 100,
-      intraPeriod: (countIntra / numPaths) * 100
+      intraPeriod: (countIntra / numPaths) * 100,
     }
   })
 
   // Use sorted ending values for stats
-  const mean = endingValues.reduce((sum, val) => sum + val, 0) / numPaths
+  const mean =
+    endingValues.reduce((sum, val) => sum + val, 0) / numPaths
   const median = calculatePercentile(sortedEndingValues, 0.5)
   const p5 = calculatePercentile(sortedEndingValues, 0.05)
   const p10 = calculatePercentile(sortedEndingValues, 0.1)
@@ -1234,43 +1254,48 @@ function performMonteCarloSimulation(
   const best = sortedEndingValues[numPaths - 1]
   const worst = sortedEndingValues[0]
 
-  const chartData = []
-  for (let year = 0; year <= duration; year++) {
-    const yearValues = paths.map(pathVals => pathVals[year] ?? 0)
-    yearValues.sort((a, b) => a - b)
-    chartData.push({
+  // Build chart data directly from yearDistributions
+  const chartData = yearDistributions.map((values, year) => {
+    const sortedYearValues = [...values].sort((a, b) => a - b)
+    return {
       year,
-      p10: calculatePercentile(yearValues, 0.1),
-      p25: calculatePercentile(yearValues, 0.25),
-      p50: calculatePercentile(yearValues, 0.5),
-      p75: calculatePercentile(yearValues, 0.75),
-      p90: calculatePercentile(yearValues, 0.9),
-    })
-  }
+      p10: calculatePercentile(sortedYearValues, 0.1),
+      p25: calculatePercentile(sortedYearValues, 0.25),
+      p50: calculatePercentile(sortedYearValues, 0.5),
+      p75: calculatePercentile(sortedYearValues, 0.75),
+      p90: calculatePercentile(sortedYearValues, 0.9),
+    }
+  })
 
-  const spreadRatio = (p95 > 0 && p5 > 0) ? p95 / p5 : 0
-  const totalRatio = (best > 0 && worst > 0) ? best / worst : 0
-  const recommendLogHistogram = spreadRatio > 15 || totalRatio > 50
+  const spreadRatio = p95 > 0 && p5 > 0 ? p95 / p5 : 0
+  const totalRatio = best > 0 && worst > 0 ? best / worst : 0
+  const recommendLogHistogram =
+    spreadRatio > 15 || totalRatio > 50
 
-  const growthRatio = (p90 > 0 && initialValue > 0) ? p90 / initialValue : 0
+  const growthRatio =
+    p90 > 0 && initialValue > 0 ? p90 / initialValue : 0
   const recommendLogLinear = growthRatio > 20
 
   // Use sorted copy for median drawdown calculation
   const sortedMaxDrawdowns = [...maxDrawdowns].sort((a, b) => a - b)
   const medianDrawdown = calculatePercentile(sortedMaxDrawdowns, 0.5)
   const worstDrawdown = Math.max(...maxDrawdowns)
-  const recommendLogDrawdown = (medianDrawdown < 0.10 && worstDrawdown > 0.60)
-  const goalProbability = portfolioGoal ? (pathsReachingGoal / numPaths) * 100 : 0
+  const recommendLogDrawdown =
+    medianDrawdown < 0.1 && worstDrawdown > 0.6
+
+  const goalProbability = portfolioGoal
+    ? (pathsReachingGoal / numPaths) * 100
+    : 0
   const profitableRate = (pathsProfitable / numPaths) * 100
   const solventRate = (pathsSolvent / numPaths) * 100
 
   return {
-    //paths, //This array is massive and not needed for display.
+    // We intentionally do NOT return the full paths matrix to avoid memory blowout.
     endingValues, // Return unsorted array for export
     maxDrawdowns, // Return unsorted array for export
     annualReturnsData,
     lossProbData,
-    investmentData, // NEW: Return this
+    investmentData,
     chartData,
     mean,
     median,
@@ -1290,6 +1315,6 @@ function performMonteCarloSimulation(
     recommendLogLinear,
     recommendLogHistogram,
     recommendLogDrawdown,
-    portfolioGoalSnapshot: portfolioGoal
+    portfolioGoalSnapshot: portfolioGoal,
   }
 }
