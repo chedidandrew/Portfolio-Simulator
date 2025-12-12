@@ -16,6 +16,7 @@ interface MonteCarloChartProps {
   mode: 'growth' | 'withdrawal'
   logScale: boolean
   onLogScaleChange: (val: boolean) => void
+  enableAnimation?: boolean
 }
 
 // Percentile labels for tooltip and legend
@@ -91,7 +92,7 @@ function logSafe(value: number): number {
   return value > LOG_FLOOR ? value : LOG_FLOOR
 }
 
-export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: MonteCarloChartProps) {
+export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enableAnimation = true }: MonteCarloChartProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
@@ -196,7 +197,7 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
                   strokeWidth={2}
                   dot={false}
                   name="p90"
-                  animationDuration={500}
+                  animationDuration={enableAnimation ? 500 : 0}
                 />
                 <Line
                   type="monotone"
@@ -205,7 +206,7 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
                   strokeWidth={2}
                   dot={false}
                   name="p75"
-                  animationDuration={400}
+                  animationDuration={enableAnimation ? 400 : 0}
                 />
                 <Line
                   type="monotone"
@@ -214,7 +215,7 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
                   strokeWidth={3}
                   dot={false}
                   name="p50"
-                  animationDuration={300}
+                  animationDuration={enableAnimation ? 300 : 0}
                 />
                 <Line
                   type="monotone"
@@ -223,7 +224,7 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
                   strokeWidth={2}
                   dot={false}
                   name="p25"
-                  animationDuration={200}
+                  animationDuration={enableAnimation ? 200 : 0}
                 />
                 <Line
                   type="monotone"
@@ -232,7 +233,7 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange }: Mont
                   strokeWidth={2}
                   dot={false}
                   name="p10"
-                  animationDuration={100}
+                  animationDuration={enableAnimation ? 100 : 0}
                 />
               </LineChart>
             </ResponsiveContainer>

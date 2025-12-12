@@ -15,6 +15,7 @@ interface MonteCarloMaxDrawdownProps {
   data: number[] // max drawdown as fraction 0 to 1
   logScale: boolean
   onLogScaleChange: (val: boolean) => void
+  enableAnimation?: boolean
 }
 
 const LOG_Y_FLOOR = 1
@@ -51,7 +52,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   )
 }
 
-export function MonteCarloMaxDrawdownHistogram({ data, logScale, onLogScaleChange }: MonteCarloMaxDrawdownProps) {
+export function MonteCarloMaxDrawdownHistogram({ data, logScale, onLogScaleChange, enableAnimation = true }: MonteCarloMaxDrawdownProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
@@ -201,7 +202,7 @@ export function MonteCarloMaxDrawdownHistogram({ data, logScale, onLogScaleChang
                   fill="#FFA500"
                   name="Number of scenarios"
                   radius={[4, 4, 0, 0]}
-                  animationDuration={200}
+                  animationDuration={enableAnimation ? 500 : 0}
                 />
               </BarChart>
             </ResponsiveContainer>

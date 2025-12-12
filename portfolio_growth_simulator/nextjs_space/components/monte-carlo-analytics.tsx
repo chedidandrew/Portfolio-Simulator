@@ -11,6 +11,7 @@ import { formatCurrency } from '@/lib/utils'
 interface AnalyticsProps {
   data: any
   isDark: boolean
+  enableAnimation?: boolean
 }
 
 /* ------------------------------------------------------------------ */
@@ -199,12 +200,12 @@ const InvestmentTooltip = ({ active, payload, label }: any) => {
 /* 1. Annualized Return Percentiles (CAGR over time)                      */
 /* ---------------------------------------------------------------------- */
 
-export function AnnualReturnsChart({ data, isDark }: AnalyticsProps) {
+export function AnnualReturnsChart({ data, isDark, enableAnimation = true }: AnalyticsProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, delay: 0.3 }}
+      transition={{ duration: 0.5, delay: 0.3 }}
       className="print-chart-page"
     >
       <Card>
@@ -238,11 +239,11 @@ export function AnnualReturnsChart({ data, isDark }: AnalyticsProps) {
                 />
                 <Tooltip content={<AnnualReturnsTooltip mode="cagr" />} />
                 <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} />
-                <Line type="monotone" dataKey="p90" stroke="#0f766e" name="90th Percentile" dot={false} strokeWidth={2} />
-                <Line type="monotone" dataKey="p75" stroke="#14b8a6" name="75th Percentile" dot={false} strokeWidth={2} />
-                <Line type="monotone" dataKey="median" stroke="#06b6d4" name="50th Percentile (Median)" dot={false} strokeWidth={3} />
-                <Line type="monotone" dataKey="p25" stroke="#0ea5e9" name="25th Percentile" dot={false} strokeWidth={2} />
-                <Line type="monotone" dataKey="p10" stroke="#f29a45" name="10th Percentile" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="p90" stroke="#0f766e" name="90th Percentile" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="monotone" dataKey="p75" stroke="#14b8a6" name="75th Percentile" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="monotone" dataKey="median" stroke="#06b6d4" name="50th Percentile (Median)" dot={false} strokeWidth={3} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="monotone" dataKey="p25" stroke="#0ea5e9" name="25th Percentile" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="monotone" dataKey="p10" stroke="#f29a45" name="10th Percentile" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -259,12 +260,12 @@ export function AnnualReturnsChart({ data, isDark }: AnalyticsProps) {
 /* 2. Probability of Annual Returns                                       */
 /* ---------------------------------------------------------------------- */
 
-export function ReturnProbabilitiesChart({ data, isDark }: AnalyticsProps) {
+export function ReturnProbabilitiesChart({ data, isDark, enableAnimation = true }: AnalyticsProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, delay: 0.4 }}
+      transition={{ duration: 0.5, delay: 0.4 }}
       className="print-chart-page"
     >
       <Card>
@@ -298,12 +299,12 @@ export function ReturnProbabilitiesChart({ data, isDark }: AnalyticsProps) {
                 />
                 <Tooltip content={<ReturnProbabilitiesTooltip mode="probability" />} />
                 <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} />
-                <Line type="monotone" dataKey="prob5" stroke="#7e22ce" name="≥ 5% CAGR" dot={false} strokeWidth={2} />
-                <Line type="monotone" dataKey="prob8" stroke="#8b5cf6" name="≥ 8% CAGR" dot={false} strokeWidth={2} />
-                <Line type="monotone" dataKey="prob10" stroke="#6366f1" name="≥ 10% CAGR" dot={false} strokeWidth={2} />
-                <Line type="monotone" dataKey="prob12" stroke="#3b82f6" name="≥ 12% CAGR" dot={false} strokeWidth={2} />
-                <Line type="monotone" dataKey="prob15" stroke="#0ea5e9" name="≥ 15% CAGR" dot={false} strokeWidth={2} />
-                <Line type="monotone" dataKey="prob20" stroke="#f29a45" name="≥ 20% CAGR" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="prob5" stroke="#7e22ce" name="≥ 5% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="monotone" dataKey="prob8" stroke="#8b5cf6" name="≥ 8% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="monotone" dataKey="prob10" stroke="#6366f1" name="≥ 10% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="monotone" dataKey="prob12" stroke="#3b82f6" name="≥ 12% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="monotone" dataKey="prob15" stroke="#0ea5e9" name="≥ 15% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="monotone" dataKey="prob20" stroke="#f29a45" name="≥ 20% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -320,12 +321,12 @@ export function ReturnProbabilitiesChart({ data, isDark }: AnalyticsProps) {
 /* 3. Loss Probabilities (End of period vs Intra-period)                  */
 /* ---------------------------------------------------------------------- */
 
-export function LossProbabilitiesChart({ data, isDark }: AnalyticsProps) {
+export function LossProbabilitiesChart({ data, isDark, enableAnimation = true }: AnalyticsProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, delay: 0.5 }}
+      transition={{ duration: 0.5, delay: 0.5 }}
       className="print-chart-page"
     >
       <Card>
@@ -361,8 +362,8 @@ export function LossProbabilitiesChart({ data, isDark }: AnalyticsProps) {
                   content={<LossProbabilitiesTooltip />}
                 />
                 <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} />
-                <Bar dataKey="intraPeriod" name="At any point (Intra-period)" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="endPeriod" name="At the end (Final Balance)" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="intraPeriod" name="At any point (Intra-period)" fill="#f59e0b" radius={[4, 4, 0, 0]} animationDuration={enableAnimation ? 400 : 0} />
+                <Bar dataKey="endPeriod" name="At the end (Final Balance)" fill="#ef4444" radius={[4, 4, 0, 0]} animationDuration={enableAnimation ? 400 : 0} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -379,12 +380,12 @@ export function LossProbabilitiesChart({ data, isDark }: AnalyticsProps) {
 /* 4. NEW: Investment Breakdown Chart                                     */
 /* ---------------------------------------------------------------------- */
 
-export function InvestmentBreakdownChart({ data, isDark }: AnalyticsProps) {
+export function InvestmentBreakdownChart({ data, isDark, enableAnimation = true }: AnalyticsProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, delay: 0.6 }}
+      transition={{ duration: 0.5, delay: 0.6 }}
       className="print-chart-page"
     >
       <Card>
@@ -437,6 +438,7 @@ export function InvestmentBreakdownChart({ data, isDark }: AnalyticsProps) {
                   fill="url(#colorInitial)" 
                   name="Initial Principal" 
                   strokeWidth={2}
+                  animationDuration={enableAnimation ? 1000 : 0}
                 />
                 <Area 
                   type="monotone" 
@@ -446,6 +448,7 @@ export function InvestmentBreakdownChart({ data, isDark }: AnalyticsProps) {
                   fill="url(#colorContrib)" 
                   name="Cumulative Contributions" 
                   strokeWidth={2}
+                  animationDuration={enableAnimation ? 1000 : 0}
                 />
               </AreaChart>
             </ResponsiveContainer>

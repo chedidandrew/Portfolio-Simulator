@@ -94,6 +94,7 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
 
   const [simulationResults, setSimulationResults] = useLocalStorage<any>( `mc-results-${mode}`, null)
   const [isSimulating, setIsSimulating] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   
   // Use local storage for full precision preference per mode
   const [showFullPrecision, setShowFullPrecision] = useLocalStorage('mc-show-full-precision-' + mode, false)
@@ -380,22 +381,34 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
 
   const handleExportExcel = () => {
     triggerHaptic('light')
-    // Run simulation first to ensure data matches current inputs
+    
+    // Switch to export mode (disables animations)
+    setIsExporting(true)
+    
+    // Run simulation to get fresh data
     runSimulation(undefined, undefined, undefined, (results) => {
-       // Wait slightly for the UI to update visually before downloading
+       // Short timeout to let UI update to no-animation state
        setTimeout(() => {
          generateExcel(results)
-       }, 500)
+         setIsExporting(false)
+       }, 50)
     })
   }
 
   const handleExportPdf = () => {
     triggerHaptic('light')
     if (typeof window === 'undefined') return
+
+    // Switch to export mode (disables animations)
+    setIsExporting(true)
+
     // Run simulation first to ensure data matches current inputs
     runSimulation(undefined, undefined, undefined, () => {
-        // Wait for charts and animations to fully complete (2s) before printing
-        setTimeout(() => window.print(), 2000)
+        // Short timeout to allow charts to render in their final state instantly
+        setTimeout(() => {
+            window.print()
+            setIsExporting(false)
+        }, 50)
     })
   }
 
@@ -959,38 +972,45 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
               mode={mode} 
               logScale={logScales.chart}
               onLogScaleChange={(val) => setLogScales(prev => ({ ...prev, chart: val }))}
+              enableAnimation={!isExporting}
             />
 
           <MonteCarloHistogram 
             data={simulationResults?.endingValues ?? []} 
             logScale={logScales.histogram}
             onLogScaleChange={(val) => setLogScales(prev => ({ ...prev, histogram: val }))}
+            enableAnimation={!isExporting}
           />
 
           <MonteCarloMaxDrawdownHistogram 
             data={simulationResults?.maxDrawdowns ?? []} 
             logScale={logScales.drawdown}
             onLogScaleChange={(val) => setLogScales(prev => ({ ...prev, drawdown: val }))}
+            enableAnimation={!isExporting}
           />
 
           <InvestmentBreakdownChart 
             data={simulationResults?.investmentData ?? []} 
             isDark={isDark} 
+            enableAnimation={!isExporting}
           />
 
           <AnnualReturnsChart 
             data={simulationResults?.annualReturnsData ?? []} 
             isDark={isDark} 
+            enableAnimation={!isExporting}
           />
 
           <ReturnProbabilitiesChart 
             data={simulationResults?.annualReturnsData ?? []} 
             isDark={isDark} 
+            enableAnimation={!isExporting}
           />
 
             <LossProbabilitiesChart 
               data={simulationResults?.lossProbData ?? []} 
               isDark={isDark} 
+              enableAnimation={!isExporting}
             />
         </div>
         </>

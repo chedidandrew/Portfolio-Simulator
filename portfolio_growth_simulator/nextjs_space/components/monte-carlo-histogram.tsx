@@ -15,6 +15,7 @@ interface MonteCarloHistogramProps {
   data: number[]
   logScale: boolean
   onLogScaleChange: (val: boolean) => void
+  enableAnimation?: boolean
 }
 
 // Custom tooltip component that matches app theme
@@ -50,7 +51,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   )
 }
 
-export function MonteCarloHistogram({ data, logScale, onLogScaleChange }: MonteCarloHistogramProps) {
+export function MonteCarloHistogram({ data, logScale, onLogScaleChange, enableAnimation = true }: MonteCarloHistogramProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   
@@ -267,7 +268,7 @@ export function MonteCarloHistogram({ data, logScale, onLogScaleChange }: MonteC
                     fill="hsl(142, 70%, 45%)"
                     name="Number of Scenarios"
                     radius={[4, 4, 0, 0]}
-                    animationDuration={200}
+                    animationDuration={enableAnimation ? 500 : 0}
                   />
                 </BarChart>
               </ResponsiveContainer>
