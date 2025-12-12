@@ -480,12 +480,20 @@ export function GrowthMode() {
     const totalContributions = runningTotalContributions
     const totalProfit = finalValue - totalContributions
     
-    let yearsToTarget = null
-    if (state.targetValue && state.targetValue > startingBalance) {
+    // FIXED: Infinite Loop Protection & Logical Guards
+    const MAX_YEARS_TO_TARGET = 1000
+    let yearsToTarget: number | null = null
+
+    // Only attempt calculation if growth is possible or we have a positive contribution
+    if (
+      state.targetValue &&
+      state.targetValue > startingBalance &&
+      (ratePerPeriod > 0 || periodicAddition > 0)
+    ) {
       let tempValue = startingBalance
       let tempPeriodicAddition = periodicAddition
       
-      for (let year = 1; year <= 100; year++) {
+      for (let year = 1; year <= MAX_YEARS_TO_TARGET; year++) {
         for (let period = 0; period < periods; period++) {
           tempValue = tempValue * (1 + ratePerPeriod) + tempPeriodicAddition
         }
@@ -623,9 +631,24 @@ export function GrowthMode() {
                   <NumericInput
                     id="starting-balance"
                     value={state?.startingBalance ?? 0}
-                    onChange={(value) => setState({ ...state, startingBalance: value })}
+                    onChange={(value) => {
+                      let n = Number(value)
+                      if (!isFinite(n)) {
+                        setState({ ...state, startingBalance: 0 })
+                        return
+                      }
+                      
+                      // Currency clamp: 0 is allowed, but if >0, min is 0.01
+                      if (n !== 0 && Math.abs(n) < 0.01) {
+                         n = 0.01
+                      }
+                      
+                      // Standardize to 2 decimals
+                      const limited = Number(n.toFixed(2))
+                      setState({ ...state, startingBalance: limited })
+                    }}
                     min={0}
-                    max={1_000_000_000}
+                    max={1_000_000_000_000_000_000}
                     maxErrorMessage="Now you are just being too greedy :)"
                   />
                 </div>
@@ -633,9 +656,26 @@ export function GrowthMode() {
                   <Label htmlFor="annual-return">Annual Return (%)</Label>
                   <NumericInput
                     id="annual-return"
-                    step={0.1}
+                    step={0.0001}
                     value={state?.annualReturn ?? 0}
-                    onChange={(value) => setState({ ...state, annualReturn: value })}
+                    onChange={(value) => {
+                      let n = Number(value)
+                      
+                      if (!isFinite(n)) {
+                        setState({ ...state, annualReturn: 0 })
+                        return
+                      }
+
+                      // Clamp extremely tiny non-zero values to avoid floating point weirdness
+                      const MIN_ABS = 0.000001
+                      if (n !== 0 && Math.abs(n) < MIN_ABS) {
+                        n = MIN_ABS * Math.sign(n)
+                      }
+
+                      // Limit precision to 6 decimals
+                      const limited = Number(n.toFixed(6))
+                      setState({ ...state, annualReturn: limited })
+                    }}
                     min={-100}
                     max={100000}
                     maxErrorMessage="Now you are just being too greedy :)"
@@ -646,7 +686,7 @@ export function GrowthMode() {
                   <NumericInput
                     id="duration"
                     value={state?.duration ?? 0}
-                    onChange={(value) => setState({ ...state, duration: value })}
+                    onChange={(value) => setState({ ...state, duration: Math.max(1, Math.floor(value)) })}
                     min={1}
                     max={100}
                     maxErrorMessage="Planning for the next century? :)"
@@ -657,9 +697,21 @@ export function GrowthMode() {
                   <NumericInput
                     id="periodic-addition"
                     value={state?.periodicAddition ?? 0}
-                    onChange={(value) => setState({ ...state, periodicAddition: value })}
+                    onChange={(value) => {
+                      let n = Number(value)
+                      if (!isFinite(n)) n = 0
+                      
+                      // Non-negative constraint
+                      if (n < 0) n = 0
+                      
+                      // Currency clamp: min 0.01 if non-zero
+                      if (n !== 0 && n < 0.01) n = 0.01
+                      
+                      const limited = Number(n.toFixed(2))
+                      setState({ ...state, periodicAddition: limited })
+                    }}
                     min={0}
-                    max={10_000_000}
+                    max={1_000_000_000_000_000_000}
                     maxErrorMessage="Now you are just being too greedy :)"
                   />
                 </div>
@@ -686,9 +738,26 @@ export function GrowthMode() {
                     id="inflation"
                     step={0.1}
                     value={state?.inflationAdjustment ?? 0}
-                    onChange={(value) => setState({ ...state, inflationAdjustment: value })}
+                    onChange={(value) => {
+                      let n = Number(value)
+                      
+                      if (!isFinite(n)) {
+                        setState({ ...state, inflationAdjustment: 0 })
+                        return
+                      }
+                      
+                      // Clamp tiny values (inflation is usually 2 decimals)
+                      const MIN_ABS = 0.01
+                      if (n !== 0 && Math.abs(n) < MIN_ABS) {
+                        n = MIN_ABS * Math.sign(n)
+                      }
+                      
+                      // Limit precision
+                      const limited = Number(n.toFixed(2))
+                      setState({ ...state, inflationAdjustment: limited })
+                    }}
                     min={-50}
-                    max={50}
+                    max={100}
                     maxErrorMessage="Hyperinflation much? :)"
                   />
                 </div>
@@ -698,7 +767,23 @@ export function GrowthMode() {
                     id="target-value"
                     placeholder="e.g., 1000000"
                     value={state?.targetValue ?? ''}
-                    onChange={(value) => setState({ ...state, targetValue: value || undefined })}
+                    onChange={(value) => {
+                      if (!value && value !== 0) {
+                        setState({ ...state, targetValue: undefined })
+                        return
+                      }
+                      
+                      let n = Number(value)
+                      if (!isFinite(n)) return
+                      
+                      if (n < 0) n = 0
+                      
+                      // Currency clamp if > 0
+                      if (n !== 0 && n < 0.01) n = 0.01
+                      
+                      const limited = Number(n.toFixed(2))
+                      setState({ ...state, targetValue: limited })
+                    }}
                     min={0}
                     max={1_000_000_000_000_000_000}
                     maxErrorMessage="What are you trying to buy, the moon? 🌝"
@@ -746,7 +831,7 @@ export function GrowthMode() {
                     hover:bg-[#3B82F6]/15 hover:border-[#3B82F6]"
                   >
                     <Share className="h-3.5 w-3.5" />
-                    <span>Share Results</span>
+                    <span>Share</span>
                   </motion.button>
 
                   <motion.button

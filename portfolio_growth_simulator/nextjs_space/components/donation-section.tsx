@@ -119,16 +119,16 @@ export function DonationSection() {
                           Thank you for your support
                         </p>
                         <p className="text-xs text-amber-700 dark:text-amber-200 mt-0.5">
-                          You are officially fueling this free app with caffeine and kindness.
+                          You are amazing.
                         </p>
                       </>
                     ) : (
                       <>
                         <p className="text-sm font-medium text-zinc-900 dark:text-foreground">
-                          Enjoying this? Buy me a coffee. ❤️
+                          Enjoying this tool?
                         </p>
                         <p className="text-xs text-zinc-600 dark:text-muted-foreground mt-0.5">
-                          Supporting a free app that somehow still charges me.
+                          Consider supporting the developer.
                         </p>
                       </>
                     )}
@@ -246,94 +246,57 @@ export function DonationSection() {
                 <X className="h-4 w-4 pointer-events-none" />
               </button>
 
-              <div className="relative space-y-5 pt-5">
-                <div className="flex items-start gap-3">
-                  <motion.div
-                    initial={{ rotate: -8, scale: 0.9 }}
-                    animate={{ rotate: 0, scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-                    className="
-                      p-2.5 rounded-full
+              <div className="relative space-y-6 pt-2">
+                <div className="flex flex-col items-center text-center gap-2">
+                   <div className="
+                      p-3 rounded-full
                       bg-amber-200/60 text-amber-700         /* light mode */
                       shadow-[0_0_20px_rgba(250,204,21,0.55)]
                       dark:bg-yellow-500/20 dark:text-yellow-300 /* dark mode */
+                      mb-1
                     "
                   >
-                    <Coffee className="h-5 w-5" />
-                  </motion.div>
+                    <Coffee className="h-6 w-6" />
+                  </div>
                   <div>
-                    <h3 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-foreground">
+                    <h3 className="text-xl font-bold text-zinc-900 dark:text-foreground">
                       Fuel the simulations
                     </h3>
-                    <p className="mt-1 text-xs sm:text-sm text-zinc-700 dark:text-muted-foreground">
-                      Thank you for even considering this. You are helping keep a free product alive that absolutely refuses to stop burning my hosting and data bills.
+                    <p className="mt-1 text-sm text-zinc-600 dark:text-muted-foreground max-w-[80%] mx-auto">
+                      I've always hated ads. Your support keeps this free tool ad free - forever.
                     </p>
                   </div>
                 </div>
 
-                {/* Primary Buy Me a Coffee options */}
+                {/* Primary Buy Me a Coffee options - NO BOX */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.05 }}
-                  className="rounded-xl border border-amber-300/60 bg-amber-50/70 dark:bg-black/40 p-4 sm:p-5 shadow-[0_0_22px_rgba(250,204,21,0.55)]"
+                  className="mt-6"
                 >
-                  <p className="text-xs uppercase tracking-[0.18em] text-amber-600 dark:text-amber-300 mb-2">
-                    Membership
-                  </p>
-                  <p className="text-sm font-medium mb-1 text-zinc-900 dark:text-foreground">
-                    Buy Me a Coffee
-                  </p>
-                  <p className="text-xs sm:text-sm text-zinc-700 dark:text-muted-foreground mb-4">
-                    Choose a monthly membership or a one time coffee. Same link, different levels of caffeine and commitment.
-                  </p>
-
-                  <div className="flex flex-col sm:flex-row gap-2.5">
+                   <div className="flex flex-col gap-3">
                     <motion.a
                       href={buyMeACoffeeUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      whileHover={{ y: -2, scale: 1.02 }}
+                      whileHover={{ y: -2, scale: 1.01 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={handleSupport}
                       className="
-                        flex-1 inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5
-                        text-xs sm:text-sm font-semibold
+                        w-full inline-flex items-center justify-center gap-2 rounded-full px-4 py-3
+                        text-sm font-bold
                         bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500
                         text-black
                         shadow-[0_0_26px_rgba(250,204,21,0.9)]
                         transition-all
+                        hover:shadow-[0_0_35px_rgba(250,204,21,0.6)]
                       "
                     >
-                      Monthly supporter
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </motion.a>
-
-                    <motion.a
-                      href={buyMeACoffeeUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      whileHover={{ y: -2, scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={handleSupport}
-                      className="
-                        flex-1 inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5
-                        text-xs sm:text-sm font-semibold
-                        bg-zinc-900 text-amber-100
-                        dark:bg-black/60
-                        border border-amber-300/70
-                        shadow-[0_0_18px_rgba(250,204,21,0.6)]
-                        transition-all
-                      "
-                    >
-                      One time coffee
-                      <ExternalLink className="h-3.5 w-3.5" />
+                      Support with Coffee
+                      <ExternalLink className="h-4 w-4" />
                     </motion.a>
                   </div>
-
-                  <p className="mt-3 text-[11px] text-zinc-600 dark:text-muted-foreground">
-                    Every contribution helps keep the simulations fast, the charts pretty, and me slightly less terrified of server invoices.
-                  </p>
                 </motion.div>
 
                 {/* Other options */}
@@ -341,13 +304,9 @@ export function DonationSection() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="space-y-2.5"
+                  className="space-y-3"
                 >
-                  <p className="text-[11px] text-zinc-600 dark:text-muted-foreground">
-                    Prefer something else? Here are a few alternate routes to financial hero status:
-                  </p>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-2 gap-3">
                     {donations.map((platform, index) => (
                       <motion.a
                         key={platform.name}
@@ -362,26 +321,17 @@ export function DonationSection() {
                         onClick={handleSupport}
                         className={`
                           relative overflow-hidden rounded-xl border border-amber-100/40 dark:border-amber-100/15
-                          bg-white/80 dark:bg-black/40 px-3.5 py-2.5
-                          text-xs sm:text-sm
+                          bg-white/80 dark:bg-black/40 px-3 py-2.5
+                          text-center
                           shadow-[0_0_12px_rgba(17,24,39,0.18)]
                           transition-all duration-300
                           group
                           ${platform.color}
                         `}
                       >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-medium text-zinc-900 dark:text-amber-50">
-                              {platform.name}
-                            </p>
-                            <p className="text-[11px] text-zinc-700 dark:text-amber-100/70">
-                              {platform.handle}
-                            </p>
-                          </div>
-                          <ExternalLink className="h-3.5 w-3.5 text-amber-600 dark:text-amber-200/90 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:scale-110" />
-                        </div>
-
+                         <p className="font-medium text-sm text-zinc-900 dark:text-amber-50">
+                            {platform.name}
+                          </p>
                         <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-200/25 via-transparent to-transparent opacity-0 group-hover:opacity-100" />
                       </motion.a>
                     ))}
@@ -393,31 +343,18 @@ export function DonationSection() {
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.18 }}
-                  className="pt-1 space-y-2"
+                  className="flex justify-center pt-2"
                 >
-                  <p className="text-[11px] text-zinc-600 dark:text-muted-foreground text-center">
-                    Not in a spot to donate right now? No problem at all. You can still help by sharing this with a friend.
-                  </p>
-                  <div className="flex justify-center">
                     <Button
                       type="button"
+                      variant="ghost"
                       onClick={handleShare}
-                      className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs sm:text-sm font-medium border border-amber-300/70 bg-zinc-100 text-amber-800 shadow-[0_0_14px_rgba(250,204,21,0.45)] hover:bg-amber-100 hover:scale-105 transition-transform dark:bg-black/40 dark:text-amber-100"
+                      className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-white/5 transition-colors"
                     >
-                      <Share2 className="h-4 w-4" />
-                      Share with a friend
+                      <Share2 className="h-3.5 w-3.5" />
+                      Share with a friend instead
                     </Button>
-                  </div>
                 </motion.div>
-
-                <motion.p
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.22 }}
-                  className="pt-1 text-[11px] text-center text-zinc-600 dark:text-muted-foreground"
-                >
-                  If you cannot or would rather not donate, that is completely fine too. Using the app, sharing it, and telling friends about it already makes you an honorary legend.
-                </motion.p>
               </div>
             </motion.div>
           </motion.div>

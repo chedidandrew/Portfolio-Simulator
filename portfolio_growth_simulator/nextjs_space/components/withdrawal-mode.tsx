@@ -550,7 +550,7 @@ export function WithdrawalMode() {
                     hover:bg-[#3B82F6]/15 hover:border-[#3B82F6]"
                   >
                     <Share className="h-3.5 w-3.5" />
-                    <span>Share Results</span>
+                    <span>Share</span>
                   </motion.button>
 
                   <motion.button
