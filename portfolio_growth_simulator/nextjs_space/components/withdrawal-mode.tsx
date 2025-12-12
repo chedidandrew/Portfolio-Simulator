@@ -378,8 +378,8 @@ export function WithdrawalMode() {
                       setState({ ...state, startingBalance: limited })
                     }}
                     min={0}
-                    max={10000000000}
-                    maxErrorMessage="Now you are just being too greedy :)"
+                    max={1_000_000_000_000_000_000}
+                    maxErrorMessage="The Fed wants its printer back :)"
                   />
                 </div>
                 <div className="space-y-2">
@@ -405,8 +405,8 @@ export function WithdrawalMode() {
                       setState({ ...state, annualReturn: limited })
                     }}
                     min={-100}
-                    max={60}
-                    maxErrorMessage="Now you are just being too greedy :)"
+                    max={100000}
+                    maxErrorMessage="Even Medallion doesn't pull returns like that :)"
                   />
                 </div>
                 <div className="space-y-2">
@@ -418,8 +418,8 @@ export function WithdrawalMode() {
                       setState({ ...state, duration: Math.max(1, Math.floor(value)) })
                     }
                     min={1}
-                    max={100}
-                    maxErrorMessage="Planning for the next century? :)"
+                    max={200}
+                    maxErrorMessage="Planning for the next two centuries? :)"
                   />
                 </div>
                 <div className="space-y-2">
@@ -440,8 +440,8 @@ export function WithdrawalMode() {
                       setState({ ...state, periodicWithdrawal: limited })
                     }}
                     min={0}
-                    max={10000000}
-                    maxErrorMessage="Now you are just being too greedy :)"
+                    max={1_000_000_000_000_000_000}
+                    maxErrorMessage="Speedrunning bankruptcy? :)"
                   />
                 </div>
                 <div className="space-y-2">
@@ -467,8 +467,8 @@ export function WithdrawalMode() {
                       setState({ ...state, inflationAdjustment: limited })
                     }}
                     min={-50}
-                    max={50}
-                    maxErrorMessage="Hyperinflation much? :)"
+                    max={100}
+                    maxErrorMessage="Your grocery bill just fainted :)"
                   />
                 </div>
                 <div className="space-y-2">

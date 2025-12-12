@@ -649,7 +649,7 @@ export function GrowthMode() {
                     }}
                     min={0}
                     max={1_000_000_000_000_000_000}
-                    maxErrorMessage="Now you are just being too greedy :)"
+                    maxErrorMessage="Not even Thanos snapped up numbers this big :)"
                   />
                 </div>
                 <div className="space-y-2">
@@ -678,7 +678,7 @@ export function GrowthMode() {
                     }}
                     min={-100}
                     max={100000}
-                    maxErrorMessage="Now you are just being too greedy :)"
+                    maxErrorMessage="Bruce Wayne called. He said relax :)"
                   />
                 </div>
                 <div className="space-y-2">
@@ -688,8 +688,8 @@ export function GrowthMode() {
                     value={state?.duration ?? 0}
                     onChange={(value) => setState({ ...state, duration: Math.max(1, Math.floor(value)) })}
                     min={1}
-                    max={100}
-                    maxErrorMessage="Planning for the next century? :)"
+                    max={200}
+                    maxErrorMessage="Immortality isn't implemented yet :)"
                   />
                 </div>
                 <div className="space-y-2">
@@ -712,7 +712,7 @@ export function GrowthMode() {
                     }}
                     min={0}
                     max={1_000_000_000_000_000_000}
-                    maxErrorMessage="Now you are just being too greedy :)"
+                    maxErrorMessage="Tony Stark couldn't afford that one :)"
                   />
                 </div>
                 <div className="space-y-2">
@@ -786,7 +786,7 @@ export function GrowthMode() {
                     }}
                     min={0}
                     max={1_000_000_000_000_000_000}
-                    maxErrorMessage="What are you trying to buy, the moon? 🌝"
+                    maxErrorMessage="Trying to buy the moon? :)"
                   />
                 </div>
               </div>

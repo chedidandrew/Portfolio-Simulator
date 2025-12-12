@@ -128,7 +128,7 @@ export function DonationSection() {
                           Enjoying this tool?
                         </p>
                         <p className="text-xs text-zinc-600 dark:text-muted-foreground mt-0.5">
-                          Consider supporting the developer.
+                          Consider supporting me :)
                         </p>
                       </>
                     )}
@@ -260,10 +260,10 @@ export function DonationSection() {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-zinc-900 dark:text-foreground">
-                      Fuel the simulations
+                      Fuel the simulator
                     </h3>
                     <p className="mt-1 text-sm text-zinc-600 dark:text-muted-foreground max-w-[80%] mx-auto">
-                      I've always hated ads. Your support keeps this free tool ad free - forever.
+                      I’ve always hated ads. Your support keeps this tool free - forever.
                     </p>
                   </div>
                 </div>

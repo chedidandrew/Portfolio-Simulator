@@ -588,8 +588,8 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
                   setParams({ ...params, initialValue: limited })
                 }}
                 min={1}
-                max={10000000000}
-                maxErrorMessage="Now you are just being too greedy :)"
+                max={1_000_000_000_000_000_000}
+                maxErrorMessage="This number violates several economic laws :)"
               />
             </div>
             <div className="space-y-2">
@@ -614,8 +614,8 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
                 }}
                 disabled={profile !== 'custom'}
                 min={-100}
-                max={60}
-                maxErrorMessage="Now you are just being too greedy :)"
+                max={100000}
+                maxErrorMessage="Easy there, Jeff Bezos :)"
               />
             </div>
             <div className="space-y-2">
@@ -641,7 +641,7 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
                 disabled={profile !== 'custom'}
                 min={0}
                 max={100}
-                maxErrorMessage="That's some serious volatility! :)"
+                maxErrorMessage="Even crypto thinks that's volatile :)"
               />
             </div>
             <div className="space-y-2">
@@ -651,8 +651,8 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
                 value={params?.duration ?? 0}
                 onChange={(value) => setParams({ ...params, duration: Math.max(1, Math.floor(value)) })}
                 min={1}
-                max={100}
-                maxErrorMessage="Planning for the next century? :)"
+                max={200}
+                maxErrorMessage="Even Michael Newman didn't live to 200 years :)"
               />
             </div>
             <div className="space-y-2">
@@ -672,8 +672,8 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
                   setParams({ ...params, cashflowAmount: limited })
                 }}
                 min={0}
-                max={10000000}
-                maxErrorMessage="Now you are just being too greedy :)"
+                max={1_000_000_000_000_000_000}
+                maxErrorMessage="I admire your confidence, but no :)"
               />
             </div>
             
@@ -691,7 +691,6 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
                     setParams({ ...params, inflationAdjustment: 0 })
                     return
                   }
-                  // Rate clamp
                   const MIN_ABS = 0.000001
                   if (n !== 0 && Math.abs(n) < MIN_ABS) {
                     n = MIN_ABS * Math.sign(n)
@@ -700,10 +699,36 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
                   setParams({ ...params, inflationAdjustment: limited })
                 }}
                 min={-50}
-                max={50}
-                maxErrorMessage="Hyperinflation much? :)"
+                max={100}
+                maxErrorMessage="Easy there, Zimbabwe :)"
               />
             </div>
+
+            {mode === 'growth' && (
+              <div className="space-y-2">
+                <Label htmlFor="mc-goal">Portfolio Goal (Optional)</Label>
+                <NumericInput
+                  id="mc-goal"
+                  placeholder="e.g., 1000000"
+                  value={params?.portfolioGoal ?? ''}
+                  onChange={(value) => {
+                    if (!value && value !== 0) {
+                      setParams({ ...params, portfolioGoal: undefined })
+                      return
+                    }
+                    let n = Number(value)
+                    if (!isFinite(n)) return
+                    if (n < 0) n = 0
+                    if (n !== 0 && n < 0.01) n = 0.01
+                    const limited = Number(n.toFixed(2))
+                    setParams({ ...params, portfolioGoal: limited })
+                  }}
+                  min={0}
+                  max={1_000_000_000_000_000_000}
+                  maxErrorMessage="Sir, this is a Wendy's :)"
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="mc-paths">Number of Scenarios</Label>
@@ -732,36 +757,11 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
                 </p>
               )}
 
-              {/* Explicit value for print */}
               <p className="hidden print:block text-xs text-muted-foreground">
                 Selected: {(params?.numPaths ?? 500).toLocaleString()}
               </p>
             </div>
-            {mode === 'growth' && (
-              <div className="space-y-2">
-                <Label htmlFor="mc-goal">Portfolio Goal (Optional)</Label>
-                <NumericInput
-                  id="mc-goal"
-                  placeholder="e.g., 1000000"
-                  value={params?.portfolioGoal ?? ''}
-                  onChange={(value) => {
-                    if (!value && value !== 0) {
-                      setParams({ ...params, portfolioGoal: undefined })
-                      return
-                    }
-                    let n = Number(value)
-                    if (!isFinite(n)) return
-                    if (n < 0) n = 0
-                    if (n !== 0 && n < 0.01) n = 0.01
-                    const limited = Number(n.toFixed(2))
-                    setParams({ ...params, portfolioGoal: limited })
-                  }}
-                  min={0}
-                  max={100000000000}
-                  maxErrorMessage="Now you are just being too greedy :)"
-                />
-              </div>
-            )}
+
           </div>
           <Button
             onClick={() => runSimulation(undefined, `monte-carlo-${Date.now()}-${Math.random()}`)}
