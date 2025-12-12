@@ -1042,7 +1042,7 @@ function performMonteCarloSimulation(
   const r = expectedReturn / 100
   const sigma = volatility / 100
   const mu = Math.log(1 + r)
-  const drift = (mu - 0.5 * sigma * sigma) * dt
+  const drift = mu * dt
   const diffusion = sigma * Math.sqrt(dt)
   const cashflowPerStep = cashflowFrequency === 'monthly' ? cashflowAmount : cashflowAmount / 12
   const inflationFactor = 1 + inflationAdjustment / 100
