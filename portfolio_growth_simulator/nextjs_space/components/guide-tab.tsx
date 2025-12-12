@@ -735,7 +735,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
             <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50">
               <p className="text-xs text-muted-foreground flex gap-2">
                 <Info className="h-4 w-4 shrink-0" />
-                Once installed, the app works offline and launches in a dedicated window, preserving your settings between sessions.
+                Once installed, the app launches in a dedicated window, preserving your settings between sessions.
               </p>
             </div>
           </GuideSection>

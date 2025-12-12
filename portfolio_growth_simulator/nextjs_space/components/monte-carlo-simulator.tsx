@@ -16,7 +16,7 @@ import { MonteCarloMaxDrawdownHistogram } from '@/components/monte-carlo-max-dra
 import { 
   AnnualReturnsChart, 
   ReturnProbabilitiesChart, 
-  LossProbabilitiesChart,
+  LossProbabilitiesChart, 
   InvestmentBreakdownChart 
 } from '@/components/monte-carlo-analytics'
 import { useTheme } from 'next-themes'
@@ -576,7 +576,17 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
               <NumericInput
                 id="mc-initial"
                 value={params?.initialValue ?? 0}
-                onChange={(value) => setParams({ ...params, initialValue: value })}
+                onChange={(value) => {
+                  let n = Number(value)
+                  if (!isFinite(n)) {
+                    setParams({ ...params, initialValue: 0 })
+                    return
+                  }
+                  // Currency clamp
+                  if (n !== 0 && Math.abs(n) < 0.01) n = 0.01
+                  const limited = Number(n.toFixed(2))
+                  setParams({ ...params, initialValue: limited })
+                }}
                 min={1}
                 max={10000000000}
                 maxErrorMessage="Now you are just being too greedy :)"
@@ -588,7 +598,20 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
                 id="mc-return"
                 step={0.1}
                 value={params?.expectedReturn ?? 0}
-                onChange={(value) => setParams({ ...params, expectedReturn: value })}
+                onChange={(value) => {
+                  let n = Number(value)
+                  if (!isFinite(n)) {
+                    setParams({ ...params, expectedReturn: 0 })
+                    return
+                  }
+                  // Rate clamp
+                  const MIN_ABS = 0.000001
+                  if (n !== 0 && Math.abs(n) < MIN_ABS) {
+                    n = MIN_ABS * Math.sign(n)
+                  }
+                  const limited = Number(n.toFixed(6))
+                  setParams({ ...params, expectedReturn: limited })
+                }}
                 disabled={profile !== 'custom'}
                 min={-100}
                 max={60}
@@ -601,7 +624,20 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
                 id="mc-volatility"
                 step={0.1}
                 value={params?.volatility ?? 0}
-                onChange={(value) => setParams({ ...params, volatility: value })}
+                onChange={(value) => {
+                  let n = Number(value)
+                  if (!isFinite(n)) {
+                    setParams({ ...params, volatility: 0 })
+                    return
+                  }
+                  // Volatility should be positive. Clamp tiny positive.
+                  const MIN_ABS = 0.000001
+                  if (n !== 0 && Math.abs(n) < MIN_ABS) {
+                    n = MIN_ABS
+                  }
+                  const limited = Number(n.toFixed(6))
+                  setParams({ ...params, volatility: limited })
+                }}
                 disabled={profile !== 'custom'}
                 min={0}
                 max={100}
@@ -613,7 +649,7 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
               <NumericInput
                 id="mc-duration"
                 value={params?.duration ?? 0}
-                onChange={(value) => setParams({ ...params, duration: value })}
+                onChange={(value) => setParams({ ...params, duration: Math.max(1, Math.floor(value)) })}
                 min={1}
                 max={100}
                 maxErrorMessage="Planning for the next century? :)"
@@ -626,7 +662,15 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
               <NumericInput
                 id="mc-cashflow"
                 value={params?.cashflowAmount ?? 0}
-                onChange={(value) => setParams({ ...params, cashflowAmount: value })}
+                onChange={(value) => {
+                  let n = Number(value)
+                  if (!isFinite(n)) n = 0
+                  if (n < 0) n = 0
+                  // Currency clamp
+                  if (n !== 0 && n < 0.01) n = 0.01
+                  const limited = Number(n.toFixed(2))
+                  setParams({ ...params, cashflowAmount: limited })
+                }}
                 min={0}
                 max={10000000}
                 maxErrorMessage="Now you are just being too greedy :)"
@@ -641,9 +685,20 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
                 id="mc-inflation"
                 step={0.1}
                 value={params?.inflationAdjustment ?? 0}
-                onChange={(value) =>
-                  setParams({ ...params, inflationAdjustment: value })
-                }
+                onChange={(value) => {
+                  let n = Number(value)
+                  if (!isFinite(n)) {
+                    setParams({ ...params, inflationAdjustment: 0 })
+                    return
+                  }
+                  // Rate clamp
+                  const MIN_ABS = 0.000001
+                  if (n !== 0 && Math.abs(n) < MIN_ABS) {
+                    n = MIN_ABS * Math.sign(n)
+                  }
+                  const limited = Number(n.toFixed(6))
+                  setParams({ ...params, inflationAdjustment: limited })
+                }}
                 min={-50}
                 max={50}
                 maxErrorMessage="Hyperinflation much? :)"
@@ -689,7 +744,18 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
                   id="mc-goal"
                   placeholder="e.g., 1000000"
                   value={params?.portfolioGoal ?? ''}
-                  onChange={(value) => setParams({ ...params, portfolioGoal: value || undefined })}
+                  onChange={(value) => {
+                    if (!value && value !== 0) {
+                      setParams({ ...params, portfolioGoal: undefined })
+                      return
+                    }
+                    let n = Number(value)
+                    if (!isFinite(n)) return
+                    if (n < 0) n = 0
+                    if (n !== 0 && n < 0.01) n = 0.01
+                    const limited = Number(n.toFixed(2))
+                    setParams({ ...params, portfolioGoal: limited })
+                  }}
                   min={0}
                   max={100000000000}
                   maxErrorMessage="Now you are just being too greedy :)"

@@ -365,9 +365,18 @@ export function WithdrawalMode() {
                   <NumericInput
                     id="starting-balance-w"
                     value={state?.startingBalance ?? 0}
-                    onChange={(value) =>
-                      setState({ ...state, startingBalance: value })
-                    }
+                    onChange={(value) => {
+                      let n = Number(value)
+                      if (!isFinite(n)) {
+                        setState({ ...state, startingBalance: 0 })
+                        return
+                      }
+                      // Currency clamp
+                      if (n !== 0 && Math.abs(n) < 0.01) n = 0.01
+                      
+                      const limited = Number(n.toFixed(2))
+                      setState({ ...state, startingBalance: limited })
+                    }}
                     min={0}
                     max={10000000000}
                     maxErrorMessage="Now you are just being too greedy :)"
@@ -381,9 +390,20 @@ export function WithdrawalMode() {
                     id="annual-return-w"
                     step={0.1}
                     value={state?.annualReturn ?? 0}
-                    onChange={(value) =>
-                      setState({ ...state, annualReturn: value })
-                    }
+                    onChange={(value) => {
+                      let n = Number(value)
+                      if (!isFinite(n)) {
+                         setState({ ...state, annualReturn: 0 })
+                         return
+                      }
+                      // Rate clamp
+                      const MIN_ABS = 0.000001
+                      if (n !== 0 && Math.abs(n) < MIN_ABS) {
+                        n = MIN_ABS * Math.sign(n)
+                      }
+                      const limited = Number(n.toFixed(6))
+                      setState({ ...state, annualReturn: limited })
+                    }}
                     min={-100}
                     max={60}
                     maxErrorMessage="Now you are just being too greedy :)"
@@ -395,7 +415,7 @@ export function WithdrawalMode() {
                     id="duration-w"
                     value={state?.duration ?? 0}
                     onChange={(value) =>
-                      setState({ ...state, duration: value })
+                      setState({ ...state, duration: Math.max(1, Math.floor(value)) })
                     }
                     min={1}
                     max={100}
@@ -409,9 +429,16 @@ export function WithdrawalMode() {
                   <NumericInput
                     id="periodic-withdrawal"
                     value={state?.periodicWithdrawal ?? 0}
-                    onChange={(value) =>
-                      setState({ ...state, periodicWithdrawal: value })
-                    }
+                    onChange={(value) => {
+                      let n = Number(value)
+                      if (!isFinite(n)) n = 0
+                      if (n < 0) n = 0
+                      // Currency clamp
+                      if (n !== 0 && n < 0.01) n = 0.01
+                      
+                      const limited = Number(n.toFixed(2))
+                      setState({ ...state, periodicWithdrawal: limited })
+                    }}
                     min={0}
                     max={10000000}
                     maxErrorMessage="Now you are just being too greedy :)"
@@ -425,9 +452,20 @@ export function WithdrawalMode() {
                     id="inflation"
                     step={0.1}
                     value={state?.inflationAdjustment ?? 0}
-                    onChange={(value) =>
-                      setState({ ...state, inflationAdjustment: value })
-                    }
+                    onChange={(value) => {
+                      let n = Number(value)
+                      if (!isFinite(n)) {
+                        setState({ ...state, inflationAdjustment: 0 })
+                        return
+                      }
+                      // Rate clamp
+                      const MIN_ABS = 0.000001
+                      if (n !== 0 && Math.abs(n) < MIN_ABS) {
+                        n = MIN_ABS * Math.sign(n)
+                      }
+                      const limited = Number(n.toFixed(6))
+                      setState({ ...state, inflationAdjustment: limited })
+                    }}
                     min={-50}
                     max={50}
                     maxErrorMessage="Hyperinflation much? :)"
