@@ -240,29 +240,55 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
     XLSX.writeFile(wb, fileName)
   }
 
+  // Check if current params are different from the ones used to generate results
+  const isDirty = () => {
+    if (!results) return true
+    if (!results.simulationParams) return true // For legacy data without params
+    return JSON.stringify(params) !== JSON.stringify(results.simulationParams)
+  }
+
   const handleExportExcel = () => {
     triggerHaptic('light')
-    // Set active state to 'excel' so UI updates immediately
     setExportState('excel')
     
-    // Give the UI a moment to show the spinner before starting heavy sync task
     setTimeout(() => {
-      // Use existing 'results' directly - no new simulation needed
-      generateExcel(results)
-      setExportState('idle')
+      // If dirty, we must rerun simulation to get matching data
+      if (isDirty()) {
+        runSimulation(undefined, undefined, undefined, (newResults) => {
+          // Give UI a moment to update state before generating file
+          setTimeout(() => {
+            generateExcel(newResults)
+            setExportState('idle')
+          }, 50)
+        })
+      } else {
+        // Results match current params, just export existing data
+        generateExcel(results)
+        setExportState('idle')
+      }
     }, 50)
   }
 
   const handleExportPdf = () => {
     triggerHaptic('light')
     if (typeof window !== 'undefined') {
-      // Set active state to 'pdf' so UI updates immediately
       setExportState('pdf')
 
       setTimeout(() => {
-        // Use existing state - print current view
-        window.print()
-        setExportState('idle')
+        // If dirty, we must rerun simulation to ensure PDF matches input fields
+        if (isDirty()) {
+          runSimulation(undefined, undefined, undefined, () => {
+             // Wait for charts to re-render (snapping to final state)
+             setTimeout(() => {
+               window.print()
+               setExportState('idle')
+             }, 50)
+          })
+        } else {
+          // Results match current params, just print
+          window.print()
+          setExportState('idle')
+        }
       }, 50)
     }
   }

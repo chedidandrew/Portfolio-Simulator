@@ -121,6 +121,9 @@ export function useMonteCarlo(mode: 'growth' | 'withdrawal', initialValues: any)
     setTimeout(() => {
       const simResults = performMonteCarloSimulation(simParams, mode, seed)
 
+      // Store the params that generated these results for dirty checking
+      const finalResults = { ...simResults, simulationParams: simParams }
+
       if (preservedLogScales) {
         setLogScales(preservedLogScales)
       } else {
@@ -131,11 +134,11 @@ export function useMonteCarlo(mode: 'growth' | 'withdrawal', initialValues: any)
         })
       }
 
-      setSimulationResults(simResults)
+      setSimulationResults(finalResults)
       setIsSimulating(false)
 
       if (onComplete) {
-        onComplete(simResults)
+        onComplete(finalResults)
       }
     }, 100)
   }
