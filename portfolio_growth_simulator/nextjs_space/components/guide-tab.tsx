@@ -82,32 +82,39 @@ function GuideSection({
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className={cn("group", className)}>
-      <Card className={cn("border-l-4 border-l-transparent transition-all duration-300 hover:shadow-md", className)}>
+      <Card className={cn(
+        "border-l-4 transition-all duration-300 shadow-sm",
+        "bg-gradient-to-br from-card to-muted/5", // Subtle gradient for depth
+        isOpen 
+          ? "border-l-primary/50 shadow-md ring-1 ring-primary/5" 
+          : "border-l-transparent hover:border-l-muted/30 hover:shadow-md",
+        className
+      )}>
         <CollapsibleTrigger asChild>
           <CardHeader className={cn("cursor-pointer py-5 select-none", headerClassName)}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={cn(
-                  "p-2 rounded-lg transition-colors duration-300", 
+                  "p-2 rounded-lg transition-colors duration-300 shadow-sm", 
                   iconWrapperClass
                 )}>
                   <Icon className={cn("h-5 w-5", iconColorClass)} />
                 </div>
                 <div className="space-y-1 text-left">
                   <CardTitle className="text-lg leading-none text-foreground">{title}</CardTitle>
-                  {description && <CardDescription className="line-clamp-1">{description}</CardDescription>}
+                  {description && <CardDescription>{description}</CardDescription>}
                 </div>
               </div>
               <div className={cn(
                 "p-1 rounded-full border transition-all duration-300",
-                isOpen ? "bg-muted text-foreground rotate-180" : "bg-transparent text-muted-foreground border-transparent group-hover:border-border"
+                isOpen ? "bg-muted text-foreground rotate-180 shadow-inner" : "bg-transparent text-muted-foreground border-transparent group-hover:border-border"
               )}>
                 <ChevronDown className="h-4 w-4" />
               </div>
             </div>
           </CardHeader>
         </CollapsibleTrigger>
-        <CollapsibleContent className="animate-accordion-down overflow-hidden data-[state=closed]:animate-accordion-up">
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
           <CardContent className="pt-0 pb-6 text-sm text-muted-foreground">
             <div className="pl-0 sm:pl-[3.25rem]"> 
               {children}
@@ -212,8 +219,8 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
             icon={Rocket} 
             description="Step-by-step guides for Growth, Withdrawal, and Monte Carlo"
             defaultOpen={true}
-            iconColorClass="text-primary" 
-            iconWrapperClass="bg-primary/10 text-primary" 
+            iconColorClass="text-emerald-500"
+            iconWrapperClass="bg-muted text-muted-foreground group-hover:bg-muted/80"
           >
             <Accordion type="single" collapsible className="w-full">
               {/* Growth Mode Guide */}
@@ -471,24 +478,23 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
             iconColorClass="text-emerald-500"
             iconWrapperClass="bg-muted text-muted-foreground group-hover:bg-muted/80"
           >
-            {/* ... Content remains unchanged ... */}
             <div className="grid gap-3">
               <Accordion type="single" collapsible className="w-full">
                 {/* iPhone Installation */}
                 <AccordionItem value="iphone" className="border-b-0 mb-3">
                   <AccordionTrigger className="hover:no-underline py-0 group">
-                    <div className="flex items-center gap-3 w-full p-3 rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 group-data-[state=open]:rounded-b-none transition-all">
+                    <div className="flex items-center gap-3 w-full p-4 rounded-lg border border-gray-300 dark:border-zinc-700 bg-gradient-to-br from-white to-gray-50 dark:from-zinc-900 dark:to-zinc-950 shadow-sm transition-all duration-300 hover:shadow-md group-data-[state=open]:rounded-b-none group-data-[state=open]:shadow-md">
                       <Smartphone className="h-5 w-5 text-gray-900 dark:text-white" />
                       <span className="text-sm font-semibold text-gray-900 dark:text-white">Install on iPhone (Safari)</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="border-x border-b border-gray-300 dark:border-zinc-700 rounded-b-lg bg-white dark:bg-zinc-900 p-4 mt-[-1px]">
-                    <ol className="space-y-3 text-sm">
+                  <AccordionContent className="border-x border-b border-gray-300 dark:border-zinc-700 rounded-b-lg bg-gradient-to-br from-white to-gray-50 dark:from-zinc-900 dark:to-zinc-950 p-5 mt-[-1px] shadow-sm">
+                    <ol className="space-y-4 text-sm">
                       <li className="flex items-start gap-3">
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-900 text-white text-xs font-bold shrink-0 dark:bg-gray-700">1</span>
                         <div>
                           <p className="font-semibold text-gray-900 dark:text-white">Open in Safari</p>
-                          <p className="text-gray-700 dark:text-gray-300 text-xs">Make sure you're viewing this page in Safari browser</p>
+                          <p className="text-gray-700 dark:text-gray-300 text-xs mt-0.5">Make sure you're viewing this page in Safari browser</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
@@ -497,7 +503,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                           <p className="font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
                             Tap the Share button <Share className="h-3 w-3" />
                           </p>
-                          <p className="text-gray-700 dark:text-gray-300 text-xs">Located at the bottom of the screen</p>
+                          <p className="text-gray-700 dark:text-gray-300 text-xs mt-0.5">Located at the bottom of the screen</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
@@ -506,19 +512,19 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                           <p className="font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
                             Select "Add to Home Screen" <Plus className="h-3 w-3" />
                           </p>
-                          <p className="text-gray-700 dark:text-gray-300 text-xs">Scroll down in the share menu to find this option</p>
+                          <p className="text-gray-700 dark:text-gray-300 text-xs mt-0.5">Scroll down in the share menu to find this option</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-900 text-white text-xs font-bold shrink-0 dark:bg-gray-700">4</span>
                         <div>
                           <p className="font-semibold text-gray-900 dark:text-white">Confirm and Add</p>
-                          <p className="text-gray-700 dark:text-gray-300 text-xs">Customize the name and tap "Add" in top right</p>
+                          <p className="text-gray-700 dark:text-gray-300 text-xs mt-0.5">Customize the name and tap "Add" in top right</p>
                         </div>
                       </li>
                     </ol>
-                    <div className="mt-4 p-3 bg-gray-100 rounded-lg dark:bg-zinc-800">
-                      <p className="text-xs text-gray-700 dark:text-gray-300">
+                    <div className="mt-5 p-3.5 bg-gray-100 rounded-lg dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700">
+                      <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
                         🎉 Once installed, you can launch Portfolio Simulator directly from your home screen like any other app and saves your parameters when you close the app!
                       </p>
                     </div>
@@ -528,44 +534,44 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                 {/* Android Installation */}
                 <AccordionItem value="android" className="border-b-0 mb-3">
                   <AccordionTrigger className="hover:no-underline py-0 group">
-                    <div className="flex items-center gap-3 w-full p-3 rounded-lg border border-green-500/30 bg-green-500/5 group-data-[state=open]:rounded-b-none transition-all">
+                    <div className="flex items-center gap-3 w-full p-4 rounded-lg border border-green-500/30 bg-gradient-to-br from-green-500/5 to-green-500/10 shadow-sm transition-all duration-300 hover:shadow-md hover:border-green-500/40 group-data-[state=open]:rounded-b-none group-data-[state=open]:shadow-md group-data-[state=open]:border-green-500/40">
                       <Smartphone className="h-5 w-5 text-green-600 dark:text-green-400" />
                       <span className="text-sm font-semibold text-foreground">Install on Android (Chrome)</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="border-x border-b border-green-500/30 rounded-b-lg bg-green-500/5 p-4 mt-[-1px]">
-                    <ol className="space-y-3 text-sm">
+                  <AccordionContent className="border-x border-b border-green-500/30 rounded-b-lg bg-gradient-to-br from-green-500/5 to-green-500/10 p-5 mt-[-1px] shadow-sm">
+                    <ol className="space-y-4 text-sm">
                       <li className="flex items-start gap-3">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold shrink-0">1</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold shrink-0 shadow-sm">1</span>
                         <div>
                           <p className="font-semibold">Open in Chrome</p>
-                          <p className="text-muted-foreground text-xs">Android PWA installs work best in Chrome</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Android PWA installs work best in Chrome</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold shrink-0">2</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold shrink-0 shadow-sm">2</span>
                         <div>
                           <p className="font-semibold flex items-center gap-2">Tap the Menu button •••</p>
-                          <p className="text-muted-foreground text-xs">Located in the top right corner</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Located in the top right corner</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold shrink-0">3</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold shrink-0 shadow-sm">3</span>
                         <div>
                           <p className="font-semibold">Select "Install App"</p>
-                          <p className="text-muted-foreground text-xs">Or "Add to Home screen" depending on version</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Or "Add to Home screen" depending on version</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold shrink-0">4</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold shrink-0 shadow-sm">4</span>
                         <div>
                           <p className="font-semibold">Confirm installation</p>
-                          <p className="text-muted-foreground text-xs">The app icon will appear on your home screen instantly</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">The app icon will appear on your home screen instantly</p>
                         </div>
                       </li>
                     </ol>
-                    <div className="mt-4 p-3 bg-background/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground">
+                    <div className="mt-5 p-3.5 bg-background/60 rounded-lg border border-green-500/20">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
                         🎉 Android installation fully supports native full screen app experience.
                       </p>
                     </div>
@@ -575,36 +581,36 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                 {/* Chrome Desktop */}
                 <AccordionItem value="desktop-chrome" className="border-b-0 mb-3">
                   <AccordionTrigger className="hover:no-underline py-0 group">
-                    <div className="flex items-center gap-3 w-full p-3 rounded-lg border border-blue-500/30 bg-blue-500/5 group-data-[state=open]:rounded-b-none transition-all">
+                    <div className="flex items-center gap-3 w-full p-4 rounded-lg border border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-blue-500/10 shadow-sm transition-all duration-300 hover:shadow-md hover:border-blue-500/40 group-data-[state=open]:rounded-b-none group-data-[state=open]:shadow-md group-data-[state=open]:border-blue-500/40">
                       <Laptop className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                       <span className="text-sm font-semibold text-foreground">Install on Chrome Desktop</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="border-x border-b border-blue-500/30 rounded-b-lg bg-blue-500/5 p-4 mt-[-1px]">
-                    <ol className="space-y-3 text-sm">
+                  <AccordionContent className="border-x border-b border-blue-500/30 rounded-b-lg bg-gradient-to-br from-blue-500/5 to-blue-500/10 p-5 mt-[-1px] shadow-sm">
+                    <ol className="space-y-4 text-sm">
                       <li className="flex items-start gap-3">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">1</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0 shadow-sm">1</span>
                         <div>
                           <p className="font-semibold">Open in Google Chrome</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">2</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0 shadow-sm">2</span>
                         <div>
                           <p className="font-semibold">Click the Install Icon</p>
-                          <p className="text-muted-foreground text-xs">Small computer-with-arrow icon in the address bar</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Small computer-with-arrow icon in the address bar</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">3</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0 shadow-sm">3</span>
                         <div>
                           <p className="font-semibold">Click "Install"</p>
-                          <p className="text-muted-foreground text-xs">Chrome will create a standalone app window on your desktop</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Chrome will create a standalone app window on your desktop</p>
                         </div>
                       </li>
                     </ol>
-                    <div className="mt-4 p-3 bg-background/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground">
+                    <div className="mt-5 p-3.5 bg-background/60 rounded-lg border border-blue-500/20">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
                         💻 Desktop installation gives you a distraction-free windowed version of Portfolio Simulator.
                       </p>
                     </div>
@@ -614,36 +620,36 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                 {/* Edge Desktop */}
                 <AccordionItem value="desktop-edge" className="border-b-0 mb-3">
                   <AccordionTrigger className="hover:no-underline py-0 group">
-                    <div className="flex items-center gap-3 w-full p-3 rounded-lg border border-cyan-500/30 bg-cyan-500/5 group-data-[state=open]:rounded-b-none transition-all">
+                    <div className="flex items-center gap-3 w-full p-4 rounded-lg border border-cyan-500/30 bg-gradient-to-br from-cyan-500/5 to-cyan-500/10 shadow-sm transition-all duration-300 hover:shadow-md hover:border-cyan-500/40 group-data-[state=open]:rounded-b-none group-data-[state=open]:shadow-md group-data-[state=open]:border-cyan-500/40">
                       <Laptop className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
                       <span className="text-sm font-semibold text-foreground">Install on Microsoft Edge</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="border-x border-b border-cyan-500/30 rounded-b-lg bg-cyan-500/5 p-4 mt-[-1px]">
-                    <ol className="space-y-3 text-sm">
+                  <AccordionContent className="border-x border-b border-cyan-500/30 rounded-b-lg bg-gradient-to-br from-cyan-500/5 to-cyan-500/10 p-5 mt-[-1px] shadow-sm">
+                    <ol className="space-y-4 text-sm">
                       <li className="flex items-start gap-3">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-cyan-600 text-white text-xs font-bold shrink-0">1</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-cyan-600 text-white text-xs font-bold shrink-0 shadow-sm">1</span>
                         <div>
                           <p className="font-semibold">Open in Microsoft Edge</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-cyan-600 text-white text-xs font-bold shrink-0">2</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-cyan-600 text-white text-xs font-bold shrink-0 shadow-sm">2</span>
                         <div>
                           <p className="font-semibold">Click "App Available"</p>
-                          <p className="text-muted-foreground text-xs">Located in the top right of the address bar</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Located in the top right of the address bar</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-cyan-600 text-white text-xs font-bold shrink-0">3</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-cyan-600 text-white text-xs font-bold shrink-0 shadow-sm">3</span>
                         <div>
                           <p className="font-semibold">Choose "Install"</p>
-                          <p className="text-muted-foreground text-xs">Edge installs Portfolio Simulator as a native-style Windows app</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Edge installs Portfolio Simulator as a native-style Windows app</p>
                         </div>
                       </li>
                     </ol>
-                    <div className="mt-4 p-3 bg-background/50 rounded-lg rounded">
-                      <p className="text-xs text-muted-foreground">
+                    <div className="mt-5 p-3.5 bg-background/60 rounded-lg border border-cyan-500/20">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
                         🖥️ Edge PWAs automatically appear in the Start Menu for easy access.
                       </p>
                     </div>
@@ -653,37 +659,37 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                 {/* Firefox Desktop */}
                 <AccordionItem value="desktop-firefox" className="border-b-0 mb-3">
                   <AccordionTrigger className="hover:no-underline py-0 group">
-                    <div className="flex items-center gap-3 w-full p-3 rounded-lg border border-[#FF7139]/30 bg-[#FF7139]/5 group-data-[state=open]:rounded-b-none transition-all">
+                    <div className="flex items-center gap-3 w-full p-4 rounded-lg border border-[#FF7139]/30 bg-gradient-to-br from-[#FF7139]/5 to-[#FF7139]/10 shadow-sm transition-all duration-300 hover:shadow-md hover:border-[#FF7139]/40 group-data-[state=open]:rounded-b-none group-data-[state=open]:shadow-md group-data-[state=open]:border-[#FF7139]/40">
                       <LaptopMinimalCheck className="h-5 w-5 text-[#FF7139]" />
                       <span className="text-sm font-semibold text-foreground">Install on Firefox (Windows)</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="border-x border-b border-[#FF7139]/30 rounded-b-lg bg-[#FF7139]/5 p-4 mt-[-1px]">
-                    <ol className="space-y-3 text-sm">
+                  <AccordionContent className="border-x border-b border-[#FF7139]/30 rounded-b-lg bg-gradient-to-br from-[#FF7139]/5 to-[#FF7139]/10 p-5 mt-[-1px] shadow-sm">
+                    <ol className="space-y-4 text-sm">
                       <li className="flex items-start gap-3">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FF7139] text-white text-xs font-bold shrink-0">1</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FF7139] text-white text-xs font-bold shrink-0 shadow-sm">1</span>
                         <div>
                           <p className="font-semibold">Open in Firefox</p>
-                          <p className="text-muted-foreground text-xs">Currently available on Windows</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Currently available on Windows</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FF7139] text-white text-xs font-bold shrink-0">2</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FF7139] text-white text-xs font-bold shrink-0 shadow-sm">2</span>
                         <div>
                           <p className="font-semibold">Open the Menu (≡)</p>
-                          <p className="text-muted-foreground text-xs">Click the three lines in the top right corner</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Click the three lines in the top right corner</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FF7139] text-white text-xs font-bold shrink-0">3</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FF7139] text-white text-xs font-bold shrink-0 shadow-sm">3</span>
                         <div>
                           <p className="font-semibold">Select "Install" or "Use as App"</p>
-                          <p className="text-muted-foreground text-xs">This will pin the app to your taskbar in its own window</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">This will pin the app to your taskbar in its own window</p>
                         </div>
                       </li>
                     </ol>
-                    <div className="mt-4 p-3 bg-background/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground">
+                    <div className="mt-5 p-3.5 bg-background/60 rounded-lg border border-[#FF7139]/20">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
                         🦊 <strong>Mac & Linux users:</strong> Firefox does not support app installation on your platform yet. Please use Chrome or Edge for the best experience.
                       </p>
                     </div>
@@ -693,37 +699,37 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                  {/* Brave Desktop */}
                 <AccordionItem value="desktop-brave" className="border-b-0">
                   <AccordionTrigger className="hover:no-underline py-0 group">
-                    <div className="flex items-center gap-3 w-full p-3 rounded-lg border border-[#FB542B]/30 bg-[#FB542B]/5 group-data-[state=open]:rounded-b-none transition-all">
+                    <div className="flex items-center gap-3 w-full p-4 rounded-lg border border-[#FB542B]/30 bg-gradient-to-br from-[#FB542B]/5 to-[#FB542B]/10 shadow-sm transition-all duration-300 hover:shadow-md hover:border-[#FB542B]/40 group-data-[state=open]:rounded-b-none group-data-[state=open]:shadow-md group-data-[state=open]:border-[#FB542B]/40">
                       <LaptopMinimalCheck className="h-5 w-5 text-[#FB542B]" />
                       <span className="text-sm font-semibold text-foreground">Install on Brave</span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="border-x border-b border-[#FB542B]/30 rounded-b-lg bg-[#FB542B]/5 p-4 mt-[-1px]">
-                    <ol className="space-y-3 text-sm">
+                  <AccordionContent className="border-x border-b border-[#FB542B]/30 rounded-b-lg bg-gradient-to-br from-[#FB542B]/5 to-[#FB542B]/10 p-5 mt-[-1px] shadow-sm">
+                    <ol className="space-y-4 text-sm">
                       <li className="flex items-start gap-3">
-                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0">1</span>
+                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0 shadow-sm">1</span>
                          <div>
                            <p className="font-semibold">Open in Brave browser</p>
-                           <p className="text-muted-foreground text-xs">Use Brave on Windows, macOS, or Linux</p>
+                           <p className="text-muted-foreground text-xs mt-0.5">Use Brave on Windows, macOS, or Linux</p>
                          </div>
                       </li>
                       <li className="flex items-start gap-3">
-                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0">2</span>
+                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0 shadow-sm">2</span>
                          <div>
                            <p className="font-semibold">Open the browser menu</p>
-                           <p className="text-muted-foreground text-xs">Click the Brave menu and look for "Apps" or "Install Portfolio Simulator"</p>
+                           <p className="text-muted-foreground text-xs mt-0.5">Click the Brave menu and look for "Apps" or "Install Portfolio Simulator"</p>
                          </div>
                       </li>
                       <li className="flex items-start gap-3">
-                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0">3</span>
+                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0 shadow-sm">3</span>
                          <div>
                            <p className="font-semibold">Click "Install"</p>
-                           <p className="text-muted-foreground text-xs">Brave will create a separate app style window on your desktop</p>
+                           <p className="text-muted-foreground text-xs mt-0.5">Brave will create a separate app style window on your desktop</p>
                          </div>
                       </li>
                     </ol>
-                    <div className="mt-4 p-3 bg-background/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground">
+                    <div className="mt-5 p-3.5 bg-background/60 rounded-lg border border-[#FB542B]/20">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
                         🦁 Brave uses the same PWA install flow as Chromium browsers while keeping your privacy features.
                       </p>
                     </div>
