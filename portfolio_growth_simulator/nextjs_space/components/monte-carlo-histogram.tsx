@@ -181,10 +181,16 @@ export function MonteCarloHistogram({ data, logScale, onLogScaleChange, enableAn
                 id="log-scale"
                 checked={logScale}
                 onCheckedChange={handleLogScaleChange}
+                className="print:hidden"
               />
-              <Label htmlFor="log-scale" className="text-sm cursor-pointer">
+              <Label htmlFor="log-scale" className="text-sm cursor-pointer print:hidden">
                 Log scale
               </Label>
+              {logScale && (
+                <span className="hidden print:inline text-xs text-muted-foreground font-medium">
+                  (Log scale enabled)
+                </span>
+              )}
             </div>
           </div>
         </CardHeader>

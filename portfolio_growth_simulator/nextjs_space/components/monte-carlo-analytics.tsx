@@ -278,7 +278,8 @@ export function ReturnProbabilitiesChart({ data, isDark, enableAnimation = true 
         <CardContent>
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 40 }}>
+              {/* Increased right margin from 10 to 20 to prevent print cut-off */}
+              <LineChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
                 <XAxis 
                   dataKey="year" 
                   tickLine={false}

@@ -127,24 +127,36 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
-              <ChartSpline 
-                className="h-5 w-5" 
-                style={{ color: "hsl(165, 65%, 48%)" }} 
+              <ChartSpline
+                className="h-5 w-5"
+                style={{ color: 'hsl(165, 65%, 48%)' }}
               />
               Scenario Paths with Percentile Bands
             </CardTitle>
+
             <div className="flex items-center gap-2">
               <Switch
                 id="log-scale-montecarlo"
                 checked={logScale}
                 onCheckedChange={handleLogScaleChange}
+                className="print:hidden"
               />
-              <Label htmlFor="log-scale-montecarlo" className="text-sm cursor-pointer">
+              <Label
+                htmlFor="log-scale-montecarlo"
+                className="text-sm cursor-pointer print:hidden"
+              >
                 Log scale
               </Label>
+
+              {logScale && (
+                <span className="hidden print:inline text-xs text-muted-foreground font-medium">
+                  (Log scale enabled)
+                </span>
+              )}
             </div>
           </div>
         </CardHeader>
+
         <CardContent>
           <div className="h-96 w-full">
             <ResponsiveContainer width="100%" height="100%">

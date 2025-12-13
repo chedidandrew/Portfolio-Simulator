@@ -36,6 +36,26 @@ interface GuideTabProps {
   onLaunchMode: (mode: string) => void
 }
 
+// Animation variants for staggered entrance
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { type: "spring", stiffness: 300, damping: 24 }
+  }
+}
+
 // Reusable compact card component with collapse functionality
 function GuideSection({ 
   title, 
@@ -45,8 +65,8 @@ function GuideSection({
   defaultOpen = false,
   className,
   headerClassName,
-  iconColorClass = "text-foreground", // Default to standard text color (Black/White)
-  iconWrapperClass = "bg-muted text-muted-foreground group-hover:bg-muted/80" // Default icon background
+  iconColorClass = "text-foreground", 
+  iconWrapperClass = "bg-muted text-muted-foreground group-hover:bg-muted/80" 
 }: { 
   title: string, 
   icon: any, 
@@ -74,7 +94,7 @@ function GuideSection({
                   <Icon className={cn("h-5 w-5", iconColorClass)} />
                 </div>
                 <div className="space-y-1 text-left">
-                  <CardTitle className={cn("text-lg leading-none", iconColorClass)}>{title}</CardTitle>
+                  <CardTitle className="text-lg leading-none text-foreground">{title}</CardTitle>
                   {description && <CardDescription className="line-clamp-1">{description}</CardDescription>}
                 </div>
               </div>
@@ -101,11 +121,15 @@ function GuideSection({
 
 export function GuideTab({ onLaunchMode }: GuideTabProps) {
   return (
-    <div className="space-y-6 pb-8">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6 pb-8"
+    >
       {/* Welcome Section */}
       <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
+        variants={itemVariants}
         className="text-center space-y-4 mb-8"
       >
         <motion.div 
@@ -129,13 +153,9 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
         </Badge>
       </motion.div>
 
-      {/* Navigation Cards - Kept colorful as requested */}
+      {/* Navigation Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
-        >
+        <motion.div variants={itemVariants}>
           <Card 
             className="h-full group cursor-pointer border-primary/20 bg-gradient-to-br from-primary/5 to-transparent hover:border-primary/40 hover:shadow-lg transition-all duration-300" 
             onClick={() => onLaunchMode('growth')}
@@ -157,11 +177,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
           </Card>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-        >
+        <motion.div variants={itemVariants}>
           <Card 
             className="h-full group cursor-pointer border-primary/20 bg-gradient-to-br from-primary/5 to-transparent hover:border-primary/40 hover:shadow-lg transition-all duration-300" 
             onClick={() => onLaunchMode('withdrawal')}
@@ -189,20 +205,15 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
       {/* Guide Content Section */}
       <div className="space-y-4">
         
-        {/* 1. How to Use - Standard Colors */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
+        {/* 1. How to Use */}
+        <motion.div variants={itemVariants}>
           <GuideSection 
             title="How to Use This Simulator" 
             icon={Rocket} 
             description="Step-by-step guides for Growth, Withdrawal, and Monte Carlo"
             defaultOpen={true}
-            // Uses standard Card background and text-foreground by default
-            iconColorClass="text-primary" // Icon can stay colored for accent, or change to text-foreground if you want icon b/w too
-            iconWrapperClass="bg-primary/10 text-primary" // Keep icon distinct, but card background is standard
+            iconColorClass="text-primary" 
+            iconWrapperClass="bg-primary/10 text-primary" 
           >
             <Accordion type="single" collapsible className="w-full">
               {/* Growth Mode Guide */}
@@ -325,12 +336,8 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
           </GuideSection>
         </motion.div>
 
-        {/* 2. Key Concepts - Standard Colors */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
+        {/* 2. Key Concepts */}
+        <motion.div variants={itemVariants}>
           <GuideSection 
             title="Key Concepts Explained" 
             icon={BookOpen}
@@ -402,12 +409,8 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
           </GuideSection>
         </motion.div>
 
-        {/* 3. Best Practices - Standard Colors */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
+        {/* 3. Best Practices - Updated to match Key Concepts style */}
+        <motion.div variants={itemVariants}>
           <GuideSection 
             title="Best Practices" 
             icon={Lightbulb}
@@ -416,7 +419,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
             iconWrapperClass="bg-muted text-muted-foreground group-hover:bg-muted/80"
           >
             <div className="space-y-3">
-              <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
                 <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-foreground text-sm">Use Conservative Assumptions</p>
@@ -426,7 +429,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
                 <Target className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-foreground text-sm">Focus on What You Control</p>
@@ -436,7 +439,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 p-3 rounded-lg border border-violet-500/20 bg-violet-500/5">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
                 <Dices className="h-5 w-5 text-violet-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-foreground text-sm">Check the "Worst Case"</p>
@@ -446,7 +449,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 p-3 rounded-lg border border-red-500/20 bg-red-500/5">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
                 <TrendingDown className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-foreground text-sm">Account for Inflation</p>
@@ -459,12 +462,8 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
           </GuideSection>
         </motion.div>
 
-        {/* 4. Installation Guides - Standard Outer Card, Colorful Inner Accordion Items */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
+        {/* 4. Installation Guides */}
+        <motion.div variants={itemVariants}>
           <GuideSection 
             title="Installation Guides" 
             icon={Download}
@@ -472,6 +471,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
             iconColorClass="text-emerald-500"
             iconWrapperClass="bg-muted text-muted-foreground group-hover:bg-muted/80"
           >
+            {/* ... Content remains unchanged ... */}
             <div className="grid gap-3">
               <Accordion type="single" collapsible className="w-full">
                 {/* iPhone Installation */}
@@ -741,12 +741,8 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
           </GuideSection>
         </motion.div>
 
-        {/* Disclaimer - Kept specific color as requested */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-        >
+        {/* Disclaimer */}
+        <motion.div variants={itemVariants}>
           <GuideSection 
             title="Important Disclaimer" 
             icon={AlertTriangle}
@@ -771,6 +767,6 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
 
       {/* Donation Section */}
       <DonationSection />
-    </div>
+    </motion.div>
   )
 }

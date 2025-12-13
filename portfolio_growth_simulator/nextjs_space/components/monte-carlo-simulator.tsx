@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useMonteCarlo } from '@/hooks/use-monte-carlo'
 import { MonteCarloParameters } from '@/components/monte-carlo/parameters'
-import { MonteCarloResults } from '@/components/monte-carlo/results'
+import { MonteCarloResults, ExportState } from '@/components/monte-carlo/results'
 import { triggerHaptic } from '@/hooks/use-haptics'
 import * as XLSX from 'xlsx'
 import { roundToCents } from '@/lib/utils'
@@ -31,7 +31,7 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
     PRESET_PROFILES,
   } = useMonteCarlo(mode, initialValues)
 
-  const [isExporting, setIsExporting] = useState(false)
+  const [exportState, setExportState] = useState<ExportState>('idle')
 
   const buildShareUrl = () => {
     if (typeof window === 'undefined') return ''
@@ -54,12 +54,10 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
   const handleShareLink = async () => {
     triggerHaptic('light')
     
-    // Ensure buildShareUrl() handles empty 'results' safely (returns null)
     const url = buildShareUrl()
     if (!url) return
 
     try {
-      // 1. Try Native Share (Mobile/Supported Browsers)
       if (typeof navigator !== 'undefined' && 'share' in navigator) {
         await navigator.share({
           title: 'Portfolio Simulator',
@@ -69,22 +67,17 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
         return
       }
 
-      // 2. Fallback to Clipboard (FIXED TYPE ERROR HERE)
       if ((navigator as any)?.clipboard?.writeText) {
         await (navigator as any).clipboard.writeText(url)
         toast('Link copied')
         return
       }
 
-      // 3. Fallback if neither works
       toast('Copy not supported on this browser')
 
     } catch (err: any) {
-      // Ignore if user simply closed the share sheet
       const name = err?.name
       if (name === 'AbortError' || name === 'NotAllowedError') return
-      
-      // Notify user of actual failures only
       toast('Could not share or copy link')
     }
   }
@@ -249,25 +242,28 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
 
   const handleExportExcel = () => {
     triggerHaptic('light')
-    setIsExporting(true)
-    runSimulation(undefined, undefined, undefined, (newResults) => {
-      setTimeout(() => {
-        generateExcel(newResults)
-        setIsExporting(false)
-      }, 50)
-    })
+    // Set active state to 'excel' so UI updates immediately
+    setExportState('excel')
+    
+    // Give the UI a moment to show the spinner before starting heavy sync task
+    setTimeout(() => {
+      // Use existing 'results' directly - no new simulation needed
+      generateExcel(results)
+      setExportState('idle')
+    }, 50)
   }
 
   const handleExportPdf = () => {
     triggerHaptic('light')
     if (typeof window !== 'undefined') {
-      setIsExporting(true)
-      runSimulation(undefined, undefined, undefined, () => {
-        setTimeout(() => {
-          window.print()
-          setIsExporting(false)
-        }, 50)
-      })
+      // Set active state to 'pdf' so UI updates immediately
+      setExportState('pdf')
+
+      setTimeout(() => {
+        // Use existing state - print current view
+        window.print()
+        setExportState('idle')
+      }, 50)
     }
   }
 
@@ -296,7 +292,7 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
           onShare={handleShareLink}
           onExportPdf={handleExportPdf}
           onExportExcel={handleExportExcel}
-          isExporting={isExporting}
+          exportState={exportState}
         />
       )}
     </div>

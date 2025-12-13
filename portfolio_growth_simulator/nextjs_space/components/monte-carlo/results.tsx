@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { 
   Dices, Share, FileText, FileSpreadsheet, 
-  AlertCircle, Target, Lightbulb 
+  AlertCircle, Target, Lightbulb, Loader2 
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
@@ -29,6 +29,8 @@ import { formatCurrency, getLargeNumberName } from '@/lib/utils'
 import { SimulationParams } from '@/lib/types'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
+export type ExportState = 'idle' | 'pdf' | 'excel'
+
 interface MonteCarloResultsProps {
   mode: 'growth' | 'withdrawal'
   results: any
@@ -40,7 +42,7 @@ interface MonteCarloResultsProps {
   onShare: () => void
   onExportPdf: () => void
   onExportExcel: () => void
-  isExporting: boolean
+  exportState: ExportState
 }
 
 export function MonteCarloResults({
@@ -54,10 +56,11 @@ export function MonteCarloResults({
   onShare,
   onExportPdf,
   onExportExcel,
-  isExporting
+  exportState
 }: MonteCarloResultsProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const isExporting = exportState !== 'idle'
 
   const renderFormattedResult = (val: number | undefined) => {
     if (val === undefined) return '$0'
@@ -71,9 +74,14 @@ export function MonteCarloResults({
         <TooltipProvider delayDuration={300}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="cursor-help decoration-dotted decoration-foreground/30 underline-offset-4 hover:underline">
+              <button 
+                type="button"
+                className="cursor-help decoration-dotted decoration-foreground/30 underline-offset-4 hover:underline focus:outline-none focus:underline bg-transparent border-none p-0 inline font-inherit text-inherit"
+                tabIndex={0}
+                onClick={(e) => e.currentTarget.focus()}
+              >
                 {formatted}
-              </span>
+              </button>
             </TooltipTrigger>
             <TooltipContent className="bg-card text-foreground border-border rounded-lg shadow-lg p-3 text-xs">
               <p>{fullName}</p>
@@ -136,7 +144,8 @@ export function MonteCarloResults({
               <ActionButtons 
                  onShare={onShare} 
                  onExportPdf={onExportPdf} 
-                 onExportExcel={onExportExcel} 
+                 onExportExcel={onExportExcel}
+                 exportState={exportState}
               />
             </div>
           </div>
@@ -346,14 +355,21 @@ function DistributionItem({ label, value, valueClass = '' }: any) {
   )
 }
 
-function ActionButtons({ onShare, onExportPdf, onExportExcel }: any) {
-  const btnClass = "inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 font-medium shadow-sm transition-colors duration-150"
-  
+function ActionButtons({ onShare, onExportPdf, onExportExcel, exportState }: {
+  onShare: () => void
+  onExportPdf: () => void
+  onExportExcel: () => void
+  exportState: ExportState
+}) {
+  const btnClass = "inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 font-medium shadow-sm transition-colors duration-150 disabled:opacity-50 disabled:cursor-wait"
+  const isAnyExporting = exportState !== 'idle'
+
   return (
     <>
       <motion.button
         type="button"
         onClick={onShare}
+        disabled={isAnyExporting}
         whileHover={{ scale: 1.05, y: -1 }}
         whileTap={{ scale: 0.96, y: 0 }}
         className={`${btnClass} border-[#3B82F6]/50 bg-[#3B82F6]/10 text-[#3B82F6] hover:bg-[#3B82F6]/15 hover:border-[#3B82F6]`}
@@ -365,23 +381,25 @@ function ActionButtons({ onShare, onExportPdf, onExportExcel }: any) {
       <motion.button
         type="button"
         onClick={onExportPdf}
+        disabled={isAnyExporting}
         whileHover={{ scale: 1.05, y: -1 }}
         whileTap={{ scale: 0.96, y: 0 }}
         className={`${btnClass} border-red-400/50 bg-red-500/10 text-red-300 hover:bg-red-500/15 hover:border-red-400`}
       >
-        <FileText className="h-3.5 w-3.5" />
-        <span>PDF</span>
+        {exportState === 'pdf' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+        <span>{exportState === 'pdf' ? 'Generating...' : 'PDF'}</span>
       </motion.button>
 
       <motion.button
         type="button"
         onClick={onExportExcel}
+        disabled={isAnyExporting}
         whileHover={{ scale: 1.05, y: -1 }}
         whileTap={{ scale: 0.96, y: 0 }}
         className={`${btnClass} border-emerald-400/50 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15 hover:border-emerald-400`}
       >
-        <FileSpreadsheet className="h-3.5 w-3.5" />
-        <span>Excel</span>
+        {exportState === 'excel' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+        <span>{exportState === 'excel' ? 'Generating...' : 'Excel'}</span>
       </motion.button>
     </>
   )

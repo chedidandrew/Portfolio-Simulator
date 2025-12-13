@@ -126,10 +126,16 @@ export function MonteCarloMaxDrawdownHistogram({ data, logScale, onLogScaleChang
                 id="log-scale-max-dd"
                 checked={logScale}
                 onCheckedChange={handleLogScaleChange}
+                className="print:hidden"
               />
-              <Label htmlFor="log-scale-max-dd" className="text-sm cursor-pointer">
+              <Label htmlFor="log-scale-max-dd" className="text-sm cursor-pointer print:hidden">
                 Log scale
               </Label>
+               {logScale && (
+                <span className="hidden print:inline text-xs text-muted-foreground font-medium">
+                  (Log scale enabled)
+                </span>
+              )}
             </div>
           </div>
         </CardHeader>
