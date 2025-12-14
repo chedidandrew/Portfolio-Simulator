@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -49,20 +50,7 @@ export function WithdrawalResults({
     const fullName = getLargeNumberName(val)
 
     if (shouldUseCompact && fullName) {
-      return (
-        <TooltipProvider delayDuration={300}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="cursor-help decoration-dotted decoration-foreground/30 underline-offset-4 hover:underline">
-                {formatted}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent className="bg-card text-foreground border-border rounded-lg shadow-lg p-3 text-xs">
-              <p>{fullName}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )
+      return <CompactValue formatted={formatted} fullName={fullName} />
     }
 
     return formatted
@@ -251,5 +239,30 @@ function ActionButtons({ onShare, onExportPdf, onExportExcel }: any) {
         <span>Excel</span>
       </motion.button>
     </>
+  )
+}
+
+function CompactValue({ formatted, fullName }: { formatted: string, fullName: string }) {
+  const [isOpen, setIsOpen] = useState(false)
+  
+  return (
+    <TooltipProvider delayDuration={300}>
+      <Tooltip open={isOpen} onOpenChange={setIsOpen}>
+        <TooltipTrigger asChild>
+          <span 
+            className="cursor-help decoration-dotted decoration-foreground/30 underline-offset-4 hover:underline"
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsOpen(prev => !prev)
+            }}
+          >
+            {formatted}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="bg-card text-foreground border-border rounded-lg shadow-lg p-3 text-xs">
+          <p>{fullName}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }

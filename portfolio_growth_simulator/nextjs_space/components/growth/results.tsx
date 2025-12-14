@@ -118,7 +118,6 @@ export function GrowthResults({
             </motion.div>
           )}
 
-          {/* Restored: Milestones inside the card content */}
           <GrowthMilestones finalValue={finalValue} />
         </CardContent>
       </Card>
@@ -194,8 +193,8 @@ function CompactValue({ formatted, fullName }: { formatted: string, fullName: st
           <span 
             className="cursor-help decoration-dotted decoration-foreground/30 underline-offset-4 hover:underline"
             onClick={(e) => {
-              // Ensure tap works on mobile by toggling state
-              setIsOpen(!isOpen)
+              e.stopPropagation()
+              setIsOpen(prev => !prev)
             }}
           >
             {formatted}

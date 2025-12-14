@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { GrowthMode } from '@/components/growth-mode'
 import { WithdrawalMode } from '@/components/withdrawal-mode'
 import { GuideTab } from '@/components/guide-tab'
+import LZString from 'lz-string'
 
 export default function Home() {
   const { theme, setTheme } = useTheme()
@@ -31,14 +32,33 @@ export default function Home() {
       const mcParam = search.get('mc')
 
       if (mcParam) {
-        const decoded = JSON.parse(decodeURIComponent(atob(mcParam)))
-        const mode =
-          decoded?.mode === 'withdrawal' ? 'withdrawal' : 'growth'
+        // 1. Try decompressing with LZString (New Format)
+        let jsonStr = LZString.decompressFromEncodedURIComponent(mcParam)
 
-        setActiveTab(mode)
-        localStorage.setItem('visited', 'true')
-        localStorage.setItem('lastTab', mode)
-        return
+        // 2. Fallback to atob (Old Format)
+        if (!jsonStr) {
+          try {
+             jsonStr = decodeURIComponent(atob(mcParam))
+          } catch {
+             // Not a valid legacy link
+          }
+        }
+
+        if (jsonStr) {
+          const decoded = JSON.parse(jsonStr)
+          const mode = decoded?.mode === 'withdrawal' ? 'withdrawal' : 'growth'
+
+          setActiveTab(mode)
+          localStorage.setItem('visited', 'true')
+          localStorage.setItem('lastTab', mode)
+          
+          // Dispatch event with the FULL decoded object (including results)
+          window.dispatchEvent(new CustomEvent('openMonteCarloFromLink', { 
+            detail: decoded 
+          }))
+          
+          return
+        }
       }
     } catch {
       // ignore and fall back to normal behavior

@@ -8,13 +8,24 @@ import { triggerHaptic } from '@/hooks/use-haptics'
 import * as XLSX from 'xlsx'
 import { roundToCents } from '@/lib/utils'
 import { toast } from 'sonner'
+import LZString from 'lz-string'
+import type { SimulationParams, SharePayload } from '@/lib/types'
 
 interface MonteCarloSimulatorProps {
   mode: 'growth' | 'withdrawal'
   initialValues: any
+
+  // Props for restoring state from URL
+  initialRngSeed?: string | null
+  initialMCParams?: SimulationParams
 }
 
-export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulatorProps) {
+export function MonteCarloSimulator({
+  mode,
+  initialValues,
+  initialRngSeed,
+  initialMCParams,
+}: MonteCarloSimulatorProps) {
   const {
     profile,
     setProfile,
@@ -29,31 +40,32 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
     setShowFullPrecision,
     runSimulation,
     PRESET_PROFILES,
-  } = useMonteCarlo(mode, initialValues)
+  } = useMonteCarlo(mode, initialValues, initialRngSeed, initialMCParams)
 
   const [exportState, setExportState] = useState<ExportState>('idle')
 
   const buildShareUrl = () => {
     if (typeof window === 'undefined') return ''
     const url = new URL(window.location.href)
-    const payload = {
+
+    const payload: SharePayload = {
       mode,
-      params,
+      type: 'monte-carlo',
+      deterministicParams: initialValues, // parent state
+      mcParams: params, // child state
       rngSeed,
       logScales,
       showFullPrecision,
     }
-    const encoded =
-      typeof btoa !== 'undefined'
-        ? btoa(encodeURIComponent(JSON.stringify(payload)))
-        : ''
-    if (encoded) url.searchParams.set('mc', encoded)
+
+    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(payload))
+    if (compressed) url.searchParams.set('mc', compressed)
     return url.toString()
   }
 
   const handleShareLink = async () => {
     triggerHaptic('light')
-    
+
     const url = buildShareUrl()
     if (!url) return
 
@@ -74,7 +86,6 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
       }
 
       toast('Copy not supported on this browser')
-
     } catch (err: any) {
       const name = err?.name
       if (name === 'AbortError' || name === 'NotAllowedError') return
@@ -110,8 +121,7 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
         ? investmentData[investmentData.length - 1].total
         : params.initialValue
 
-    const investedLabel =
-      mode === 'withdrawal' ? 'Starting Balance' : 'Total Invested'
+    const investedLabel = mode === 'withdrawal' ? 'Starting Balance' : 'Total Invested'
 
     const summaryRows = [
       { Key: 'Mode', Value: mode },
@@ -240,32 +250,22 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
     XLSX.writeFile(wb, fileName)
   }
 
-  // Check if current params are different from the ones used to generate results
   const isDirty = () => {
     if (!results) return true
-    if (!results.simulationParams) return true // For legacy data without params
-    return JSON.stringify(params) !== JSON.stringify(results.simulationParams)
+    return true
   }
 
   const handleExportExcel = () => {
     triggerHaptic('light')
     setExportState('excel')
-    
+
     setTimeout(() => {
-      // If dirty, we must rerun simulation to get matching data
-      if (isDirty()) {
-        runSimulation(undefined, undefined, undefined, (newResults) => {
-          // Give UI a moment to update state before generating file
-          setTimeout(() => {
-            generateExcel(newResults)
-            setExportState('idle')
-          }, 50)
-        })
-      } else {
-        // Results match current params, just export existing data
-        generateExcel(results)
-        setExportState('idle')
-      }
+      runSimulation(undefined, undefined, undefined, (newResults) => {
+        setTimeout(() => {
+          generateExcel(newResults)
+          setExportState('idle')
+        }, 50)
+      })
     }, 50)
   }
 
@@ -275,20 +275,12 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
       setExportState('pdf')
 
       setTimeout(() => {
-        // If dirty, we must rerun simulation to ensure PDF matches input fields
-        if (isDirty()) {
-          runSimulation(undefined, undefined, undefined, () => {
-             // Wait for charts to re-render (snapping to final state)
-             setTimeout(() => {
-               window.print()
-               setExportState('idle')
-             }, 50)
-          })
-        } else {
-          // Results match current params, just print
-          window.print()
-          setExportState('idle')
-        }
+        runSimulation(undefined, undefined, undefined, () => {
+          setTimeout(() => {
+            window.print()
+            setExportState('idle')
+          }, 50)
+        })
       }, 50)
     }
   }
@@ -302,7 +294,7 @@ export function MonteCarloSimulator({ mode, initialValues }: MonteCarloSimulator
         profile={profile}
         setProfile={setProfile}
         isSimulating={isSimulating}
-        onRun={() => runSimulation()}
+        onRun={() => runSimulation(undefined, `monte-carlo-${Date.now()}-${Math.random()}`)}
         presetProfiles={PRESET_PROFILES}
       />
 

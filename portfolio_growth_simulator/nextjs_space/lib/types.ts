@@ -28,3 +28,13 @@ export interface SimulationParams {
   numPaths: number
   portfolioGoal?: number
 }
+
+export interface SharePayload {
+  mode: 'growth' | 'withdrawal'
+  type: 'deterministic' | 'monte-carlo'
+  deterministicParams: GrowthState | WithdrawalState
+  mcParams?: SimulationParams
+  rngSeed?: string | null
+  showFullPrecision?: boolean
+  logScales?: { chart: boolean; histogram: boolean; drawdown: boolean }
+}
