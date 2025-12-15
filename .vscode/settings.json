@@ -10,5 +10,7 @@
   "files.watcherExclude": {
     "**/node_modules/**": true,
     "**/.next/**": true
-  }
+  },
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore"
 }
