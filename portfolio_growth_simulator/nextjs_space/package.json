@@ -96,7 +96,7 @@
     "lz-string": "1.5.0",
     "mapbox-gl": "1.13.3",
     "next": "^14.2.35",
-    "next-auth": "4.24.11",
+    "next-auth": "^4.24.13",
     "next-themes": "0.3.0",
     "plotly.js": "2.35.3",
     "qrcode.react": "4.2.0",
