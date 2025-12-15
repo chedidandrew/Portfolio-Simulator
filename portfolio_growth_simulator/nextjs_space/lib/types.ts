@@ -6,6 +6,7 @@ export interface GrowthState {
   frequency: 'yearly' | 'quarterly' | 'monthly' | 'weekly'
   targetValue?: number
   inflationAdjustment: number
+  excludeInflationAdjustment?: boolean
 }
 
 export interface WithdrawalState {
@@ -15,6 +16,7 @@ export interface WithdrawalState {
   periodicWithdrawal: number
   inflationAdjustment: number
   frequency: 'yearly' | 'quarterly' | 'monthly' | 'weekly'
+  excludeInflationAdjustment?: boolean
 }
 
 export interface SimulationParams {

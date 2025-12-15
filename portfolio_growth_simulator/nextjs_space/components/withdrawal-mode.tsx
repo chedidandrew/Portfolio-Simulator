@@ -28,6 +28,7 @@ export function WithdrawalMode() {
     periodicWithdrawal: 3000,
     inflationAdjustment: 2.5,
     frequency: 'monthly',
+    excludeInflationAdjustment: false
   })
 
   const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('withdrawal-show-monte-carlo', false)

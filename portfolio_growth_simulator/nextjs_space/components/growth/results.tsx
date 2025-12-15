@@ -1,24 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { TrendingUp, Share, FileText, FileSpreadsheet, Target } from 'lucide-react'
+import { TrendingUp, Share, FileText, FileSpreadsheet, Target, ShoppingCart, Percent } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { GrowthChart } from '@/components/growth-chart'
 import { formatCurrency, getLargeNumberName } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { GrowthMilestones } from './milestones'
+import { GrowthProjectionResult } from '@/lib/simulation/growth-engine'
 
 interface GrowthResultsProps {
-  data: {
-    finalValue: number
-    totalContributions: number
-    totalProfit: number
-    yearsToTarget: number | null
-    yearData: any[]
-  }
+  data: GrowthProjectionResult
   targetValue?: number
   showFullPrecision: boolean
   setShowFullPrecision: (v: boolean) => void
@@ -34,15 +29,26 @@ export function GrowthResults({
   setShowFullPrecision,
   onShare,
   onExportPdf,
-  onExportExcel
+  onExportExcel,
 }: GrowthResultsProps) {
-  
-  const { finalValue, totalContributions, totalProfit, yearsToTarget, yearData } = data
-  const isProfitNegative = totalProfit < 0
+  const {
+    finalValue,
+    finalValueInTodaysDollars,
+    totalContributions,
+    totalProfit,
+    yearsToTarget,
+    yearData,
+  } = data
 
-  // Helper for formatting result cards: Full Precision if toggled AND < 100M (or compact otherwise)
+  const isProfitNegative = totalProfit < 0
+  
+  // Calculate Return on Investment (ROI)
+  const roi = totalContributions > 0 
+    ? (totalProfit / totalContributions) * 100 
+    : 0
+
   const formatResult = (val: number) => {
-    if (val === undefined) return '$0'
+    if (val === undefined || isNaN(val)) return '$0'
 
     const shouldUseCompact = val >= 1e100 || !showFullPrecision
     const formatted = formatCurrency(val, true, 2, shouldUseCompact)
@@ -67,56 +73,85 @@ export function GrowthResults({
 
             <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 text-xs sm:text-sm print:hidden">
               <div className="flex items-center gap-2 mr-2 border-r border-border pr-3">
-                <Switch
-                  id="precision-toggle"
-                  checked={showFullPrecision}
-                  onCheckedChange={setShowFullPrecision}
-                />
+                <Switch id="precision-toggle" checked={showFullPrecision} onCheckedChange={setShowFullPrecision} />
                 <Label htmlFor="precision-toggle" className="font-normal cursor-pointer">
                   Expand
                 </Label>
               </div>
 
-              <ActionButtons 
-                onShare={onShare} 
-                onExportPdf={onExportPdf} 
-                onExportExcel={onExportExcel} 
-              />
+              <ActionButtons onShare={onShare} onExportPdf={onExportPdf} onExportExcel={onExportExcel} />
             </div>
           </div>
         </CardHeader>
+
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <MetricCard 
               label="Final Portfolio Value" 
               value={formatResult(finalValue)} 
               colorClass="text-primary" 
+              bgClass="bg-gradient-to-br from-primary/10 to-primary/5"
             />
             <MetricCard 
               label="Total Contributions" 
               value={formatResult(totalContributions)} 
               colorClass="text-blue-500" 
+              bgClass="bg-gradient-to-br from-blue-500/10 to-blue-500/5"
             />
-            <MetricCard 
-              label="Total Profit" 
-              value={formatResult(totalProfit)} 
-              colorClass={isProfitNegative ? 'text-destructive' : 'text-emerald-500'} 
+            <MetricCard
+              label="Total Profit"
+              value={formatResult(totalProfit)}
+              colorClass={isProfitNegative ? 'text-destructive' : 'text-emerald-500'}
+              bgClass={isProfitNegative 
+                ? 'bg-gradient-to-br from-destructive/10 to-destructive/5' 
+                : 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5'
+              }
             />
           </div>
 
-          {targetValue && yearsToTarget && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-gradient-to-br from-indigo-500/10 to-indigo-500/5">
+              <div className="p-2 bg-indigo-500/10 rounded-md mt-1">
+                <ShoppingCart className="h-4 w-4 text-indigo-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Purchasing Power (Real Value)</p>
+                <p className="text-2xl font-bold text-indigo-500 my-1">{formatResult(finalValueInTodaysDollars)}</p>
+                <p className="text-xs text-muted-foreground leading-tight">
+                  This is what your final balance would be worth in today&apos;s money, adjusted for inflation.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-500/5">
+              <div className="p-2 bg-amber-500/10 rounded-md mt-1">
+                <Percent className="h-4 w-4 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Return on Investment (ROI)</p>
+                <p className={`text-2xl font-bold my-1 ${roi < 0 ? 'text-destructive' : 'text-amber-500'}`}>
+                  {roi > 0 ? '+' : ''}{roi.toFixed(1)}%
+                </p>
+                <p className="text-xs text-muted-foreground leading-tight">
+                  Your total percentage return on invested capital.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {targetValue && yearsToTarget ? (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="flex items-center gap-2 p-4 bg-primary/10 rounded-lg"
+              className="flex items-center gap-2 p-4 bg-primary/10 rounded-lg border border-primary/20"
             >
               <Target className="h-5 w-5 text-primary" />
               <p className="text-sm">
-                You'll reach your target of <span className="font-bold">${targetValue.toLocaleString()}</span> in approximately{' '}
-                <span className="font-bold text-primary">{yearsToTarget} years</span>
+                You&apos;ll reach your target of <span className="font-bold">${targetValue.toLocaleString()}</span> in
+                approximately <span className="font-bold text-primary">{yearsToTarget} years</span>
               </p>
             </motion.div>
-          )}
+          ) : null}
 
           <GrowthMilestones finalValue={finalValue} />
         </CardContent>
@@ -127,24 +162,41 @@ export function GrowthResults({
   )
 }
 
-function MetricCard({ label, value, colorClass }: { label: string, value: React.ReactNode, colorClass: string }) {
+function MetricCard({
+  label,
+  value,
+  colorClass,
+  bgClass
+}: {
+  label: string
+  value: ReactNode
+  colorClass: string
+  bgClass: string
+}) {
   return (
     <motion.div
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      className="min-w-0 bg-gradient-to-br from-muted/50 to-muted/10 rounded-lg p-4 space-y-1"
+      className={`min-w-0 rounded-lg p-4 space-y-1 ${bgClass}`}
     >
       <p className="text-xs text-muted-foreground">{label}</p>
-      <div className={`text-lg sm:text-xl md:text-2xl font-bold break-words leading-tight ${colorClass}`}>
-        {value}
-      </div>
+      <div className={`text-lg sm:text-xl md:text-2xl font-bold break-words leading-tight ${colorClass}`}>{value}</div>
     </motion.div>
   )
 }
 
-function ActionButtons({ onShare, onExportPdf, onExportExcel }: any) {
-  const btnClass = "inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 font-medium shadow-sm transition-colors duration-150"
-  
+function ActionButtons({
+  onShare,
+  onExportPdf,
+  onExportExcel,
+}: {
+  onShare: () => void
+  onExportPdf: () => void
+  onExportExcel: () => void
+}) {
+  const btnClass =
+    'inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 font-medium shadow-sm transition-colors duration-150'
+
   return (
     <>
       <motion.button
@@ -183,23 +235,24 @@ function ActionButtons({ onShare, onExportPdf, onExportExcel }: any) {
   )
 }
 
-function CompactValue({ formatted, fullName }: { formatted: string, fullName: string }) {
+function CompactValue({ formatted, fullName }: { formatted: string; fullName: string }) {
   const [isOpen, setIsOpen] = useState(false)
-  
+
   return (
     <TooltipProvider delayDuration={300}>
       <Tooltip open={isOpen} onOpenChange={setIsOpen}>
         <TooltipTrigger asChild>
-          <span 
+          <span
             className="cursor-help decoration-dotted decoration-foreground/30 underline-offset-4 hover:underline"
             onClick={(e) => {
               e.stopPropagation()
-              setIsOpen(prev => !prev)
+              setIsOpen((prev) => !prev)
             }}
           >
             {formatted}
           </span>
         </TooltipTrigger>
+
         <TooltipContent className="bg-card text-foreground border-border rounded-lg shadow-lg p-3 text-xs">
           <p>{fullName}</p>
         </TooltipContent>

@@ -28,7 +28,8 @@ export function GrowthMode() {
     periodicAddition: 500,
     frequency: 'monthly',
     targetValue: 500000,
-    inflationAdjustment: 0,
+    inflationAdjustment: 2.5,
+    excludeInflationAdjustment: true
   })
 
   const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('growth-show-monte-carlo', false)
