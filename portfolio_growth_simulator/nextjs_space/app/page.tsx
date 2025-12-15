@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { GrowthMode } from '@/components/growth-mode'
 import { WithdrawalMode } from '@/components/withdrawal-mode'
 import { GuideTab } from '@/components/guide-tab'
+import LZString from 'lz-string'
 
 export default function Home() {
   const { theme, setTheme } = useTheme()
@@ -31,14 +32,52 @@ export default function Home() {
       const mcParam = search.get('mc')
 
       if (mcParam) {
-        const decoded = JSON.parse(decodeURIComponent(atob(mcParam)))
-        const mode =
-          decoded?.mode === 'withdrawal' ? 'withdrawal' : 'growth'
+        // FIX: Explicitly type 'decoded' as 'any' to resolve the TypeScript error
+        let decoded: any = null
 
-        setActiveTab(mode)
-        localStorage.setItem('visited', 'true')
-        localStorage.setItem('lastTab', mode)
-        return
+        // 1. Try decompressing with LZString (New Format)
+        const lzDecompressed = LZString.decompressFromEncodedURIComponent(mcParam)
+        if (lzDecompressed) {
+          try {
+            const parsed = JSON.parse(lzDecompressed)
+            // valid JSON? use it.
+            if (parsed && typeof parsed === 'object') {
+              decoded = parsed
+            }
+          } catch {
+            // LZString returned a string, but it wasn't valid JSON.
+            // This happens when LZString tries to decode a simple Base64 string.
+            // Ignore and fall through to legacy.
+          }
+        }
+
+        // 2. Fallback to atob (Legacy Format) if LZString failed to produce valid JSON
+        if (!decoded) {
+          try {
+             const raw = decodeURIComponent(atob(mcParam))
+             decoded = JSON.parse(raw)
+          } catch {
+             // Not a valid legacy link either
+          }
+        }
+
+        if (decoded) {
+          const mode = decoded?.mode === 'withdrawal' ? 'withdrawal' : 'growth'
+
+          setActiveTab(mode)
+          localStorage.setItem('visited', 'true')
+          localStorage.setItem('lastTab', mode)
+          
+          // Dispatch event with the FULL decoded object (including results)
+          // This allows the child components to catch it and hydrate their state
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('openMonteCarloFromLink', { 
+              detail: decoded 
+            }))
+          }, 100) // Small delay to ensure components are mounted
+          
+          return
+        }
       }
     } catch {
       // ignore and fall back to normal behavior

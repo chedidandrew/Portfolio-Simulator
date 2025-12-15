@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { DollarSign } from 'lucide-react'
 import { WithdrawalState } from '@/lib/types'
 
@@ -24,6 +25,8 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          
+          {/* Starting Balance */}
           <div className="space-y-2">
             <Label htmlFor="starting-balance-w">Starting Balance ($)</Label>
             <NumericInput
@@ -44,6 +47,8 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               maxErrorMessage="The Fed wants its printer back :)"
             />
           </div>
+
+          {/* Annual Return */}
           <div className="space-y-2">
             <Label htmlFor="annual-return-w">Annual Return (%)</Label>
             <NumericInput
@@ -68,6 +73,8 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               maxErrorMessage="Even Medallion doesn't pull returns like that :)"
             />
           </div>
+
+          {/* Duration */}
           <div className="space-y-2">
             <Label htmlFor="duration-w">Duration (Years)</Label>
             <NumericInput
@@ -81,6 +88,8 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               maxErrorMessage="Planning for the next two centuries? :)"
             />
           </div>
+
+          {/* Withdrawal Amount */}
           <div className="space-y-2">
             <Label htmlFor="periodic-withdrawal">Withdrawal Amount ($)</Label>
             <NumericInput
@@ -99,30 +108,52 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               maxErrorMessage="Speedrunning bankruptcy? :)"
             />
           </div>
+          
+          {/* Inflation Adjustment - With Toggle */}
           <div className="space-y-2">
-            <Label htmlFor="inflation">Inflation Adjustment (%)</Label>
-            <NumericInput
-              id="inflation"
-              step={0.1}
-              value={state.inflationAdjustment ?? 0}
-              onChange={(value) => {
-                let n = Number(value)
-                if (!isFinite(n)) {
-                  setState({ ...state, inflationAdjustment: 0 })
-                  return
-                }
-                const MIN_ABS = 0.000001
-                if (n !== 0 && Math.abs(n) < MIN_ABS) {
-                  n = MIN_ABS * Math.sign(n)
-                }
-                const limited = Number(n.toFixed(6))
-                setState({ ...state, inflationAdjustment: limited })
-              }}
-              min={-50}
-              max={100}
-              maxErrorMessage="Your grocery bill just fainted :)"
-            />
+            <Label htmlFor="inflation">Annual Inflation Adjustment (%)</Label>
+            <div className="flex flex-col gap-3">
+              <NumericInput
+                id="inflation"
+                step={0.1}
+                value={state.inflationAdjustment ?? 0}
+                onChange={(value) => {
+                  let n = Number(value)
+                  if (!isFinite(n)) {
+                    setState({ ...state, inflationAdjustment: 0 })
+                    return
+                  }
+                  const MIN_ABS = 0.000001
+                  if (n !== 0 && Math.abs(n) < MIN_ABS) {
+                    n = MIN_ABS * Math.sign(n)
+                  }
+                  const limited = Number(n.toFixed(6))
+                  setState({ ...state, inflationAdjustment: limited })
+                }}
+                min={-50}
+                max={100}
+                maxErrorMessage="Your grocery bill just fainted :)"
+              />
+              
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="adjust-withdrawals"
+                  checked={!(state.excludeInflationAdjustment ?? false)}
+                  onCheckedChange={(checked) =>
+                    setState({ ...state, excludeInflationAdjustment: !checked })
+                  }
+                />
+                <Label
+                  htmlFor="adjust-withdrawals"
+                  className="text-xs font-normal text-muted-foreground cursor-pointer"
+                >
+                  Increase withdrawals annually by this rate?
+                </Label>
+              </div>
+            </div>
           </div>
+
+          {/* Frequency */}
           <div className="space-y-2">
             <Label htmlFor="frequency-w">Withdrawal Frequency</Label>
             <Select

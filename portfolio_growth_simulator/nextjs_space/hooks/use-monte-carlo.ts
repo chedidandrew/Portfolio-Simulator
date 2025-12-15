@@ -38,7 +38,13 @@ const PRESET_PROFILES = {
   },
 }
 
-export function useMonteCarlo(mode: 'growth' | 'withdrawal', initialValues: any) {
+export function useMonteCarlo(
+  mode: 'growth' | 'withdrawal', 
+  initialValues: any,
+  // NEW: Accept overrides from parent
+  initialRngSeed?: string | null,
+  initialMCParams?: SimulationParams
+) {
   const [profile, setProfile] = useLocalStorage<keyof typeof PRESET_PROFILES>(
     'mc-profile-' + mode,
     'moderate'
@@ -64,11 +70,7 @@ export function useMonteCarlo(mode: 'growth' | 'withdrawal', initialValues: any)
 
   const [logScales, setLogScales] = useLocalStorage<LogScaleSettings>(
     'mc-log-scales-' + mode,
-    {
-      chart: false,
-      histogram: false,
-      drawdown: false,
-    }
+    { chart: false, histogram: false, drawdown: false }
   )
 
   const [rngSeed, setRngSeed] = useLocalStorage<string | null>(
@@ -86,7 +88,18 @@ export function useMonteCarlo(mode: 'growth' | 'withdrawal', initialValues: any)
     false
   )
 
-  // Update params when profile changes
+  // 1. Initialize from Shared Link Data (if present)
+  useEffect(() => {
+    if (initialMCParams) {
+      setParams(prev => ({ ...prev, ...initialMCParams }))
+      setProfile('custom')
+    }
+    if (initialRngSeed) {
+      setRngSeed(initialRngSeed)
+    }
+  }, [initialMCParams, initialRngSeed, setParams, setRngSeed, setProfile])
+
+  // 2. Profile Switch Logic (only if NOT custom)
   useEffect(() => {
     if (profile !== 'custom') {
       const targetReturn = PRESET_PROFILES[profile].expectedReturn
@@ -112,16 +125,17 @@ export function useMonteCarlo(mode: 'growth' | 'withdrawal', initialValues: any)
     onComplete?: (results: any) => void
   ) => {
     const simParams = overrideParams ?? params
-    const seed =
-      seedOverride ?? rngSeed ?? `monte-carlo-${Date.now()}-${Math.random()}`
+    
+    // If a seed is passed (e.g. from URL), use it. 
+    // Otherwise use stored seed. 
+    // Finally fallback to new random seed.
+    const seed = seedOverride ?? rngSeed ?? `monte-carlo-${Date.now()}-${Math.random()}`
 
     setIsSimulating(true)
     setRngSeed(seed)
 
     setTimeout(() => {
       const simResults = performMonteCarloSimulation(simParams, mode, seed)
-
-      // Store the params that generated these results for dirty checking
       const finalResults = { ...simResults, simulationParams: simParams }
 
       if (preservedLogScales) {
@@ -143,54 +157,14 @@ export function useMonteCarlo(mode: 'growth' | 'withdrawal', initialValues: any)
     }, 100)
   }
 
-  // Handle URL loading
+  // 3. AUTO-RUN: Triggers immediately if a seed was provided via props (Link opened)
   useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    try {
-      const search = new URLSearchParams(window.location.search)
-      const mcParam = search.get('mc')
-
-      if (!mcParam) return
-
-      const decoded = JSON.parse(decodeURIComponent(atob(mcParam)))
-
-      if (!decoded || !decoded.params) return
-
-      window.dispatchEvent(
-        new CustomEvent('openMonteCarloFromLink', {
-          detail: { mode: decoded.mode },
-        })
-      )
-
-      setProfile('custom')
-
-      const mergedParams: SimulationParams = {
-        ...params,
-        ...decoded.params,
-      }
-      setParams(mergedParams)
-
-      const seedFromUrl =
-        typeof decoded.rngSeed === 'string' ? decoded.rngSeed : undefined
-      if (seedFromUrl) {
-        setRngSeed(seedFromUrl)
-      }
-
-      const savedLogScales = decoded.logScales as LogScaleSettings | undefined
-
-      if (typeof decoded.showFullPrecision === 'boolean') {
-        setShowFullPrecision(decoded.showFullPrecision)
-      }
-
-      runSimulation(mergedParams, seedFromUrl, savedLogScales)
-
-      window.history.replaceState(null, '', window.location.pathname)
-    } catch (err) {
-      console.error('Failed to restore Monte Carlo state from URL', err)
+    if (initialRngSeed && initialMCParams) {
+       // Run simulation using the passed params and seed
+       runSimulation(initialMCParams, initialRngSeed)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRngSeed])
 
   return {
     profile,

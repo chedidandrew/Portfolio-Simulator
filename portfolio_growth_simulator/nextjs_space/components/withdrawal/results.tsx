@@ -1,25 +1,21 @@
 'use client'
 
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { 
   TrendingDown, Share, FileText, FileSpreadsheet, 
-  CheckCircle2, AlertTriangle, XCircle 
+  CheckCircle2, AlertTriangle, Wallet, ShoppingCart 
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { formatCurrency, getLargeNumberName } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { WithdrawalChart } from '@/components/withdrawal-chart'
+import { WithdrawalProjectionResult } from '@/lib/simulation/withdrawal-engine'
 
 interface WithdrawalResultsProps {
-  data: {
-    endingBalance: number
-    totalWithdrawn: number
-    isSustainable: boolean
-    yearsUntilZero: number | null
-    yearData: any[]
-  }
+  data: WithdrawalProjectionResult
   duration: number
   showFullPrecision: boolean
   setShowFullPrecision: (v: boolean) => void
@@ -38,31 +34,27 @@ export function WithdrawalResults({
   onExportExcel
 }: WithdrawalResultsProps) {
   
-  const { endingBalance, totalWithdrawn, isSustainable, yearsUntilZero, yearData } = data
+  const { 
+    endingBalance, 
+    endingBalanceInTodaysDollars,
+    totalWithdrawn, 
+    totalWithdrawnInTodaysDollars,
+    isSustainable, 
+    yearsUntilZero, 
+    yearData 
+  } = data
+  
   const sustainabilityColor = isSustainable ? 'text-emerald-500' : 'text-destructive'
 
   const renderFormattedResult = (val: number | undefined) => {
-    if (val === undefined) return '$0'
+    if (val === undefined || isNaN(val)) return '$0'
 
     const shouldUseCompact = val >= 1e100 || !showFullPrecision
     const formatted = formatCurrency(val, true, 2, shouldUseCompact)
     const fullName = getLargeNumberName(val)
 
     if (shouldUseCompact && fullName) {
-      return (
-        <TooltipProvider delayDuration={300}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="cursor-help decoration-dotted decoration-foreground/30 underline-offset-4 hover:underline">
-                {formatted}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent className="bg-card text-foreground border-border rounded-lg shadow-lg p-3 text-xs">
-              <p>{fullName}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )
+      return <CompactValue formatted={formatted} fullName={fullName} />
     }
 
     return formatted
@@ -160,56 +152,94 @@ export function WithdrawalResults({
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
+            {/* Primary Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <motion.div
-                key={endingBalance}
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className={`rounded-lg p-4 space-y-1 ${
-                  isSustainable
-                    ? 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5'
-                    : 'bg-gradient-to-br from-destructive/10 to-destructive/5'
-                }`}
-              >
-                <p className="text-xs text-muted-foreground">Ending Balance</p>
-                <p className={`text-lg sm:text-xl md:text-2xl font-bold ${sustainabilityColor} break-words leading-tight`}>
-                  {renderFormattedResult(endingBalance)}
-                </p>
-              </motion.div>
+              <MetricCard
+                label="Ending Balance"
+                value={renderFormattedResult(endingBalance)}
+                colorClass={sustainabilityColor}
+                bgClass={isSustainable 
+                  ? 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5' 
+                  : 'bg-gradient-to-br from-destructive/10 to-destructive/5'
+                }
+              />
 
-              <motion.div
-                key={totalWithdrawn}
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.1 }}
-                className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 rounded-lg p-4 space-y-1"
-              >
-                <p className="text-xs text-muted-foreground">Total Withdrawn</p>
-                <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-500 break-words leading-tight">
-                  {renderFormattedResult(totalWithdrawn)}
-                </p>
-              </motion.div>
+              <MetricCard
+                label="Total Withdrawn"
+                value={renderFormattedResult(totalWithdrawn)}
+                colorClass="text-blue-500"
+                bgClass="bg-gradient-to-br from-blue-500/10 to-blue-500/5"
+              />
 
-              <motion.div
-                key={yearsUntilZero}
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 rounded-lg p-4 space-y-1"
-              >
-                <p className="text-xs text-muted-foreground">Portfolio Lasts</p>
-                <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-500 break-words leading-tight">
-                  {yearsUntilZero ?? duration}+ years
-                </p>
-              </motion.div>
+              <MetricCard
+                label="Portfolio Lasts"
+                value={`${yearsUntilZero ?? duration}+ years`}
+                colorClass="text-purple-500"
+                bgClass="bg-gradient-to-br from-purple-500/10 to-purple-500/5"
+              />
             </div>
+
+            {/* Secondary Context Metrics (NEW) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-gradient-to-br from-indigo-500/10 to-indigo-500/5">
+                <div className="p-2 bg-indigo-500/10 rounded-md mt-1">
+                  <Wallet className="h-4 w-4 text-indigo-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Legacy Value (Purchasing Power)</p>
+                  <p className="text-2xl font-bold text-indigo-500 my-1">{renderFormattedResult(endingBalanceInTodaysDollars)}</p>
+                  <p className="text-xs text-muted-foreground leading-tight">
+                    This is what your remaining balance would be worth in today&apos;s money.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-500/5">
+                <div className="p-2 bg-amber-500/10 rounded-md mt-1">
+                  <ShoppingCart className="h-4 w-4 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Total Real Consumption</p>
+                  <p className="text-2xl font-bold text-amber-500 my-1">{renderFormattedResult(totalWithdrawnInTodaysDollars)}</p>
+                  <p className="text-xs text-muted-foreground leading-tight">
+                    The total effective purchasing power you were able to spend from this portfolio.
+                  </p>
+                </div>
+              </div>
+            </div>
+
           </CardContent>
         </Card>
       </motion.div>
 
       <WithdrawalChart data={yearData} />
     </>
+  )
+}
+
+function MetricCard({ 
+  label, 
+  value, 
+  colorClass, 
+  bgClass 
+}: { 
+  label: string, 
+  value: React.ReactNode, 
+  colorClass: string,
+  bgClass: string
+}) {
+  return (
+    <motion.div
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      className={`min-w-0 rounded-lg p-4 space-y-1 ${bgClass}`}
+    >
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <div className={`text-lg sm:text-xl md:text-2xl font-bold break-words leading-tight ${colorClass}`}>
+        {value}
+      </div>
+    </motion.div>
   )
 }
 
@@ -251,5 +281,30 @@ function ActionButtons({ onShare, onExportPdf, onExportExcel }: any) {
         <span>Excel</span>
       </motion.button>
     </>
+  )
+}
+
+function CompactValue({ formatted, fullName }: { formatted: string, fullName: string }) {
+  const [isOpen, setIsOpen] = useState(false)
+  
+  return (
+    <TooltipProvider delayDuration={300}>
+      <Tooltip open={isOpen} onOpenChange={setIsOpen}>
+        <TooltipTrigger asChild>
+          <span 
+            className="cursor-help decoration-dotted decoration-foreground/30 underline-offset-4 hover:underline"
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsOpen(prev => !prev)
+            }}
+          >
+            {formatted}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="bg-card text-foreground border-border rounded-lg shadow-lg p-3 text-xs">
+          <p>{fullName}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }

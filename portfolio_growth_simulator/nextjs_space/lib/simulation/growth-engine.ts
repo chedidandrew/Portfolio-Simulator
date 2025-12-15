@@ -2,22 +2,18 @@ import { GrowthState } from '@/lib/types'
 
 export interface GrowthProjectionResult {
   finalValue: number
+  finalValueInTodaysDollars: number
   totalContributions: number
+  totalInterest: number
   totalProfit: number
   yearData: Array<{
     year: number
     startingValue: number
     contributions: number
+    interest: number
     endingValue: number
   }>
   yearsToTarget: number | null
-}
-
-const FREQUENCY_MULTIPLIER: Record<string, number> = {
-  yearly: 1,
-  quarterly: 4,
-  monthly: 12,
-  weekly: 52,
 }
 
 export function calculateGrowthProjection(state: GrowthState): GrowthProjectionResult {
@@ -28,82 +24,112 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     periodicAddition, 
     frequency, 
     inflationAdjustment,
-    targetValue 
+    targetValue,
+    excludeInflationAdjustment // <--- Make sure to destructure this
   } = state
 
-  const periods = FREQUENCY_MULTIPLIER[frequency] || 12
-  // Rate per period: (1 + r)^(1/n) - 1
-  const ratePerPeriod = Math.pow(1 + annualReturn / 100, 1 / periods) - 1
-  
-  // Inflation adjustment factor per year (contributions increase by this % annually)
+  // --- 1. Engine Configuration ---
+  const totalMonths = duration * 12
+  const monthlyRate = Math.pow(1 + annualReturn / 100, 1 / 12) - 1
   const inflationFactor = 1 + (inflationAdjustment / 100)
 
-  const yearData = []
-  let currentValue = startingBalance
-  
-  // Track the current periodic addition which might change yearly due to inflation
+  // --- 2. Simulation State ---
+  let currentBalance = startingBalance
+  let totalContributions = startingBalance
   let currentPeriodicAddition = periodicAddition
-  let runningTotalContributions = startingBalance
 
-  // 1. Calculate Standard Projection
-  for (let year = 1; year <= duration; year++) {
-    const startingValue = currentValue
-    let yearContributions = 0
+  const yearData = []
+  let yearStartBalance = startingBalance
+  let yearContributions = 0
+  let yearInterest = 0
+
+  // --- 3. Run Simulation ---
+  for (let month = 1; month <= totalMonths; month++) {
+    const balanceBeforeInterest = currentBalance
     
-    for (let period = 0; period < periods; period++) {
-      currentValue = currentValue * (1 + ratePerPeriod) + currentPeriodicAddition
-      yearContributions += currentPeriodicAddition
+    // A. Apply Growth
+    currentBalance = currentBalance * (1 + monthlyRate)
+    const monthlyInterest = currentBalance - balanceBeforeInterest
+    yearInterest += monthlyInterest
+
+    // B. Apply Contributions
+    let contributionThisMonth = 0
+    if (frequency === 'monthly') contributionThisMonth = currentPeriodicAddition
+    else if (frequency === 'quarterly' && month % 3 === 0) contributionThisMonth = currentPeriodicAddition
+    else if (frequency === 'yearly' && month % 12 === 0) contributionThisMonth = currentPeriodicAddition
+    else if (frequency === 'weekly') contributionThisMonth = (currentPeriodicAddition * 52) / 12
+
+    if (contributionThisMonth > 0) {
+      currentBalance += contributionThisMonth
+      totalContributions += contributionThisMonth
+      yearContributions += contributionThisMonth
     }
-    
-    runningTotalContributions += yearContributions
-    
-    yearData.push({
-      year,
-      startingValue,
-      contributions: yearContributions,
-      endingValue: currentValue,
-    })
 
-    // Increase contribution for the NEXT year by inflation rate
-    currentPeriodicAddition *= inflationFactor
+    // C. End of Year Processing
+    if (month % 12 === 0) {
+      yearData.push({
+        year: month / 12,
+        startingValue: yearStartBalance,
+        contributions: yearContributions,
+        interest: yearInterest,
+        endingValue: currentBalance,
+      })
+
+      yearStartBalance = currentBalance
+      yearContributions = 0
+      yearInterest = 0
+
+      // D. Apply Inflation to Contributions (CONDITIONAL)
+      // Only increase contributions if the user has NOT checked "Exclude Inflation Adjustment"
+      if (!excludeInflationAdjustment) {
+        currentPeriodicAddition *= inflationFactor
+      }
+    }
   }
-  
-  const finalValue = currentValue
-  const totalContributions = runningTotalContributions
+
+  const finalValue = currentBalance
   const totalProfit = finalValue - totalContributions
-  
-  // 2. Calculate Years to Target (if applicable)
-  const MAX_YEARS_TO_TARGET = 1000
+  const totalInterest = finalValue - totalContributions
+
+  // --- 4. Real Value Calculation ---
+  // Always discount by inflation to show purchasing power, regardless of contribution strategy
+  const finalValueInTodaysDollars = finalValue / Math.pow(1 + inflationAdjustment / 100, duration)
+
+  // --- 5. Years to Target ---
   let yearsToTarget: number | null = null
 
-  // Only attempt calculation if target exists, target > start, and there is growth potential
-  if (
-    targetValue &&
-    targetValue > startingBalance &&
-    (ratePerPeriod > 0 || periodicAddition > 0)
-  ) {
-    let tempValue = startingBalance
-    let tempPeriodicAddition = periodicAddition
+  if (targetValue && targetValue > startingBalance) {
+    let tBalance = startingBalance
+    let tContribution = periodicAddition
     
-    // We run a separate simulation loop just for finding the target year
-    for (let year = 1; year <= MAX_YEARS_TO_TARGET; year++) {
-      for (let period = 0; period < periods; period++) {
-        tempValue = tempValue * (1 + ratePerPeriod) + tempPeriodicAddition
-      }
+    for (let m = 1; m <= 1000 * 12; m++) {
+      tBalance = tBalance * (1 + monthlyRate)
       
-      if (tempValue >= targetValue) {
-        yearsToTarget = year
+      let tAdd = 0
+      if (frequency === 'monthly') tAdd = tContribution
+      else if (frequency === 'quarterly' && m % 3 === 0) tAdd = tContribution
+      else if (frequency === 'yearly' && m % 12 === 0) tAdd = tContribution
+      else if (frequency === 'weekly') tAdd = (tContribution * 52) / 12
+      
+      tBalance += tAdd
+
+      if (tBalance >= targetValue) {
+        yearsToTarget = parseFloat((m / 12).toFixed(1))
         break
       }
-      
-      // Apply inflation to the simulation for target
-      tempPeriodicAddition *= inflationFactor
+
+      // Apply inflation to target loop only if enabled
+      if (m % 12 === 0 && !excludeInflationAdjustment) {
+        tContribution *= inflationFactor
+      }
     }
   }
   
   return { 
     finalValue, 
+    finalValueInTodaysDollars,
     totalContributions, 
+    totalInterest, 
     totalProfit, 
     yearData, 
     yearsToTarget 

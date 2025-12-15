@@ -2,7 +2,9 @@ import { WithdrawalState } from '@/lib/types'
 
 export interface WithdrawalProjectionResult {
   endingBalance: number
+  endingBalanceInTodaysDollars: number
   totalWithdrawn: number
+  totalWithdrawnInTodaysDollars: number
   isSustainable: boolean
   yearsUntilZero: number | null
   yearData: Array<{
@@ -14,13 +16,6 @@ export interface WithdrawalProjectionResult {
   }>
 }
 
-const FREQUENCY_MULTIPLIER: Record<string, number> = {
-  weekly: 52,
-  monthly: 12,
-  quarterly: 4,
-  yearly: 1,
-}
-
 export function calculateWithdrawalProjection(state: WithdrawalState): WithdrawalProjectionResult {
   const {
     startingBalance,
@@ -29,62 +24,90 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
     periodicWithdrawal,
     inflationAdjustment,
     frequency,
+    excludeInflationAdjustment // <--- Destructure this
   } = state
 
-  const periods = FREQUENCY_MULTIPLIER[frequency] || 12
-  const yearCount = Math.max(0, duration)
-  // Rate per period: (1 + r)^(1/n) - 1
-  const ratePerPeriod = Math.pow(1 + annualReturn / 100, 1 / periods) - 1
-  const inflationFactorPerYear = 1 + inflationAdjustment / 100
+  // --- 1. Engine Configuration ---
+  const totalMonths = duration * 12
+  const monthlyRate = Math.pow(1 + annualReturn / 100, 1 / 12) - 1
+  const inflationFactor = 1 + inflationAdjustment / 100
+
+  // --- 2. Simulation State ---
+  let currentBalance = startingBalance
+  let currentPeriodicWithdrawal = periodicWithdrawal
+  
+  let yearsUntilZero: number | null = null
+  let totalWithdrawn = 0
+  let totalWithdrawnInTodaysDollars = 0
 
   const yearData = []
+  let yearStartBalance = startingBalance
+  let yearWithdrawals = 0
 
-  let currentBalance = startingBalance
-  let currentWithdrawal = periodicWithdrawal
-  let yearsUntilZero: number | null = null
+  // --- 3. Run Simulation ---
+  for (let month = 1; month <= totalMonths; month++) {
+    // A. Apply Growth
+    if (currentBalance > 0) {
+      currentBalance = currentBalance * (1 + monthlyRate)
+    }
 
-  for (let year = 1; year <= yearCount; year++) {
-    const startBalance = currentBalance
-    let yearWithdrawals = 0
+    // B. Determine Withdrawal Amount
+    let withdrawalThisMonth = 0
+    if (frequency === 'monthly') withdrawalThisMonth = currentPeriodicWithdrawal
+    else if (frequency === 'quarterly' && month % 3 === 0) withdrawalThisMonth = currentPeriodicWithdrawal
+    else if (frequency === 'yearly' && month % 12 === 0) withdrawalThisMonth = currentPeriodicWithdrawal
+    else if (frequency === 'weekly') withdrawalThisMonth = (currentPeriodicWithdrawal * 52) / 12
 
-    for (let period = 0; period < periods; period++) {
-      if (currentBalance <= 0) {
-        currentBalance = 0
-        break
+    // C. Execute Withdrawal
+    if (withdrawalThisMonth > 0) {
+      const actualWithdrawal = Math.min(currentBalance, withdrawalThisMonth)
+      currentBalance -= actualWithdrawal
+      totalWithdrawn += actualWithdrawal
+      yearWithdrawals += actualWithdrawal
+
+      // Real Value Calculation (Always applies, regardless of strategy)
+      const discountFactor = Math.pow(inflationFactor, month / 12)
+      totalWithdrawnInTodaysDollars += (actualWithdrawal / discountFactor)
+    }
+
+    // Check for depletion
+    if (currentBalance <= 0.01 && yearsUntilZero === null) {
+      currentBalance = 0
+      yearsUntilZero = parseFloat((month / 12).toFixed(1))
+    }
+
+    // D. End of Year Processing
+    if (month % 12 === 0) {
+      yearData.push({
+        year: month / 12,
+        startingBalance: yearStartBalance,
+        withdrawals: yearWithdrawals,
+        endingBalance: Math.max(0, currentBalance),
+        isSustainable: currentBalance > 0,
+      })
+
+      yearStartBalance = currentBalance
+      yearWithdrawals = 0
+
+      // E. Apply Inflation to Withdrawal Amount (CONDITIONAL)
+      // Only increase the monthly withdrawal amount if the user wants to keep up with inflation.
+      if (!excludeInflationAdjustment) {
+        currentPeriodicWithdrawal *= inflationFactor
       }
-      currentBalance = currentBalance * (1 + ratePerPeriod) - currentWithdrawal
-      yearWithdrawals += currentWithdrawal
     }
-
-    const isSustainable = currentBalance > 0
-
-    if (!isSustainable && yearsUntilZero === null) {
-      yearsUntilZero = year
-    }
-
-    yearData.push({
-      year,
-      startingBalance: Math.max(0, startBalance),
-      withdrawals: yearWithdrawals,
-      endingBalance: Math.max(0, currentBalance),
-      isSustainable,
-    })
-
-    if (currentBalance <= 0) {
-      break
-    }
-    
-    // Increase withdrawal amount for next year by inflation
-    currentWithdrawal *= inflationFactorPerYear
   }
 
   const endingBalance = Math.max(0, currentBalance)
-  const totalWithdrawn = yearData.reduce((sum, y) => sum + y.withdrawals, 0)
   const isSustainable = endingBalance > 0
+  
+  // Real Value of Legacy (Always applies)
+  const endingBalanceInTodaysDollars = endingBalance / Math.pow(inflationFactor, duration)
 
   return {
     endingBalance,
+    endingBalanceInTodaysDollars,
     totalWithdrawn,
+    totalWithdrawnInTodaysDollars,
     isSustainable,
     yearsUntilZero,
     yearData,

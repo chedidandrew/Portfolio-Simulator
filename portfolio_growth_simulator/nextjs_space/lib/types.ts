@@ -6,6 +6,7 @@ export interface GrowthState {
   frequency: 'yearly' | 'quarterly' | 'monthly' | 'weekly'
   targetValue?: number
   inflationAdjustment: number
+  excludeInflationAdjustment?: boolean
 }
 
 export interface WithdrawalState {
@@ -15,6 +16,7 @@ export interface WithdrawalState {
   periodicWithdrawal: number
   inflationAdjustment: number
   frequency: 'yearly' | 'quarterly' | 'monthly' | 'weekly'
+  excludeInflationAdjustment?: boolean
 }
 
 export interface SimulationParams {
@@ -27,4 +29,14 @@ export interface SimulationParams {
   inflationAdjustment?: number
   numPaths: number
   portfolioGoal?: number
+}
+
+export interface SharePayload {
+  mode: 'growth' | 'withdrawal'
+  type: 'deterministic' | 'monte-carlo'
+  deterministicParams: GrowthState | WithdrawalState
+  mcParams?: SimulationParams
+  rngSeed?: string | null
+  showFullPrecision?: boolean
+  logScales?: { chart: boolean; histogram: boolean; drawdown: boolean }
 }

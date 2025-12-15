@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { DollarSign } from 'lucide-react'
 import { GrowthState } from '@/lib/types'
 
@@ -22,9 +23,9 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
         </CardTitle>
         <CardDescription>Configure your investment scenario</CardDescription>
       </CardHeader>
+
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          
           {/* Starting Balance */}
           <div className="space-y-2">
             <Label htmlFor="starting-balance">Starting Balance ($)</Label>
@@ -37,13 +38,9 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
                   setState({ ...state, startingBalance: 0 })
                   return
                 }
-                
-                // Currency clamp: 0 is allowed, but if >0, min is 0.01
-                if (n !== 0 && Math.abs(n) < 0.01) {
-                   n = 0.01
-                }
-                
-                // Standardize to 2 decimals
+
+                if (n !== 0 && Math.abs(n) < 0.01) n = 0.01
+
                 const limited = Number(n.toFixed(2))
                 setState({ ...state, startingBalance: limited })
               }}
@@ -62,19 +59,17 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
               value={state.annualReturn ?? 0}
               onChange={(value) => {
                 let n = Number(value)
-                
+
                 if (!isFinite(n)) {
                   setState({ ...state, annualReturn: 0 })
                   return
                 }
 
-                // Clamp extremely tiny non-zero values to avoid floating point weirdness
                 const MIN_ABS = 0.000001
                 if (n !== 0 && Math.abs(n) < MIN_ABS) {
                   n = MIN_ABS * Math.sign(n)
                 }
 
-                // Limit precision to 6 decimals
                 const limited = Number(n.toFixed(6))
                 setState({ ...state, annualReturn: limited })
               }}
@@ -106,13 +101,10 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
               onChange={(value) => {
                 let n = Number(value)
                 if (!isFinite(n)) n = 0
-                
-                // Non-negative constraint
+
                 if (n < 0) n = 0
-                
-                // Currency clamp: min 0.01 if non-zero
                 if (n !== 0 && n < 0.01) n = 0.01
-                
+
                 const limited = Number(n.toFixed(2))
                 setState({ ...state, periodicAddition: limited })
               }}
@@ -143,33 +135,50 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
 
           {/* Inflation Adjustment */}
           <div className="space-y-2">
-            <Label htmlFor="inflation">Inflation Adjustment (%)</Label>
-            <NumericInput
-              id="inflation"
-              step={0.1}
-              value={state.inflationAdjustment ?? 0}
-              onChange={(value) => {
-                let n = Number(value)
-                
-                if (!isFinite(n)) {
-                  setState({ ...state, inflationAdjustment: 0 })
-                  return
-                }
-                
-                // Clamp tiny values (inflation is usually 2 decimals)
-                const MIN_ABS = 0.01
-                if (n !== 0 && Math.abs(n) < MIN_ABS) {
-                  n = MIN_ABS * Math.sign(n)
-                }
-                
-                // Limit precision
-                const limited = Number(n.toFixed(2))
-                setState({ ...state, inflationAdjustment: limited })
-              }}
-              min={-50}
-              max={100}
-              maxErrorMessage="Hyperinflation much? :)"
-            />
+            <Label htmlFor="inflation">Annual Inflation Adjustment (%)</Label>
+
+            <div className="flex flex-col gap-3">
+              <NumericInput
+                id="inflation"
+                step={0.1}
+                value={state.inflationAdjustment ?? 0}
+                onChange={(value) => {
+                  let n = Number(value)
+
+                  if (!isFinite(n)) {
+                    setState({ ...state, inflationAdjustment: 0 })
+                    return
+                  }
+
+                  const MIN_ABS = 0.01
+                  if (n !== 0 && Math.abs(n) < MIN_ABS) {
+                    n = MIN_ABS * Math.sign(n)
+                  }
+
+                  const limited = Number(n.toFixed(2))
+                  setState({ ...state, inflationAdjustment: limited })
+                }}
+                min={-50}
+                max={100}
+                maxErrorMessage="Hyperinflation much? :)"
+              />
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="adjust-contrib"
+                  checked={!(state.excludeInflationAdjustment ?? false)}
+                  onCheckedChange={(checked) =>
+                    setState({ ...state, excludeInflationAdjustment: !checked })
+                  }
+                />
+                <Label
+                  htmlFor="adjust-contrib"
+                  className="text-xs font-normal text-muted-foreground cursor-pointer"
+                >
+                  Increase contributions annually by this rate?
+                </Label>
+              </div>
+            </div>
           </div>
 
           {/* Target Value */}
@@ -184,15 +193,13 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
                   setState({ ...state, targetValue: undefined })
                   return
                 }
-                
+
                 let n = Number(value)
                 if (!isFinite(n)) return
-                
+
                 if (n < 0) n = 0
-                
-                // Currency clamp if > 0
                 if (n !== 0 && n < 0.01) n = 0.01
-                
+
                 const limited = Number(n.toFixed(2))
                 setState({ ...state, targetValue: limited })
               }}

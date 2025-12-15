@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocalStorage } from '@/hooks/use-local-storage'
-import { GrowthState } from '@/lib/types'
+import type { GrowthState, SimulationParams, SharePayload } from '@/lib/types'
 import { triggerHaptic } from '@/hooks/use-haptics'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -18,9 +18,9 @@ import { GrowthTable } from '@/components/growth/table'
 import { MonteCarloSimulator } from '@/components/monte-carlo-simulator'
 import { DonationSection } from '@/components/donation-section'
 import { useGrowthCalculation } from '@/hooks/use-growth-calculation'
+import LZString from 'lz-string'
 
 export function GrowthMode() {
-  // 1. State
   const [state, setState] = useLocalStorage<GrowthState>('growth-mode-state', {
     startingBalance: 10000,
     annualReturn: 8,
@@ -28,51 +28,87 @@ export function GrowthMode() {
     periodicAddition: 500,
     frequency: 'monthly',
     targetValue: 500000,
-    inflationAdjustment: 0,
+    inflationAdjustment: 2.5,
+    excludeInflationAdjustment: true
   })
 
   const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('growth-show-monte-carlo', false)
   const [showFullPrecision, setShowFullPrecision] = useLocalStorage('growth-show-full-precision', false)
 
-  // 2. Logic Hook
+  // NEW: MC state restored from URL (passed into MonteCarloSimulator)
+  const [initialRngSeed, setInitialRngSeed] = useState<string | null>(null)
+  const [initialMCParams, setInitialMCParams] = useState<SimulationParams | undefined>(undefined)
+
   const calculation = useGrowthCalculation(state)
 
-  // 3. Effects (URL Loading)
+  // Listen for the event dispatched by app/page.tsx
   useEffect(() => {
     if (typeof window === 'undefined') return
+
+    const handleOpenFromLink = (event: any) => {
+      const decoded = event.detail
+      if (decoded?.mode !== 'growth') return
+
+      // 1) Restore deterministic params (supports new and old keys)
+      const loadedParams = decoded.deterministicParams || decoded.params
+      if (loadedParams) setState(loadedParams)
+
+      // Restore precision toggle if present
+      if (typeof decoded.showFullPrecision === 'boolean') {
+        setShowFullPrecision(decoded.showFullPrecision)
+      }
+
+      // 2) Branch on link type
+      if (decoded.type === 'deterministic') {
+        setUseMonteCarloMode(false)
+      } else {
+        // 3) Monte Carlo link: enable MC and restore MC inputs
+        setUseMonteCarloMode(true)
+        if (decoded.rngSeed) setInitialRngSeed(decoded.rngSeed)
+        if (decoded.mcParams) setInitialMCParams(decoded.mcParams)
+      }
+      
+      // Clean URL
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+
+    // Check on mount if we already have the payload in URL (direct load)
     try {
       const search = new URLSearchParams(window.location.search)
       const mcParam = search.get('mc')
-      if (!mcParam) return
-
-      const decoded = JSON.parse(decodeURIComponent(atob(mcParam)))
-      if (decoded?.mode === 'growth') {
-        if (decoded.type === 'deterministic' && decoded.params) {
-          setUseMonteCarloMode(false)
-          setState(decoded.params)
-          if (typeof decoded.showFullPrecision === 'boolean') {
-            setShowFullPrecision(decoded.showFullPrecision)
-          }
-          window.history.replaceState(null, '', window.location.pathname)
-        } else if (decoded.type !== 'deterministic' && !useMonteCarloMode) {
-          setUseMonteCarloMode(true)
-        }
+      if (mcParam) {
+        // We let app/page.tsx handle the decoding and dispatching, 
+        // but we add a listener here to catch it.
+        window.addEventListener('openMonteCarloFromLink', handleOpenFromLink)
+        return () => window.removeEventListener('openMonteCarloFromLink', handleOpenFromLink)
       }
-    } catch { /* ignore */ }
+    } catch {}
+
+    // Also listen generally for navigation events
+    window.addEventListener('openMonteCarloFromLink', handleOpenFromLink)
+    return () => window.removeEventListener('openMonteCarloFromLink', handleOpenFromLink)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 4. Actions (Share / Export)
   const buildShareUrl = () => {
     if (typeof window === 'undefined') return ''
     const url = new URL(window.location.href)
+
+    // Dynamic payload based on current mode
     const payload = {
       mode: 'growth',
-      type: 'deterministic',
-      params: state,
+      type: useMonteCarloMode ? 'monte-carlo' : 'deterministic',
+      deterministicParams: state,
+      params: state, // legacy compatibility
       showFullPrecision,
+      // Note: If you want to share specific MC params/seeds, they need to be lifted up 
+      // from the MonteCarloSimulator or saved to a context. 
+      // Currently, this shares the mode switch but defaults to new random seeds.
     }
+
+    // Legacy encoding method: encodeURIComponent -> btoa
     const encoded = typeof btoa !== 'undefined' ? btoa(encodeURIComponent(JSON.stringify(payload))) : ''
+    
     if (encoded) url.searchParams.set('mc', encoded)
     return url.toString()
   }
@@ -83,7 +119,6 @@ export function GrowthMode() {
     if (!url) return
 
     try {
-      // 1. Try Native Share (Mobile/Supported Browsers)
       if (typeof navigator !== 'undefined' && 'share' in navigator) {
         await navigator.share({
           title: 'Portfolio Simulator',
@@ -92,22 +127,17 @@ export function GrowthMode() {
         })
         return
       }
-      
-      // 2. Fallback to Clipboard (FIXED TYPE ERROR HERE)
+
       if ((navigator as any)?.clipboard?.writeText) {
         await (navigator as any).clipboard.writeText(url)
         toast('Link copied')
         return
       }
-      
-      // 3. Fallback if neither works
-      toast('Copy not supported on this browser')
 
+      toast('Copy not supported on this browser')
     } catch (err: any) {
-      // Ignore if user simply closed the share sheet
       const name = err?.name
       if (name === 'AbortError' || name === 'NotAllowedError') return
-      // Notify user of actual failures only
       toast('Could not share or copy link')
     }
   }
@@ -138,7 +168,7 @@ export function GrowthMode() {
     const wsSummary = XLSX.utils.json_to_sheet(summaryRows)
     ;(wsSummary as any)['!cols'] = [{ wch: 20 }, { wch: 20 }]
 
-    const excelData = calculation.yearData.map(row => ({
+    const excelData = calculation.yearData.map((row) => ({
       Year: row.year,
       'Starting Value': roundToCents(row.startingValue),
       Contributions: roundToCents(row.contributions),
@@ -146,12 +176,7 @@ export function GrowthMode() {
     }))
 
     const wsData = XLSX.utils.json_to_sheet(excelData)
-    ;(wsData as any)['!cols'] = [
-      { wch: 10 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 20 },
-    ]
+    ;(wsData as any)['!cols'] = [{ wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 20 }]
 
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
@@ -163,7 +188,6 @@ export function GrowthMode() {
     XLSX.writeFile(wb, fileName)
   }
 
-  // 5. Render
   return (
     <div className="space-y-6">
       <motion.div
@@ -177,48 +201,39 @@ export function GrowthMode() {
         </p>
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-      >
+      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
                   <Dices className="h-4 w-4 text-violet-500" />
-                  <Label className="text-base font-semibold">
-                    Monte Carlo Simulation
-                  </Label>
+                  <Label className="text-base font-semibold">Monte Carlo Simulation</Label>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Model market volatility with randomized scenarios
                 </p>
               </div>
-              <Switch
-                checked={useMonteCarloMode}
-                onCheckedChange={setUseMonteCarloMode}
-              />
+              <Switch checked={useMonteCarloMode} onCheckedChange={setUseMonteCarloMode} />
             </div>
           </CardContent>
         </Card>
       </motion.div>
 
       {useMonteCarloMode ? (
-        <MonteCarloSimulator mode="growth" initialValues={state} />
+        <MonteCarloSimulator
+          mode="growth"
+          initialValues={state}
+          initialRngSeed={initialRngSeed}
+          initialMCParams={initialMCParams}
+        />
       ) : (
         <>
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-          >
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
             <GrowthParameters state={state} setState={setState} />
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-          >
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
             <GrowthResults
               data={calculation}
               targetValue={state.targetValue}
@@ -230,10 +245,7 @@ export function GrowthMode() {
             />
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-          >
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
             <GrowthTable data={calculation.yearData} />
           </motion.div>
         </>
