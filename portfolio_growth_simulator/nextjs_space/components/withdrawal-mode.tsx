@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Dices } from 'lucide-react'
 import { motion } from 'framer-motion'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import { roundToCents } from '@/lib/utils'
 import { toast } from 'sonner'
 import { WithdrawalParameters } from '@/components/withdrawal/parameters'
@@ -139,9 +139,18 @@ export function WithdrawalMode() {
     if (typeof window !== 'undefined') window.print()
   }
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     triggerHaptic('light')
     if (!calculation.yearData.length) return
+
+    const workbook = new ExcelJS.Workbook()
+
+    // 1. Summary Sheet
+    const wsSummary = workbook.addWorksheet('Summary')
+    wsSummary.columns = [
+      { header: 'Key', key: 'Key', width: 20 },
+      { header: 'Value', key: 'Value', width: 20 },
+    ]
 
     const summaryRows = [
       { Key: 'Mode', Value: 'Withdrawal (Deterministic)' },
@@ -155,9 +164,17 @@ export function WithdrawalMode() {
       { Key: 'Total Withdrawn', Value: roundToCents(calculation.totalWithdrawn) },
       { Key: 'Sustainable', Value: calculation.isSustainable ? 'Yes' : 'No' },
     ]
+    wsSummary.addRows(summaryRows)
 
-    const wsSummary = XLSX.utils.json_to_sheet(summaryRows)
-    ;(wsSummary as any)['!cols'] = [{ wch: 20 }, { wch: 20 }]
+    // 2. Data Sheet
+    const wsData = workbook.addWorksheet('Balance By Year')
+    wsData.columns = [
+      { header: 'Year', key: 'Year', width: 10 },
+      { header: 'Starting Balance', key: 'Starting Balance', width: 20 },
+      { header: 'Withdrawals', key: 'Withdrawals', width: 20 },
+      { header: 'Ending Balance', key: 'Ending Balance', width: 20 },
+      { header: 'Sustainable', key: 'Sustainable', width: 15 },
+    ]
 
     const excelData = calculation.yearData.map((row) => ({
       Year: row.year,
@@ -166,24 +183,20 @@ export function WithdrawalMode() {
       'Ending Balance': roundToCents(row.endingBalance),
       Sustainable: row.isSustainable ? 'Yes' : 'No',
     }))
+    wsData.addRows(excelData)
 
-    const wsData = XLSX.utils.json_to_sheet(excelData)
-    ;(wsData as any)['!cols'] = [
-      { wch: 10 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 15 },
-    ]
-
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
-    XLSX.utils.book_append_sheet(wb, wsData, 'Balance By Year')
-
+    // Generate and Download
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = window.URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
     const date = new Date().toISOString().split('T')[0]
     const fileName = `portfolio-withdrawal-deterministic-${date}.xlsx`
-
-    XLSX.writeFile(wb, fileName)
+    
+    anchor.href = url
+    anchor.download = fileName
+    anchor.click()
+    window.URL.revokeObjectURL(url)
   }
 
   return (

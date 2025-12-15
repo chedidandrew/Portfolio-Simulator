@@ -5,7 +5,7 @@ import { useMonteCarlo } from '@/hooks/use-monte-carlo'
 import { MonteCarloParameters } from '@/components/monte-carlo/parameters'
 import { MonteCarloResults, ExportState } from '@/components/monte-carlo/results'
 import { triggerHaptic } from '@/hooks/use-haptics'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import { roundToCents } from '@/lib/utils'
 import { toast } from 'sonner'
 import LZString from 'lz-string'
@@ -93,7 +93,7 @@ export function MonteCarloSimulator({
     }
   }
 
-  const generateExcel = (simResults: any) => {
+  const generateExcel = async (simResults: any) => {
     if (!simResults) return
 
     const {
@@ -123,6 +123,14 @@ export function MonteCarloSimulator({
 
     const investedLabel = mode === 'withdrawal' ? 'Starting Balance' : 'Total Invested'
 
+    const workbook = new ExcelJS.Workbook()
+
+    // 1. Summary Sheet
+    const wsSummary = workbook.addWorksheet('Summary')
+    wsSummary.columns = [
+      { header: 'Key', key: 'Key', width: 26 },
+      { header: 'Value', key: 'Value', width: 20 },
+    ]
     const summaryRows = [
       { Key: 'Mode', Value: mode },
       { Key: 'Initial Value', Value: roundToCents(params.initialValue) },
@@ -145,10 +153,18 @@ export function MonteCarloSimulator({
       { Key: 'Worst Ending Value', Value: roundToCents(worst) },
       { Key: 'Random Seed', Value: rngSeed ?? '' },
     ]
+    wsSummary.addRows(summaryRows)
 
-    const wsSummary = XLSX.utils.json_to_sheet(summaryRows)
-    ;(wsSummary as any)['!cols'] = [{ wch: 26 }, { wch: 20 }]
-
+    // 2. Yearly Percentiles
+    const wsPercentiles = workbook.addWorksheet('Yearly Percentiles')
+    wsPercentiles.columns = [
+      { header: 'Year', key: 'Year', width: 8 },
+      { header: 'P10', key: 'P10', width: 16 },
+      { header: 'P25', key: 'P25', width: 16 },
+      { header: 'Median (P50)', key: 'Median (P50)', width: 18 },
+      { header: 'P75', key: 'P75', width: 16 },
+      { header: 'P90', key: 'P90', width: 16 },
+    ]
     const percentileRows = (chartData ?? []).map((row: any) => ({
       Year: row.year,
       P10: roundToCents(row.p10),
@@ -157,16 +173,26 @@ export function MonteCarloSimulator({
       P75: roundToCents(row.p75),
       P90: roundToCents(row.p90),
     }))
-    const wsPercentiles = XLSX.utils.json_to_sheet(percentileRows)
-    ;(wsPercentiles as any)['!cols'] = [
-      { wch: 8 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 18 },
-      { wch: 16 },
-      { wch: 16 },
-    ]
+    wsPercentiles.addRows(percentileRows)
 
+    // 3. Annual Returns
+    const wsAnnual = workbook.addWorksheet('Annual Returns')
+    wsAnnual.columns = [
+      { header: 'Year', key: 'Year', width: 8 },
+      { header: 'CAGR P10 %', key: 'CAGR P10 %', width: 12 },
+      { header: 'CAGR P25 %', key: 'CAGR P25 %', width: 12 },
+      { header: 'CAGR Median %', key: 'CAGR Median %', width: 15 },
+      { header: 'CAGR P75 %', key: 'CAGR P75 %', width: 12 },
+      { header: 'CAGR P90 %', key: 'CAGR P90 %', width: 12 },
+      { header: 'Prob ≥ 5%', key: 'Prob ≥ 5%', width: 12 },
+      { header: 'Prob ≥ 8%', key: 'Prob ≥ 8%', width: 13 },
+      { header: 'Prob ≥ 10%', key: 'Prob ≥ 10%', width: 13 },
+      { header: 'Prob ≥ 12%', key: 'Prob ≥ 12%', width: 13 },
+      { header: 'Prob ≥ 15%', key: 'Prob ≥ 15%', width: 13 },
+      { header: 'Prob ≥ 20%', key: 'Prob ≥ 20%', width: 13 },
+      { header: 'Prob ≥ 25%', key: 'Prob ≥ 25%', width: 13 },
+      { header: 'Prob ≥ 30%', key: 'Prob ≥ 30%', width: 13 },
+    ]
     const annualRows = (annualReturnsData ?? []).map((row: any) => ({
       Year: row.year,
       'CAGR P10 %': roundToCents(row.p10),
@@ -183,71 +209,74 @@ export function MonteCarloSimulator({
       'Prob ≥ 25%': roundToCents(row.prob25),
       'Prob ≥ 30%': roundToCents(row.prob30),
     }))
-    const wsAnnual = XLSX.utils.json_to_sheet(annualRows)
-    ;(wsAnnual as any)['!cols'] = [
-      { wch: 8 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 15 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 13 },
-      { wch: 13 },
-      { wch: 13 },
-      { wch: 13 },
-      { wch: 13 },
-    ]
+    wsAnnual.addRows(annualRows)
 
+    // 4. Investment Breakdown
+    const wsInvestment = workbook.addWorksheet('Investment Breakdown')
+    wsInvestment.columns = [
+      { header: 'Year', key: 'Year', width: 8 },
+      { header: 'Initial Principal', key: 'Initial Principal', width: 18 },
+      { header: 'Cumulative Contributions', key: 'Cumulative Contributions', width: 22 },
+      { header: 'Total Invested', key: 'Total Invested', width: 18 },
+    ]
     const investmentRows = (investmentData ?? []).map((row: any) => ({
       Year: row.year,
       'Initial Principal': roundToCents(row.initial),
       'Cumulative Contributions': roundToCents(row.contributions),
       'Total Invested': roundToCents(row.total),
     }))
-    const wsInvestment = XLSX.utils.json_to_sheet(investmentRows)
-    ;(wsInvestment as any)['!cols'] = [
-      { wch: 8 },
-      { wch: 18 },
-      { wch: 22 },
-      { wch: 18 },
-    ]
+    wsInvestment.addRows(investmentRows)
 
+    // 5. Ending Values
+    const wsEnding = workbook.addWorksheet('Ending Values')
+    wsEnding.columns = [
+      { header: 'Scenario', key: 'Scenario', width: 10 },
+      { header: 'Ending Value', key: 'Ending Value', width: 18 },
+    ]
     const endingRows = (endingValues ?? []).map((v: number, idx: number) => ({
       Scenario: idx + 1,
       'Ending Value': roundToCents(v),
     }))
-    const wsEnding = XLSX.utils.json_to_sheet(endingRows)
-    ;(wsEnding as any)['!cols'] = [{ wch: 10 }, { wch: 18 }]
+    wsEnding.addRows(endingRows)
 
+    // 6. Max Drawdowns
+    const wsDrawdowns = workbook.addWorksheet('Max Drawdowns')
+    wsDrawdowns.columns = [
+      { header: 'Scenario', key: 'Scenario', width: 10 },
+      { header: 'Max Drawdown %', key: 'Max Drawdown %', width: 18 },
+    ]
     const ddRows = (maxDrawdowns ?? []).map((d: number, idx: number) => ({
       Scenario: idx + 1,
       'Max Drawdown %': roundToCents(d * 100),
     }))
-    const wsDrawdowns = XLSX.utils.json_to_sheet(ddRows)
-    ;(wsDrawdowns as any)['!cols'] = [{ wch: 10 }, { wch: 18 }]
+    wsDrawdowns.addRows(ddRows)
 
+    // 7. Loss Probabilities
+    const wsLoss = workbook.addWorksheet('Loss Probabilities')
+    wsLoss.columns = [
+      { header: 'Loss Threshold', key: 'Loss Threshold', width: 16 },
+      { header: 'End of Period Loss %', key: 'End of Period Loss %', width: 20 },
+      { header: 'Intra period Loss %', key: 'Intra period Loss %', width: 20 },
+    ]
     const lossRows = (lossProbData ?? []).map((row: any) => ({
       'Loss Threshold': row.threshold,
       'End of Period Loss %': roundToCents(row.endPeriod),
       'Intra period Loss %': roundToCents(row.intraPeriod),
     }))
-    const wsLoss = XLSX.utils.json_to_sheet(lossRows)
-    ;(wsLoss as any)['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 20 }]
+    wsLoss.addRows(lossRows)
 
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary')
-    XLSX.utils.book_append_sheet(wb, wsPercentiles, 'Yearly Percentiles')
-    XLSX.utils.book_append_sheet(wb, wsAnnual, 'Annual Returns')
-    XLSX.utils.book_append_sheet(wb, wsInvestment, 'Investment Breakdown')
-    XLSX.utils.book_append_sheet(wb, wsEnding, 'Ending Values')
-    XLSX.utils.book_append_sheet(wb, wsDrawdowns, 'Max Drawdowns')
-    XLSX.utils.book_append_sheet(wb, wsLoss, 'Loss Probabilities')
-
+    // Download
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = window.URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
     const date = new Date().toISOString().split('T')[0]
     const fileName = `monte-carlo-simulation-${mode}-${date}.xlsx`
-
-    XLSX.writeFile(wb, fileName)
+    
+    anchor.href = url
+    anchor.download = fileName
+    anchor.click()
+    window.URL.revokeObjectURL(url)
   }
 
   const isDirty = () => {
