@@ -24,12 +24,17 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
     periodicWithdrawal,
     inflationAdjustment,
     frequency,
-    excludeInflationAdjustment // <--- Destructure this
+    excludeInflationAdjustment
   } = state
 
   // --- 1. Engine Configuration ---
   const totalMonths = duration * 12
+  // Keep chosen rate logic (Effective vs Nominal) here. 
+  // Effective rate:
   const monthlyRate = Math.pow(1 + annualReturn / 100, 1 / 12) - 1
+  // Nominal rate:
+  // const monthlyRate = (annualReturn / 100) / 12
+
   const inflationFactor = 1 + inflationAdjustment / 100
 
   // --- 2. Simulation State ---
@@ -46,28 +51,31 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
 
   // --- 3. Run Simulation ---
   for (let month = 1; month <= totalMonths; month++) {
-    // A. Apply Growth
-    if (currentBalance > 0) {
-      currentBalance = currentBalance * (1 + monthlyRate)
-    }
-
-    // B. Determine Withdrawal Amount
+    
+    // --- STEP 1: Execute Withdrawal (MOVED TO START) ---
+    // Determine Amount
     let withdrawalThisMonth = 0
     if (frequency === 'monthly') withdrawalThisMonth = currentPeriodicWithdrawal
     else if (frequency === 'quarterly' && month % 3 === 0) withdrawalThisMonth = currentPeriodicWithdrawal
     else if (frequency === 'yearly' && month % 12 === 0) withdrawalThisMonth = currentPeriodicWithdrawal
     else if (frequency === 'weekly') withdrawalThisMonth = (currentPeriodicWithdrawal * 52) / 12
 
-    // C. Execute Withdrawal
+    // Execute
     if (withdrawalThisMonth > 0) {
       const actualWithdrawal = Math.min(currentBalance, withdrawalThisMonth)
       currentBalance -= actualWithdrawal
       totalWithdrawn += actualWithdrawal
       yearWithdrawals += actualWithdrawal
 
-      // Real Value Calculation (Always applies, regardless of strategy)
+      // Real Value Calculation
       const discountFactor = Math.pow(inflationFactor, month / 12)
       totalWithdrawnInTodaysDollars += (actualWithdrawal / discountFactor)
+    }
+
+    // --- STEP 2: Apply Growth (MOVED TO AFTER WITHDRAWAL) ---
+    // Only grow what is LEFT in the account
+    if (currentBalance > 0) {
+      currentBalance = currentBalance * (1 + monthlyRate)
     }
 
     // Check for depletion
@@ -89,8 +97,7 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
       yearStartBalance = currentBalance
       yearWithdrawals = 0
 
-      // E. Apply Inflation to Withdrawal Amount (CONDITIONAL)
-      // Only increase the monthly withdrawal amount if the user wants to keep up with inflation.
+      // E. Apply Inflation to Withdrawal Amount
       if (!excludeInflationAdjustment) {
         currentPeriodicWithdrawal *= inflationFactor
       }
@@ -100,7 +107,6 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
   const endingBalance = Math.max(0, currentBalance)
   const isSustainable = endingBalance > 0
   
-  // Real Value of Legacy (Always applies)
   const endingBalanceInTodaysDollars = endingBalance / Math.pow(inflationFactor, duration)
 
   return {

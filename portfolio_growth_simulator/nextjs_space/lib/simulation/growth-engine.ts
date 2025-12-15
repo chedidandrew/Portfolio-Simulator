@@ -30,7 +30,7 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
 
   // --- 1. Engine Configuration ---
   const totalMonths = duration * 12
-  const monthlyRate = Math.pow(1 + annualReturn / 100, 1 / 12) - 1
+  const monthlyRate = (annualReturn / 100) / 12
   const inflationFactor = 1 + (inflationAdjustment / 100)
 
   // --- 2. Simulation State ---
