@@ -1,6 +1,7 @@
 {
   "name": "app",
   "private": true,
+  "engines": { "node": "20.x" },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,7 +12,6 @@
     "seed": "tsx --require dotenv/config scripts/seed.ts"
   },
   "devDependencies": {
-    "@next/swc-wasm-nodejs": "13.5.1",
     "@types/node": "20.6.2",
     "@types/react": "18.2.22",
     "@types/react-dom": "18.2.7",
@@ -123,9 +123,5 @@
     "zod": "3.23.8",
     "zustand": "5.0.3"
   },
-  "browserslist": [
-    "> 0.5%",
-    "last 2 versions",
-    "not dead"
-  ]
+  "browserslist": ["> 0.5%", "last 2 versions", "not dead"]
 }
