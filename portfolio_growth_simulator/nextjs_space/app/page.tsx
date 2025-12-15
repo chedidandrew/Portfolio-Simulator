@@ -32,20 +32,36 @@ export default function Home() {
       const mcParam = search.get('mc')
 
       if (mcParam) {
-        // 1. Try decompressing with LZString (New Format)
-        let jsonStr = LZString.decompressFromEncodedURIComponent(mcParam)
+        // FIX: Explicitly type 'decoded' as 'any' to resolve the TypeScript error
+        let decoded: any = null
 
-        // 2. Fallback to atob (Old Format)
-        if (!jsonStr) {
+        // 1. Try decompressing with LZString (New Format)
+        const lzDecompressed = LZString.decompressFromEncodedURIComponent(mcParam)
+        if (lzDecompressed) {
           try {
-             jsonStr = decodeURIComponent(atob(mcParam))
+            const parsed = JSON.parse(lzDecompressed)
+            // valid JSON? use it.
+            if (parsed && typeof parsed === 'object') {
+              decoded = parsed
+            }
           } catch {
-             // Not a valid legacy link
+            // LZString returned a string, but it wasn't valid JSON.
+            // This happens when LZString tries to decode a simple Base64 string.
+            // Ignore and fall through to legacy.
           }
         }
 
-        if (jsonStr) {
-          const decoded = JSON.parse(jsonStr)
+        // 2. Fallback to atob (Legacy Format) if LZString failed to produce valid JSON
+        if (!decoded) {
+          try {
+             const raw = decodeURIComponent(atob(mcParam))
+             decoded = JSON.parse(raw)
+          } catch {
+             // Not a valid legacy link either
+          }
+        }
+
+        if (decoded) {
           const mode = decoded?.mode === 'withdrawal' ? 'withdrawal' : 'growth'
 
           setActiveTab(mode)
@@ -53,9 +69,12 @@ export default function Home() {
           localStorage.setItem('lastTab', mode)
           
           // Dispatch event with the FULL decoded object (including results)
-          window.dispatchEvent(new CustomEvent('openMonteCarloFromLink', { 
-            detail: decoded 
-          }))
+          // This allows the child components to catch it and hydrate their state
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('openMonteCarloFromLink', { 
+              detail: decoded 
+            }))
+          }, 100) // Small delay to ensure components are mounted
           
           return
         }

@@ -40,23 +40,12 @@ export function GrowthMode() {
 
   const calculation = useGrowthCalculation(state)
 
+  // Listen for the event dispatched by app/page.tsx
   useEffect(() => {
     if (typeof window === 'undefined') return
-    try {
-      const search = new URLSearchParams(window.location.search)
-      const mcParam = search.get('mc')
-      if (!mcParam) return
 
-      let jsonStr = LZString.decompressFromEncodedURIComponent(mcParam)
-      if (!jsonStr) {
-        try {
-          jsonStr = decodeURIComponent(atob(mcParam))
-        } catch {}
-      }
-      if (!jsonStr) return
-
-      const decoded = JSON.parse(jsonStr)
-
+    const handleOpenFromLink = (event: any) => {
+      const decoded = event.detail
       if (decoded?.mode !== 'growth') return
 
       // 1) Restore deterministic params (supports new and old keys)
@@ -71,20 +60,32 @@ export function GrowthMode() {
       // 2) Branch on link type
       if (decoded.type === 'deterministic') {
         setUseMonteCarloMode(false)
-        window.history.replaceState(null, '', window.location.pathname)
-        return
+      } else {
+        // 3) Monte Carlo link: enable MC and restore MC inputs
+        setUseMonteCarloMode(true)
+        if (decoded.rngSeed) setInitialRngSeed(decoded.rngSeed)
+        if (decoded.mcParams) setInitialMCParams(decoded.mcParams)
       }
-
-      // 3) Monte Carlo link: enable MC and restore MC inputs
-      setUseMonteCarloMode(true)
-      if (decoded.rngSeed) setInitialRngSeed(decoded.rngSeed)
-      if (decoded.mcParams) setInitialMCParams(decoded.mcParams)
-
-      // Safe to clean URL once state is captured
+      
+      // Clean URL
       window.history.replaceState(null, '', window.location.pathname)
-    } catch {
-      /* ignore */
     }
+
+    // Check on mount if we already have the payload in URL (direct load)
+    try {
+      const search = new URLSearchParams(window.location.search)
+      const mcParam = search.get('mc')
+      if (mcParam) {
+        // We let app/page.tsx handle the decoding and dispatching, 
+        // but we add a listener here to catch it.
+        window.addEventListener('openMonteCarloFromLink', handleOpenFromLink)
+        return () => window.removeEventListener('openMonteCarloFromLink', handleOpenFromLink)
+      }
+    } catch {}
+
+    // Also listen generally for navigation events
+    window.addEventListener('openMonteCarloFromLink', handleOpenFromLink)
+    return () => window.removeEventListener('openMonteCarloFromLink', handleOpenFromLink)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -92,16 +93,21 @@ export function GrowthMode() {
     if (typeof window === 'undefined') return ''
     const url = new URL(window.location.href)
 
-    const payload: SharePayload = {
+    // Dynamic payload based on current mode
+    const payload = {
       mode: 'growth',
-      type: 'deterministic',
+      type: useMonteCarloMode ? 'monte-carlo' : 'deterministic',
       deterministicParams: state,
-      // keep for backward compatibility with older decoders
-      params: state as any,
+      params: state, // legacy compatibility
       showFullPrecision,
-    } as any
+      // Note: If you want to share specific MC params/seeds, they need to be lifted up 
+      // from the MonteCarloSimulator or saved to a context. 
+      // Currently, this shares the mode switch but defaults to new random seeds.
+    }
 
-    const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(payload))
+    // Legacy encoding method: encodeURIComponent -> btoa
+    const encoded = typeof btoa !== 'undefined' ? btoa(encodeURIComponent(JSON.stringify(payload))) : ''
+    
     if (encoded) url.searchParams.set('mc', encoded)
     return url.toString()
   }
