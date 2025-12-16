@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode, type ComponentType } from 'react'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -49,34 +51,38 @@ const containerVariants = {
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
+  visible: {
+    opacity: 1,
     y: 0,
     transition: { type: "spring", stiffness: 300, damping: 24 }
   }
 }
 
 // Reusable compact card component with collapse functionality
-function GuideSection({ 
-  title, 
-  icon: Icon, 
-  description, 
-  children, 
+function GuideSection({
+  title,
+  icon: Icon,
+  description,
+  children,
   defaultOpen = false,
   className,
   headerClassName,
-  iconColorClass = "text-foreground", 
-  iconWrapperClass = "bg-muted text-muted-foreground group-hover:bg-muted/80" 
-}: { 
-  title: string, 
-  icon: any, 
-  description?: string, 
-  children: React.ReactNode, 
+  iconColorClass = "text-foreground",
+  iconWrapperClass = "bg-muted text-muted-foreground group-hover:bg-muted/80",
+  openBorderClassName = "border-l-primary/50",
+  openRingClassName = "ring-primary/5",
+}: {
+  title: string,
+  icon: ComponentType<{ className?: string }>,
+  description?: string,
+  children: ReactNode,
   defaultOpen?: boolean,
   className?: string,
   headerClassName?: string,
   iconColorClass?: string,
   iconWrapperClass?: string
+  openBorderClassName?: string
+  openRingClassName?: string
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
@@ -85,8 +91,8 @@ function GuideSection({
       <Card className={cn(
         "border-l-4 transition-all duration-300 shadow-sm",
         "bg-gradient-to-br from-card to-muted/5", // Subtle gradient for depth
-        isOpen 
-          ? "border-l-primary/50 shadow-md ring-1 ring-primary/5" 
+        isOpen
+          ? cn(openBorderClassName, "shadow-md ring-1", openRingClassName)
           : "border-l-transparent hover:border-l-muted/30 hover:shadow-md",
         className
       )}>
@@ -95,7 +101,7 @@ function GuideSection({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={cn(
-                  "p-2 rounded-lg transition-colors duration-300 shadow-sm", 
+                  "p-2 rounded-lg transition-colors duration-300 shadow-sm",
                   iconWrapperClass
                 )}>
                   <Icon className={cn("h-5 w-5", iconColorClass)} />
@@ -116,7 +122,7 @@ function GuideSection({
         </CollapsibleTrigger>
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
           <CardContent className="pt-0 pb-6 text-sm text-muted-foreground">
-            <div className="pl-0 sm:pl-[3.25rem]"> 
+            <div className="pl-0 sm:pl-[3.25rem]">
               {children}
             </div>
           </CardContent>
@@ -128,7 +134,7 @@ function GuideSection({
 
 export function GuideTab({ onLaunchMode }: GuideTabProps) {
   return (
-    <motion.div 
+    <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
@@ -139,7 +145,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
         variants={itemVariants}
         className="text-center space-y-4 mb-8"
       >
-        <motion.div 
+        <motion.div
           className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 shadow-inner mb-2"
           whileHover={{ scale: 1.05, rotate: 5 }}
           whileTap={{ scale: 0.95 }}
@@ -163,8 +169,8 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
       {/* Navigation Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <motion.div variants={itemVariants}>
-          <Card 
-            className="h-full group cursor-pointer border-primary/20 bg-gradient-to-br from-primary/5 to-transparent hover:border-primary/40 hover:shadow-lg transition-all duration-300" 
+          <Card
+            className="h-full group cursor-pointer border-primary/20 bg-gradient-to-br from-primary/5 to-transparent hover:border-primary/40 hover:shadow-lg transition-all duration-300"
             onClick={() => onLaunchMode('growth')}
           >
             <CardHeader>
@@ -185,8 +191,8 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
         </motion.div>
 
         <motion.div variants={itemVariants}>
-          <Card 
-            className="h-full group cursor-pointer border-primary/20 bg-gradient-to-br from-primary/5 to-transparent hover:border-primary/40 hover:shadow-lg transition-all duration-300" 
+          <Card
+            className="h-full group cursor-pointer border-primary/20 bg-gradient-to-br from-primary/5 to-transparent hover:border-primary/40 hover:shadow-lg transition-all duration-300"
             onClick={() => onLaunchMode('withdrawal')}
           >
             <CardHeader>
@@ -211,12 +217,12 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
 
       {/* Guide Content Section */}
       <div className="space-y-4">
-        
+
         {/* 1. How to Use */}
         <motion.div variants={itemVariants}>
-          <GuideSection 
-            title="How to Use This Simulator" 
-            icon={Rocket} 
+          <GuideSection
+            title="How to Use This Simulator"
+            icon={Rocket}
             description="Step-by-step guides for Growth, Withdrawal, and Monte Carlo"
             defaultOpen={true}
             iconColorClass="text-emerald-500"
@@ -345,8 +351,8 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
 
         {/* 2. Key Concepts */}
         <motion.div variants={itemVariants}>
-          <GuideSection 
-            title="Key Concepts Explained" 
+          <GuideSection
+            title="Key Concepts Explained"
             icon={BookOpen}
             description="Terminology used in the simulator"
             iconColorClass="text-emerald-500"
@@ -418,8 +424,8 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
 
         {/* 3. Best Practices - Updated to match Key Concepts style */}
         <motion.div variants={itemVariants}>
-          <GuideSection 
-            title="Best Practices" 
+          <GuideSection
+            title="Best Practices"
             icon={Lightbulb}
             description="Tips for realistic financial planning"
             iconColorClass="text-emerald-500"
@@ -469,10 +475,29 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
           </GuideSection>
         </motion.div>
 
+        <Card className="mt-6 border-dashed border-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Curious about the Math?
+            </CardTitle>
+            <CardDescription>
+              I value transparency. See exactly how Portfolio Simulator calculates interest, inflation, and withdrawals behind the scenes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/methodology">
+              <Button className="w-full sm:w-auto">
+                View Methodology & Logic
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
         {/* 4. Installation Guides */}
         <motion.div variants={itemVariants}>
-          <GuideSection 
-            title="Installation Guides" 
+          <GuideSection
+            title="Installation Guides"
             icon={Download}
             description="Install as a native app on your device"
             iconColorClass="text-emerald-500"
@@ -655,7 +680,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                     </div>
                   </AccordionContent>
                 </AccordionItem>
-                
+
                 {/* Firefox Desktop */}
                 <AccordionItem value="desktop-firefox" className="border-b-0 mb-3">
                   <AccordionTrigger className="hover:no-underline py-0 group">
@@ -696,7 +721,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                   </AccordionContent>
                 </AccordionItem>
 
-                 {/* Brave Desktop */}
+                {/* Brave Desktop */}
                 <AccordionItem value="desktop-brave" className="border-b-0">
                   <AccordionTrigger className="hover:no-underline py-0 group">
                     <div className="flex items-center gap-3 w-full p-4 rounded-lg border border-[#FB542B]/30 bg-gradient-to-br from-[#FB542B]/5 to-[#FB542B]/10 shadow-sm transition-all duration-300 hover:shadow-md hover:border-[#FB542B]/40 group-data-[state=open]:rounded-b-none group-data-[state=open]:shadow-md group-data-[state=open]:border-[#FB542B]/40">
@@ -707,25 +732,25 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                   <AccordionContent className="border-x border-b border-[#FB542B]/30 rounded-b-lg bg-gradient-to-br from-[#FB542B]/5 to-[#FB542B]/10 p-5 mt-[-1px] shadow-sm">
                     <ol className="space-y-4 text-sm">
                       <li className="flex items-start gap-3">
-                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0 shadow-sm">1</span>
-                         <div>
-                           <p className="font-semibold">Open in Brave browser</p>
-                           <p className="text-muted-foreground text-xs mt-0.5">Use Brave on Windows, macOS, or Linux</p>
-                         </div>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0 shadow-sm">1</span>
+                        <div>
+                          <p className="font-semibold">Open in Brave browser</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Use Brave on Windows, macOS, or Linux</p>
+                        </div>
                       </li>
                       <li className="flex items-start gap-3">
-                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0 shadow-sm">2</span>
-                         <div>
-                           <p className="font-semibold">Open the browser menu</p>
-                           <p className="text-muted-foreground text-xs mt-0.5">Click the Brave menu and look for "Apps" or "Install Portfolio Simulator"</p>
-                         </div>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0 shadow-sm">2</span>
+                        <div>
+                          <p className="font-semibold">Open the browser menu</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Click the Brave menu and look for "Apps" or "Install Portfolio Simulator"</p>
+                        </div>
                       </li>
                       <li className="flex items-start gap-3">
-                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0 shadow-sm">3</span>
-                         <div>
-                           <p className="font-semibold">Click "Install"</p>
-                           <p className="text-muted-foreground text-xs mt-0.5">Brave will create a separate app style window on your desktop</p>
-                         </div>
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0 shadow-sm">3</span>
+                        <div>
+                          <p className="font-semibold">Click "Install"</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Brave will create a separate app style window on your desktop</p>
+                        </div>
                       </li>
                     </ol>
                     <div className="mt-5 p-3.5 bg-background/60 rounded-lg border border-[#FB542B]/20">
@@ -737,7 +762,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                 </AccordionItem>
               </Accordion>
             </div>
-            
+
             <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50">
               <p className="text-xs text-muted-foreground flex gap-2">
                 <Info className="h-4 w-4 shrink-0" />
@@ -749,12 +774,14 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
 
         {/* Disclaimer */}
         <motion.div variants={itemVariants}>
-          <GuideSection 
-            title="Important Disclaimer" 
+          <GuideSection
+            title="Important Disclaimer"
             icon={AlertTriangle}
             className="border-amber-500/30 bg-amber-500/5 data-[state=open]:border-l-amber-500"
             iconColorClass="text-amber-600 dark:text-amber-500"
             iconWrapperClass="bg-amber-500/10 text-amber-600 dark:text-amber-500"
+            openBorderClassName="border-l-amber-500"
+            openRingClassName="ring-amber-500/10"
           >
             <div className="text-sm text-muted-foreground space-y-3">
               <p>

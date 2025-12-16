@@ -187,7 +187,7 @@ export function WithdrawalResults({
                   <Wallet className="h-4 w-4 text-indigo-500" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">Legacy Value (Purchasing Power)</p>
+                  <p className="text-sm font-medium text-foreground"> Real Legacy Value (Purchasing Power)</p>
                   <p className="text-2xl font-bold text-indigo-500 my-1">{renderFormattedResult(endingBalanceInTodaysDollars)}</p>
                   <p className="text-xs text-muted-foreground leading-tight">
                     This is what your remaining balance would be worth in today&apos;s money.
