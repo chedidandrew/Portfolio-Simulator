@@ -117,11 +117,10 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
     return data[data.length - 1].year
   }, [data])
 
-  // Threshold: If total duration is <= 2 years, we show monthly details
+  // Threshold: If total duration is <= 3 years, we show monthly details
   const showMonthlyLabels = maxYear <= 3
 
   // 2. Generate EXPLICIT ticks.
-  // This forces Recharts to consider every single year (or month) as a tick candidate.
   const customTicks = useMemo(() => {
     if (!maxYear) return [0]
     
@@ -159,7 +158,6 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
     }
 
     // STRATEGY 2: Long Duration (Hide Fractional Months)
-    // If it's not an integer year, return empty string to hide the tick label
     if (!isInteger) return ''
     
     return `Year ${value}`
@@ -237,33 +235,28 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
                   dataKey="year"
                   type="number"
                   domain={[0, 'dataMax']}
-
-                  // KEY CHANGE 1: Pass custom ticks array
                   ticks={customTicks}
-
                   tickLine={false}
                   axisLine={{ stroke: isDark ? 'hsl(240, 3.7%, 15.9%)' : 'hsl(214, 32%, 91%)' }}
                   
-                  // KEY CHANGE 2: Angle -45, textAnchor end, dy 10
+                  // FIX: Cast object to 'any' to bypass strict SVG type check on 'angle'
                   tick={{
                     fontSize: 11,
                     angle: -45,
                     textAnchor: 'end',
                     dy: 10,
                     fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)',
-                  }}
+                  } as any}
                   
-                  // KEY CHANGE 3: Increase height for rotated labels
                   height={60} 
 
                   tickFormatter={formatXAxis}
                   allowDecimals={showMonthlyLabels}
-                  
-                  // KEY CHANGE 4: Force display of all ticks unless they overlap
                   interval={0}
                   minTickGap={1}
 
                   label={{
+                    value: 'Time',
                     position: 'insideBottom',
                     offset: -5,
                     style: {
