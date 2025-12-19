@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts'
+import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Percent, TrendingUpDown, ShieldAlert, Wallet } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
@@ -15,12 +15,116 @@ interface AnalyticsProps {
 }
 
 /* ------------------------------------------------------------------ */
-/* Shared tooltip components for analytics charts                     */
+/* Helpers for Axis Formatting (Smart Ticks)                          */
 /* ------------------------------------------------------------------ */
+
+// Hook to generate "Smart Ticks" dynamically based on duration.
+function useCustomTicks(data: any[]) {
+  return useMemo(() => {
+    if (!data || data.length === 0) return [0]
+    const maxYear = data[data.length - 1].year || 0
+    const showMonthlyLabels = maxYear <= 2
+
+    // Case 1: Short Duration (Show Monthly details)
+    if (showMonthlyLabels) {
+      const totalMonths = Math.ceil(maxYear * 12)
+      return Array.from({ length: totalMonths + 1 }, (_, i) => i / 12)
+    }
+
+    // Case 2: Smart Interval for all other durations
+    // We target roughly 12 ticks to keep the chart clean.
+    const targetTickCount = 15
+    const rawInterval = maxYear / targetTickCount
+
+    // Snap to "nice" intervals (1, 2, 4, 5, 10, 20, 25, 50, 100)
+    const niceIntervals = [1, 2, 4, 5, 10, 20, 25, 50, 100]
+    const interval = niceIntervals.find(i => i >= rawInterval) || niceIntervals[niceIntervals.length - 1]
+
+    const ticks = []
+    for (let i = 0; i <= maxYear; i += interval) {
+      ticks.push(i)
+    }
+    // Always include the very last year if it's not close to the last tick
+    if (maxYear - ticks[ticks.length - 1] > interval * 0.5) {
+      ticks.push(maxYear)
+    }
+    
+    return ticks
+  }, [data])
+}
+
+const formatXAxis = (value: number, maxYear: number) => {
+  if (value === 0) return 'Start'
+  
+  const showMonthlyLabels = maxYear <= 2
+  const isInteger = Math.abs(value % 1) < 0.001
+
+  if (showMonthlyLabels) {
+    if (isInteger) return `Year ${Math.round(value)}`
+    
+    const years = Math.floor(value)
+    const months = Math.round((value - years) * 12)
+    if (years === 0) return `Month ${months}`
+    return `Yr ${years} M ${months}`
+  }
+
+  // If we are in "Annual/Smart" mode, hide any fractional ticks that slip in
+  if (!isInteger) return ''
+  return `Year ${value}`
+}
+
+// Common XAxis props for style consistency
+const commonXAxisProps = (isDark: boolean, data: any[]) => {
+  const ticks = useCustomTicks(data)
+  const maxYear = data && data.length > 0 ? data[data.length - 1].year : 0
+
+  return {
+    dataKey: "year",
+    type: "number",
+    domain: [0, 'dataMax'],
+    ticks: ticks,
+    tickLine: false,
+    axisLine: { stroke: isDark ? 'hsl(240, 3.7%, 15.9%)' : 'hsl(214, 32%, 91%)' },
+    tick: {
+      fontSize: 11,
+      angle: -45,
+      textAnchor: 'end',
+      dy: 10,
+      fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)',
+    } as any, // Cast to any to bypass strict SVG types for 'angle'
+    height: 60,
+    interval: 0,
+    minTickGap: 1,
+    tickFormatter: (val: number) => formatXAxis(val, maxYear),
+    label: {
+      value: 'Time',
+      position: 'insideBottom',
+      offset: -5,
+      style: {
+        textAnchor: 'middle',
+        fontSize: 11,
+        fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)',
+      },
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Shared tooltip components                                          */
+/* ------------------------------------------------------------------ */
+
+const formatTooltipLabel = (label: number) => {
+  if (!label || label <= 0) return 'Start'
+  const years = Math.floor(label)
+  const months = Math.round((label - years) * 12)
+  
+  if (months === 0) return `Year ${years}`
+  if (years === 0) return `Month ${months}`
+  return `Year ${years}, Month ${months}`
+}
 
 const AnnualReturnsTooltip = ({ active, payload, label, mode }: any) => {
   if (!active || !payload || !payload.length) return null
-
   const point = payload[0]?.payload ?? {}
 
   const rows = [
@@ -34,7 +138,7 @@ const AnnualReturnsTooltip = ({ active, payload, label, mode }: any) => {
   return (
     <div className="bg-card border border-border rounded-lg shadow-lg p-3 space-y-1.5 text-xs">
       <p className="text-sm font-semibold text-foreground">
-        Year {label}
+        {formatTooltipLabel(label)}
       </p>
       <div className="text-muted-foreground">
         {mode === 'cagr' ? 'Expected CAGR' : ''}
@@ -62,7 +166,6 @@ const AnnualReturnsTooltip = ({ active, payload, label, mode }: any) => {
 
 const ReturnProbabilitiesTooltip = ({ active, payload, label, mode }: any) => {
   if (!active || !payload || !payload.length) return null
-
   const point = payload[0]?.payload ?? {}
 
   const rows = [
@@ -77,7 +180,7 @@ const ReturnProbabilitiesTooltip = ({ active, payload, label, mode }: any) => {
   return (
     <div className="bg-card border border-border rounded-lg shadow-lg p-3 space-y-1.5 text-xs">
       <p className="text-sm font-semibold text-foreground">
-        Year {label}
+        {formatTooltipLabel(label)}
       </p>
       <div className="text-muted-foreground">
         {mode === 'probability' ? 'Probability of Annual Returns' : ''}
@@ -103,10 +206,8 @@ const ReturnProbabilitiesTooltip = ({ active, payload, label, mode }: any) => {
   )
 }
 
-
 const LossProbabilitiesTooltip = ({ active, payload }: any) => {
   if (!active || !payload || !payload.length) return null
-
   const row = payload[0]?.payload ?? {}
   const threshold = row.threshold ?? ''
   const intra = payload.find((p: any) => p.dataKey === 'intraPeriod')?.value ?? 0
@@ -122,31 +223,17 @@ const LossProbabilitiesTooltip = ({ active, payload }: any) => {
         </div>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div
-              className="w-3 h-3 rounded-sm"
-              style={{ backgroundColor: '#f59e0b' }}
-            />
-            <span className="text-muted-foreground">
-              At any point (intra-period)
-            </span>
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#f59e0b' }} />
+            <span className="text-muted-foreground">At any point (intra-period)</span>
           </div>
-          <span className="font-semibold text-foreground">
-            {intra.toFixed(1)}%
-          </span>
+          <span className="font-semibold text-foreground">{intra.toFixed(1)}%</span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div
-              className="w-3 h-3 rounded-sm"
-              style={{ backgroundColor: '#ef4444' }}
-            />
-            <span className="text-muted-foreground">
-              At the end (final balance)
-            </span>
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#ef4444' }} />
+            <span className="text-muted-foreground">At the end (final balance)</span>
           </div>
-          <span className="font-semibold text-foreground">
-            {end.toFixed(1)}%
-          </span>
+          <span className="font-semibold text-foreground">{end.toFixed(1)}%</span>
         </div>
       </div>
     </div>
@@ -155,16 +242,12 @@ const LossProbabilitiesTooltip = ({ active, payload }: any) => {
 
 const InvestmentTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload || !payload.length) return null
-  
   const data = payload[0].payload
-  const total = data.total
-  const initial = data.initial
-  const contributions = data.contributions
-
+  
   return (
     <div className="bg-card border border-border rounded-lg shadow-lg p-3 space-y-1.5 text-xs">
       <p className="text-sm font-semibold text-foreground">
-        Year {label}
+        {formatTooltipLabel(label)}
       </p>
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-4">
@@ -173,7 +256,7 @@ const InvestmentTooltip = ({ active, payload, label }: any) => {
             <span className="text-muted-foreground">Initial Principal</span>
           </div>
           <span className="font-semibold text-foreground">
-            {formatCurrency(initial)}
+            {formatCurrency(data.initial)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-4">
@@ -182,13 +265,13 @@ const InvestmentTooltip = ({ active, payload, label }: any) => {
             <span className="text-muted-foreground">Cumulative Contributions</span>
           </div>
           <span className="font-semibold text-foreground">
-            {formatCurrency(contributions)}
+            {formatCurrency(data.contributions)}
           </span>
         </div>
         <div className="pt-1 mt-1 border-t border-border flex items-center justify-between gap-4">
           <span className="font-bold text-foreground">Total Invested</span>
           <span className="font-bold text-foreground">
-            {formatCurrency(total)}
+            {formatCurrency(data.total)}
           </span>
         </div>
       </div>
@@ -197,10 +280,15 @@ const InvestmentTooltip = ({ active, payload, label }: any) => {
 }
 
 /* ---------------------------------------------------------------------- */
-/* 1. Annualized Return Percentiles (CAGR over time)                      */
+/* 1. Annualized Return Percentiles (CAGR)                                */
 /* ---------------------------------------------------------------------- */
 
 export function AnnualReturnsChart({ data, isDark, enableAnimation = true }: AnalyticsProps) {
+  const commonProps = commonXAxisProps(isDark, data)
+  
+  // Custom Logic: Remove 'Start' (0) tick for CAGR Chart
+  const filteredTicks = commonProps.ticks.filter(t => t !== 0)
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -211,7 +299,6 @@ export function AnnualReturnsChart({ data, isDark, enableAnimation = true }: Ana
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            {/* use primary themed icon */}
             <Percent className="h-5 w-5 text-emerald-400" />
             Expected Annual Return (CAGR)
           </CardTitle>
@@ -219,18 +306,11 @@ export function AnnualReturnsChart({ data, isDark, enableAnimation = true }: Ana
         <CardContent>
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 40 }}>
+              <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 35 }}>
                 <XAxis 
-                  dataKey="year" 
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#71717a' }}
-                  label={{
-                    value: 'Years invested',
-                    position: 'insideBottom',
-                    offset: -15,
-                    fontSize: 11,
-                    fill: isDark ? '#a1a1aa' : '#71717a',
-                  }}
+                  {...(commonProps as any)} 
+                  ticks={filteredTicks} 
+                  domain={['dataMin', 'dataMax']} 
                 />
                 <YAxis 
                   tickLine={false}
@@ -261,6 +341,11 @@ export function AnnualReturnsChart({ data, isDark, enableAnimation = true }: Ana
 /* ---------------------------------------------------------------------- */
 
 export function ReturnProbabilitiesChart({ data, isDark, enableAnimation = true }: AnalyticsProps) {
+  const commonProps = commonXAxisProps(isDark, data)
+  
+  // Custom Logic: Remove 'Start' (0) tick for Probability Chart
+  const filteredTicks = commonProps.ticks.filter(t => t !== 0)
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -272,25 +357,17 @@ export function ReturnProbabilitiesChart({ data, isDark, enableAnimation = true 
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUpDown className="h-5 w-5 text-violet-400" />
-            Probability of Annual Returns
+            Probability of Returns
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              {/* Increased right margin from 10 to 20 to prevent print cut-off */}
-              <LineChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
+              <LineChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 35 }}>
                 <XAxis 
-                  dataKey="year" 
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#71717a' }}
-                  label={{
-                    value: 'Years invested',
-                    position: 'insideBottom',
-                    offset: -15,
-                    fontSize: 11,
-                    fill: isDark ? '#a1a1aa' : '#71717a',
-                  }}
+                  {...(commonProps as any)} 
+                  ticks={filteredTicks}
+                  domain={['dataMin', 'dataMax']}
                 />
                 <YAxis 
                   tickLine={false}
@@ -319,10 +396,11 @@ export function ReturnProbabilitiesChart({ data, isDark, enableAnimation = true 
 }
 
 /* ---------------------------------------------------------------------- */
-/* 3. Loss Probabilities (End of period vs Intra-period)                  */
+/* 3. Loss Probabilities (Unchanged)                                      */
 /* ---------------------------------------------------------------------- */
 
 export function LossProbabilitiesChart({ data, isDark, enableAnimation = true }: AnalyticsProps) {
+  // Loss chart uses categorical text X-Axis ("Loss > 10%"), so we apply style only.
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -340,15 +418,22 @@ export function LossProbabilitiesChart({ data, isDark, enableAnimation = true }:
         <CardContent>
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 40 }}>
+              <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 35 }}>
                 <XAxis 
                   dataKey="threshold" 
                   tickLine={false}
-                  tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#71717a' }}
+                  tick={{ 
+                    fontSize: 11, 
+                    fill: isDark ? '#a1a1aa' : '#71717a',
+                    angle: -45,
+                    textAnchor: 'end',
+                    dy: 10
+                  } as any}
+                  height={60}
                   label={{
                     value: 'Loss Magnitude',
                     position: 'insideBottom',
-                    offset: -15,
+                    offset: -5,
                     fontSize: 11,
                     fill: isDark ? '#a1a1aa' : '#71717a',
                   }}
@@ -378,10 +463,12 @@ export function LossProbabilitiesChart({ data, isDark, enableAnimation = true }:
 }
 
 /* ---------------------------------------------------------------------- */
-/* 4. NEW: Investment Breakdown Chart                                     */
+/* 4. Investment Breakdown Chart                                          */
 /* ---------------------------------------------------------------------- */
 
 export function InvestmentBreakdownChart({ data, isDark, enableAnimation = true }: AnalyticsProps) {
+  const xAxisProps = commonXAxisProps(isDark, data)
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -399,7 +486,7 @@ export function InvestmentBreakdownChart({ data, isDark, enableAnimation = true 
         <CardContent>
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 40 }}>
+              <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 35 }}>
                 <defs>
                   <linearGradient id="colorInitial" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
@@ -410,21 +497,9 @@ export function InvestmentBreakdownChart({ data, isDark, enableAnimation = true 
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <XAxis 
-                  dataKey="year" 
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#71717a' }}
-                  label={{
-                    value: 'Years invested',
-                    position: 'insideBottom',
-                    offset: -15,
-                    fontSize: 11,
-                    fill: isDark ? '#a1a1aa' : '#71717a',
-                  }}
-                />
+                <XAxis {...(xAxisProps as any)} />
                 <YAxis 
                   tickLine={false}
-                  // Fixed: Use central formatCurrency with $ enabled and compact
                   tickFormatter={(val) => formatCurrency(val, true, 0)}
                   tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#71717a' }}
                 />

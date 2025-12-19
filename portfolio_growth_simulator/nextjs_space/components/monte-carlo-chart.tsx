@@ -19,7 +19,6 @@ interface MonteCarloChartProps {
   enableAnimation?: boolean
 }
 
-// Percentile labels for tooltip and legend
 const PERCENTILE_LABELS: Record<string, string> = {
   p90: '90th percentile',
   p75: '75th percentile',
@@ -28,13 +27,12 @@ const PERCENTILE_LABELS: Record<string, string> = {
   p10: '10th percentile',
 }
 
-// Line colors used both in chart and tooltip
 const PERCENTILE_COLORS: Record<string, string> = {
-  p90: 'hsl(250, 70%, 60%)',  // purple
-  p75: 'hsl(200, 75%, 55%)',  // blue
-  p50: 'hsl(165, 65%, 48%)',  // teal green
-  p25: 'hsl(180, 70%, 55%)',  // cyan
-  p10: 'hsl(30, 85%, 60%)',   // orange
+  p90: 'hsl(250, 70%, 60%)',
+  p75: 'hsl(200, 75%, 55%)',
+  p50: 'hsl(165, 65%, 48%)',
+  p25: 'hsl(180, 70%, 55%)',
+  p10: 'hsl(30, 85%, 60%)',
 }
 
 interface TooltipProps {
@@ -50,18 +48,13 @@ const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
   const point = payload[0].payload
   let timeLabel = 'Start'
 
-  // Tooltip Logic: Always verbose "Year X, Month Y"
   if (label && label > 0) {
     const years = Math.floor(label)
     const months = Math.round((label - years) * 12)
     
-    if (years === 0) {
-      timeLabel = `Month ${months}`
-    } else if (months === 0) {
-      timeLabel = `Year ${years}`
-    } else {
-      timeLabel = `Year ${years}, Month ${months}`
-    }
+    if (years === 0) timeLabel = `Month ${months}`
+    else if (months === 0) timeLabel = `Year ${years}`
+    else timeLabel = `Year ${years}, Month ${months}`
   }
 
   const rows = [
@@ -74,9 +67,7 @@ const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
 
   return (
     <div className="rounded-md border bg-popover px-3 py-2 shadow-md text-xs space-y-1">
-      <div className="font-semibold">
-        {timeLabel}
-      </div>
+      <div className="font-semibold">{timeLabel}</div>
       <div className="text-muted-foreground">
         {mode === 'growth' ? 'Projected portfolio value' : 'Projected remaining balance'}
       </div>
@@ -84,15 +75,10 @@ const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
         {rows.map(({ key, value }) => (
           <div key={key} className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <span
-                className="inline-block h-2 w-2 rounded-full"
-                style={{ backgroundColor: PERCENTILE_COLORS[key] }}
-              />
+              <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: PERCENTILE_COLORS[key] }} />
               <span>{PERCENTILE_LABELS[key]}</span>
             </div>
-            <span className="font-semibold">
-              {formatCurrency(value)}
-            </span>
+            <span className="font-semibold">{formatCurrency(value)}</span>
           </div>
         ))}
       </div>
@@ -101,7 +87,6 @@ const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
 }
 
 const LOG_FLOOR = 1
-
 function logSafe(value: number): number {
   if (!Number.isFinite(value)) return LOG_FLOOR
   return value > LOG_FLOOR ? value : LOG_FLOOR
@@ -111,55 +96,61 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  // 1. Determine max year to decide formatting strategy
+  // 1. Determine max year
   const maxYear = useMemo(() => {
     if (!data || data.length === 0) return 0
     return data[data.length - 1].year
   }, [data])
 
-  // Threshold: If total duration is <= 3 years, we show monthly details
-  const showMonthlyLabels = maxYear <= 3
+  const showMonthlyLabels = maxYear <= 2
 
-  // 2. Generate EXPLICIT ticks.
+  // 2. SMART TICK GENERATOR
+  // Dynamically determines ticks based on total duration to prevent crowding
   const customTicks = useMemo(() => {
     if (!maxYear) return [0]
     
-    // Short Duration: Tick every month (1/12th of a year)
+    // Case 1: Short duration (Month by month)
     if (showMonthlyLabels) {
       const totalMonths = Math.ceil(maxYear * 12)
       return Array.from({ length: totalMonths + 1 }, (_, i) => i / 12)
     }
 
-    // Long Duration: Tick every integer year (0, 1, 2, ... maxYear)
-    const totalYears = Math.floor(maxYear)
-    return Array.from({ length: totalYears + 1 }, (_, i) => i)
+    // Case 2: Standard or Long duration
+    // Goal: Show ~12-15 ticks total.
+    const targetTickCount = 15
+    const rawInterval = maxYear / targetTickCount
+    
+    // Snap to "nice" intervals (1, 2, 4, 5, 10, 20, 25, 50, 100)
+    const niceIntervals = [1, 2, 4, 5, 10, 20, 25, 50, 100]
+    const interval = niceIntervals.find(i => i >= rawInterval) || niceIntervals[niceIntervals.length - 1]
+
+    const ticks = []
+    for (let i = 0; i <= maxYear; i += interval) {
+      ticks.push(i)
+    }
+    // Always include the very last year if it's not close to the last tick
+    if (maxYear - ticks[ticks.length - 1] > interval * 0.5) {
+      ticks.push(maxYear)
+    }
+    
+    return ticks
   }, [maxYear, showMonthlyLabels])
 
   // Custom X-Axis Formatter
   const formatXAxis = (value: number) => {
     if (value === 0) return 'Start'
     
-    // Check if it's an integer (Year boundary)
     const isInteger = Math.abs(value % 1) < 0.001
 
-    // STRATEGY 1: Short Duration (Show Months)
     if (showMonthlyLabels) {
       if (isInteger) return `Year ${Math.round(value)}`
-      
       const years = Math.floor(value)
       const months = Math.round((value - years) * 12)
-
-      // If it's less than a year, just say "Month X"
       if (years === 0) return `Month ${months}`
-
-      // If it's over a year, use compact notation to fit on mobile axis
-      // e.g., "Yr 1 M 3" instead of "Year 1 Month 3"
       return `Yr ${years} M ${months}`
     }
 
-    // STRATEGY 2: Long Duration (Hide Fractional Months)
     if (!isInteger) return ''
-    
     return `Year ${value}`
   }
 
@@ -194,10 +185,7 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
-              <ChartSpline
-                className="h-5 w-5"
-                style={{ color: 'hsl(165, 65%, 48%)' }}
-              />
+              <ChartSpline className="h-5 w-5" style={{ color: 'hsl(165, 65%, 48%)' }} />
               Scenario Paths with Percentile Bands
             </CardTitle>
 
@@ -208,13 +196,9 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
                 onCheckedChange={handleLogScaleChange}
                 className="print:hidden"
               />
-              <Label
-                htmlFor="log-scale-montecarlo"
-                className="text-sm cursor-pointer print:hidden"
-              >
+              <Label htmlFor="log-scale-montecarlo" className="text-sm cursor-pointer print:hidden">
                 Log scale
               </Label>
-
               {logScale && (
                 <span className="hidden print:inline text-xs text-muted-foreground font-medium">
                   (Log scale enabled)
@@ -227,10 +211,7 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
         <CardContent>
           <div className="h-96 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={chartData}
-                margin={{ top: 10, right: 20, left: 0, bottom: 35 }}
-              >
+              <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 35 }}>
                 <XAxis
                   dataKey="year"
                   type="number"
@@ -238,8 +219,6 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
                   ticks={customTicks}
                   tickLine={false}
                   axisLine={{ stroke: isDark ? 'hsl(240, 3.7%, 15.9%)' : 'hsl(214, 32%, 91%)' }}
-                  
-                  // FIX: Cast object to 'any' to bypass strict SVG type check on 'angle'
                   tick={{
                     fontSize: 11,
                     angle: -45,
@@ -247,14 +226,11 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
                     dy: 10,
                     fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)',
                   } as any}
-                  
                   height={60} 
-
                   tickFormatter={formatXAxis}
                   allowDecimals={showMonthlyLabels}
                   interval={0}
                   minTickGap={1}
-
                   label={{
                     value: 'Time',
                     position: 'insideBottom',
@@ -269,66 +245,19 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
                 <YAxis
                   tickLine={false}
                   axisLine={{ stroke: isDark ? 'hsl(240, 3.7%, 15.9%)' : 'hsl(214, 32%, 91%)' }}
-                  tick={{
-                    fontSize: 11,
-                    fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)',
-                  }}
+                  tick={{ fontSize: 11, fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)' }}
                   scale={logScale ? 'log' : 'linear'}
                   domain={logScale ? ['auto', 'auto'] : [0, 'auto']}
                   tickFormatter={(val) => formatCurrency(val, true, 1)}
                 />
                 <Tooltip content={(props) => <CustomTooltip {...props} mode={mode} />} />
-                <Legend
-                  verticalAlign="top"
-                  wrapperStyle={{ fontSize: 11, marginTop: '-10px' }}
-                  formatter={(value: string) => PERCENTILE_LABELS[value] ?? value}
-                />
+                <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} formatter={(value: string) => PERCENTILE_LABELS[value] ?? value} />
 
-                <Line
-                  type="monotone"
-                  dataKey="p90"
-                  stroke={PERCENTILE_COLORS.p90}
-                  strokeWidth={2}
-                  dot={false}
-                  name="p90"
-                  animationDuration={enableAnimation ? 500 : 0}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="p75"
-                  stroke={PERCENTILE_COLORS.p75}
-                  strokeWidth={2}
-                  dot={false}
-                  name="p75"
-                  animationDuration={enableAnimation ? 400 : 0}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="p50"
-                  stroke={PERCENTILE_COLORS.p50}
-                  strokeWidth={3}
-                  dot={false}
-                  name="p50"
-                  animationDuration={enableAnimation ? 300 : 0}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="p25"
-                  stroke={PERCENTILE_COLORS.p25}
-                  strokeWidth={2}
-                  dot={false}
-                  name="p25"
-                  animationDuration={enableAnimation ? 200 : 0}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="p10"
-                  stroke={PERCENTILE_COLORS.p10}
-                  strokeWidth={2}
-                  dot={false}
-                  name="p10"
-                  animationDuration={enableAnimation ? 100 : 0}
-                />
+                <Line type="monotone" dataKey="p90" stroke={PERCENTILE_COLORS.p90} strokeWidth={2} dot={false} name="p90" animationDuration={enableAnimation ? 500 : 0} />
+                <Line type="monotone" dataKey="p75" stroke={PERCENTILE_COLORS.p75} strokeWidth={2} dot={false} name="p75" animationDuration={enableAnimation ? 400 : 0} />
+                <Line type="monotone" dataKey="p50" stroke={PERCENTILE_COLORS.p50} strokeWidth={3} dot={false} name="p50" animationDuration={enableAnimation ? 300 : 0} />
+                <Line type="monotone" dataKey="p25" stroke={PERCENTILE_COLORS.p25} strokeWidth={2} dot={false} name="p25" animationDuration={enableAnimation ? 200 : 0} />
+                <Line type="monotone" dataKey="p10" stroke={PERCENTILE_COLORS.p10} strokeWidth={2} dot={false} name="p10" animationDuration={enableAnimation ? 100 : 0} />
               </LineChart>
             </ResponsiveContainer>
           </div>
