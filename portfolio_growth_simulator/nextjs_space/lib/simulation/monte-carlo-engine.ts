@@ -64,16 +64,21 @@ export function performMonteCarloSimulation(
     return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)
   }
 
-  // 1) Distributions per year across all paths
-  const yearDistributions: number[][] = Array.from(
-    { length: duration + 1 },
+  // 1) Distributions per TIME UNIT across all paths
+  // We now ALWAYS record monthly data (granularity = 1 step)
+  // This allows the chart to show monthly volatility wiggles for any duration.
+  const recordFrequency = 1 
+  const numRecordingSteps = totalTimeSteps
+  
+  const distributions: number[][] = Array.from(
+    { length: numRecordingSteps + 1 },
     () => []
   )
 
   // 2) Ending stats per path
   const endingValues: number[] = []
   const maxDrawdowns: number[] = []
-  const lowestValues: number[] = [] // Lowest value ever reached for each scenario
+  const lowestValues: number[] = [] 
 
   // 3) Annual CAGR distribution per year
   const annualCAGRs: number[][] = []
@@ -82,32 +87,28 @@ export function performMonteCarloSimulation(
   }
 
   let pathsReachingGoal = 0
-  let pathsProfitable = 0 // > total invested
-  let pathsSolvent = 0 // > 0
+  let pathsProfitable = 0 
+  let pathsSolvent = 0 
 
   for (let path = 0; path < numPaths; path++) {
     let currentValue = initialValue
-    let pureValue = initialValue // Track pure asset performance
+    let pureValue = initialValue 
     let lowestValue = initialValue
     let currentCashflowPerStep = cashflowPerStep
 
-    // Track total principal invested for this path
     let totalInvestedSoFar = initialValue
-
-    // Track drawdown on the fly
     let peak = currentValue
     let maxDrawdownForPath = 0
 
-    // Store Year 0 value
-    yearDistributions[0].push(currentValue)
+    // Store Time 0 value
+    distributions[0].push(currentValue)
 
     for (let step = 1; step <= totalTimeSteps; step++) {
       // Calculate growth factor once for this step
       const growthFactor = Math.exp(drift + diffusion * normalRandom())
 
-      // Apply growth to both tracked values
       currentValue = currentValue * growthFactor
-      pureValue = pureValue * growthFactor // Pure value only grows by market return
+      pureValue = pureValue * growthFactor 
 
       if (mode === 'growth') {
         currentValue += currentCashflowPerStep
@@ -119,25 +120,23 @@ export function performMonteCarloSimulation(
 
       if (currentValue < lowestValue) lowestValue = currentValue
 
-      // Max drawdown on the fly (no need to store full path)
+      // Max drawdown on the fly
       if (currentValue > peak) peak = currentValue
       if (peak > 0) {
         const dd = (peak - currentValue) / peak
         if (dd > maxDrawdownForPath) maxDrawdownForPath = dd
       }
 
-      // Store end-of-year statistics only
+      // Always record distribution for chart (every step)
+      distributions[step].push(currentValue)
+
+      // Perform ANNUAL adjustments (Inflation, CAGR)
       if (step % timeStepsPerYear === 0) {
         const yearIndex = step / timeStepsPerYear
 
-        // Store this year's portfolio value for percentile chart
-        yearDistributions[yearIndex].push(currentValue)
-
-        // Increase cashflow by inflation annually
         currentCashflowPerStep *= inflationFactor
 
         if (yearIndex > 0) {
-          // Calculate CAGR using pureValue (pure asset performance) instead of account balance
           const cagr = Math.pow(pureValue / initialValue, 1 / yearIndex) - 1
           annualCAGRs[yearIndex].push(cagr * 100)
         }
@@ -153,7 +152,6 @@ export function performMonteCarloSimulation(
     if (currentValue > 0) pathsSolvent++
   }
 
-  // Create sorted copies for percentile calculations
   const sortedEndingValues = [...endingValues].sort((a, b) => a - b)
 
   const annualReturnsData = []
@@ -189,13 +187,11 @@ export function performMonteCarloSimulation(
     })
   }
 
-  // --- INVESTMENT DATA ---
   const investmentData = []
   let simInvInitial = initialValue
   let simInvContrib = 0
   let simInvCashflow = cashflowPerStep
 
-  // Push Year 0
   investmentData.push({
     year: 0,
     initial: simInvInitial,
@@ -204,9 +200,7 @@ export function performMonteCarloSimulation(
   })
 
   for (let y = 1; y <= duration; y++) {
-    // Add 12 months of contributions (only if growth mode)
     const yearContribution = mode === 'growth' ? simInvCashflow * 12 : 0
-
     simInvContrib += yearContribution
 
     investmentData.push({
@@ -215,12 +209,9 @@ export function performMonteCarloSimulation(
       contributions: simInvContrib,
       total: simInvInitial + simInvContrib,
     })
-
-    // Apply inflation for next year
     simInvCashflow *= inflationFactor
   }
 
-  // --- LOSS PROBABILITIES ---
   const lossThresholds = [0, 2.5, 5, 10, 15, 20, 30, 50]
   const lossProbData = lossThresholds.map((threshold) => {
     const countEnd = endingValues.filter((val) => {
@@ -241,7 +232,6 @@ export function performMonteCarloSimulation(
     }
   })
 
-  // Use sorted ending values for stats
   const mean = endingValues.reduce((sum, val) => sum + val, 0) / numPaths
   const median = calculatePercentile(sortedEndingValues, 0.5)
   const p5 = calculatePercentile(sortedEndingValues, 0.05)
@@ -253,16 +243,20 @@ export function performMonteCarloSimulation(
   const best = sortedEndingValues[numPaths - 1]
   const worst = sortedEndingValues[0]
 
-  // Build chart data directly from yearDistributions
-  const chartData = yearDistributions.map((values, year) => {
-    const sortedYearValues = [...values].sort((a, b) => a - b)
+  const chartData = distributions.map((values, index) => {
+    const sortedPeriodValues = [...values].sort((a, b) => a - b)
+    
+    // index is the month number (0 to totalMonths). 
+    // We convert to partial years for the chart x-axis.
+    const yearValue = index / 12 
+
     return {
-      year,
-      p10: calculatePercentile(sortedYearValues, 0.1),
-      p25: calculatePercentile(sortedYearValues, 0.25),
-      p50: calculatePercentile(sortedYearValues, 0.5),
-      p75: calculatePercentile(sortedYearValues, 0.75),
-      p90: calculatePercentile(sortedYearValues, 0.9),
+      year: yearValue,
+      p10: calculatePercentile(sortedPeriodValues, 0.1),
+      p25: calculatePercentile(sortedPeriodValues, 0.25),
+      p50: calculatePercentile(sortedPeriodValues, 0.5),
+      p75: calculatePercentile(sortedPeriodValues, 0.75),
+      p90: calculatePercentile(sortedPeriodValues, 0.9),
     }
   })
 

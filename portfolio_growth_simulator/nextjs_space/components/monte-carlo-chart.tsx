@@ -48,6 +48,21 @@ const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
   if (!active || !payload || !payload.length) return null
 
   const point = payload[0].payload
+  let timeLabel = 'Start'
+
+  // Tooltip Logic: Always verbose "Year X, Month Y"
+  if (label && label > 0) {
+    const years = Math.floor(label)
+    const months = Math.round((label - years) * 12)
+    
+    if (years === 0) {
+      timeLabel = `Month ${months}`
+    } else if (months === 0) {
+      timeLabel = `Year ${years}`
+    } else {
+      timeLabel = `Year ${years}, Month ${months}`
+    }
+  }
 
   const rows = [
     { key: 'p90', value: point.p90 },
@@ -60,7 +75,7 @@ const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
   return (
     <div className="rounded-md border bg-popover px-3 py-2 shadow-md text-xs space-y-1">
       <div className="font-semibold">
-        Year {label}
+        {timeLabel}
       </div>
       <div className="text-muted-foreground">
         {mode === 'growth' ? 'Projected portfolio value' : 'Projected remaining balance'}
@@ -95,6 +110,60 @@ function logSafe(value: number): number {
 export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enableAnimation = true }: MonteCarloChartProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+
+  // 1. Determine max year to decide formatting strategy
+  const maxYear = useMemo(() => {
+    if (!data || data.length === 0) return 0
+    return data[data.length - 1].year
+  }, [data])
+
+  // Threshold: If total duration is <= 2 years, we show monthly details
+  const showMonthlyLabels = maxYear <= 3
+
+  // 2. Generate EXPLICIT ticks.
+  // This forces Recharts to consider every single year (or month) as a tick candidate.
+  const customTicks = useMemo(() => {
+    if (!maxYear) return [0]
+    
+    // Short Duration: Tick every month (1/12th of a year)
+    if (showMonthlyLabels) {
+      const totalMonths = Math.ceil(maxYear * 12)
+      return Array.from({ length: totalMonths + 1 }, (_, i) => i / 12)
+    }
+
+    // Long Duration: Tick every integer year (0, 1, 2, ... maxYear)
+    const totalYears = Math.floor(maxYear)
+    return Array.from({ length: totalYears + 1 }, (_, i) => i)
+  }, [maxYear, showMonthlyLabels])
+
+  // Custom X-Axis Formatter
+  const formatXAxis = (value: number) => {
+    if (value === 0) return 'Start'
+    
+    // Check if it's an integer (Year boundary)
+    const isInteger = Math.abs(value % 1) < 0.001
+
+    // STRATEGY 1: Short Duration (Show Months)
+    if (showMonthlyLabels) {
+      if (isInteger) return `Year ${Math.round(value)}`
+      
+      const years = Math.floor(value)
+      const months = Math.round((value - years) * 12)
+
+      // If it's less than a year, just say "Month X"
+      if (years === 0) return `Month ${months}`
+
+      // If it's over a year, use compact notation to fit on mobile axis
+      // e.g., "Yr 1 M 3" instead of "Year 1 Month 3"
+      return `Yr ${years} M ${months}`
+    }
+
+    // STRATEGY 2: Long Duration (Hide Fractional Months)
+    // If it's not an integer year, return empty string to hide the tick label
+    if (!isInteger) return ''
+    
+    return `Year ${value}`
+  }
 
   const chartData = useMemo(
     () =>
@@ -166,16 +235,37 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
               >
                 <XAxis
                   dataKey="year"
+                  type="number"
+                  domain={[0, 'dataMax']}
+
+                  // KEY CHANGE 1: Pass custom ticks array
+                  ticks={customTicks}
+
                   tickLine={false}
                   axisLine={{ stroke: isDark ? 'hsl(240, 3.7%, 15.9%)' : 'hsl(214, 32%, 91%)' }}
+                  
+                  // KEY CHANGE 2: Angle -45, textAnchor end, dy 10
                   tick={{
                     fontSize: 11,
+                    angle: -45,
+                    textAnchor: 'end',
+                    dy: 10,
                     fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)',
                   }}
+                  
+                  // KEY CHANGE 3: Increase height for rotated labels
+                  height={60} 
+
+                  tickFormatter={formatXAxis}
+                  allowDecimals={showMonthlyLabels}
+                  
+                  // KEY CHANGE 4: Force display of all ticks unless they overlap
+                  interval={0}
+                  minTickGap={1}
+
                   label={{
-                    value: 'Years',
                     position: 'insideBottom',
-                    offset: -15,
+                    offset: -5,
                     style: {
                       textAnchor: 'middle',
                       fontSize: 11,
@@ -192,7 +282,6 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
                   }}
                   scale={logScale ? 'log' : 'linear'}
                   domain={logScale ? ['auto', 'auto'] : [0, 'auto']}
-                  // Use central formatCurrency (compact) for consistent large numbers
                   tickFormatter={(val) => formatCurrency(val, true, 1)}
                 />
                 <Tooltip content={(props) => <CustomTooltip {...props} mode={mode} />} />
@@ -251,7 +340,7 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
             </ResponsiveContainer>
           </div>
           <p className="text-xs text-muted-foreground mt-3 text-center">
-            Shows the range of possible portfolio values each year using up to 100,000 simulated market outcomes, from optimistic to pessimistic scenarios.
+            Shows the range of possible portfolio values using up to 100,000 simulated market outcomes, from optimistic to pessimistic scenarios.
           </p>
         </CardContent>
       </Card>
