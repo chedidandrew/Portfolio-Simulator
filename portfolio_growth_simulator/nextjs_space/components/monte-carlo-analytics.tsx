@@ -18,25 +18,26 @@ interface AnalyticsProps {
 /* Helpers for Axis Formatting (Smart Ticks)                          */
 /* ------------------------------------------------------------------ */
 
-// Hook to generate "Smart Ticks" dynamically based on duration.
 function useCustomTicks(data: any[]) {
   return useMemo(() => {
     if (!data || data.length === 0) return [0]
     const maxYear = data[data.length - 1].year || 0
-    const showMonthlyLabels = maxYear <= 2
+    
+    // Case 1: Very Short (<= 0.5 years / 6 months) -> Weekly ticks
+    if (maxYear <= 0.5) {
+      const totalWeeks = Math.ceil(maxYear * 52)
+      return Array.from({ length: totalWeeks + 1 }, (_, i) => i / 52)
+    }
 
-    // Case 1: Short Duration (Show Monthly details)
-    if (showMonthlyLabels) {
+    // Case 2: Short Duration (<= 3 years) -> Monthly ticks
+    if (maxYear <= 3) {
       const totalMonths = Math.ceil(maxYear * 12)
       return Array.from({ length: totalMonths + 1 }, (_, i) => i / 12)
     }
 
-    // Case 2: Smart Interval for all other durations
-    // We target roughly 12 ticks to keep the chart clean.
+    // Case 3: Smart Interval
     const targetTickCount = 15
     const rawInterval = maxYear / targetTickCount
-
-    // Snap to "nice" intervals (1, 2, 4, 5, 10, 20, 25, 50, 100)
     const niceIntervals = [1, 2, 4, 5, 10, 20, 25, 50, 100]
     const interval = niceIntervals.find(i => i >= rawInterval) || niceIntervals[niceIntervals.length - 1]
 
@@ -44,7 +45,6 @@ function useCustomTicks(data: any[]) {
     for (let i = 0; i <= maxYear; i += interval) {
       ticks.push(i)
     }
-    // Always include the very last year if it's not close to the last tick
     if (maxYear - ticks[ticks.length - 1] > interval * 0.5) {
       ticks.push(maxYear)
     }
@@ -55,25 +55,25 @@ function useCustomTicks(data: any[]) {
 
 const formatXAxis = (value: number, maxYear: number) => {
   if (value === 0) return 'Start'
-  
-  const showMonthlyLabels = maxYear <= 2
   const isInteger = Math.abs(value % 1) < 0.001
 
-  if (showMonthlyLabels) {
+  if (maxYear <= 0.5) {
+    const weeks = Math.round(value * 52)
+    return `Week ${weeks}`
+  }
+
+  if (maxYear <= 2) {
     if (isInteger) return `Year ${Math.round(value)}`
-    
     const years = Math.floor(value)
     const months = Math.round((value - years) * 12)
     if (years === 0) return `Month ${months}`
     return `Yr ${years} M ${months}`
   }
 
-  // If we are in "Annual/Smart" mode, hide any fractional ticks that slip in
   if (!isInteger) return ''
   return `Year ${value}`
 }
 
-// Common XAxis props for style consistency
 const commonXAxisProps = (isDark: boolean, data: any[]) => {
   const ticks = useCustomTicks(data)
   const maxYear = data && data.length > 0 ? data[data.length - 1].year : 0
@@ -91,7 +91,7 @@ const commonXAxisProps = (isDark: boolean, data: any[]) => {
       textAnchor: 'end',
       dy: 10,
       fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)',
-    } as any, // Cast to any to bypass strict SVG types for 'angle'
+    } as any,
     height: 60,
     interval: 0,
     minTickGap: 1,
@@ -116,11 +116,20 @@ const commonXAxisProps = (isDark: boolean, data: any[]) => {
 const formatTooltipLabel = (label: number) => {
   if (!label || label <= 0) return 'Start'
   const years = Math.floor(label)
-  const months = Math.round((label - years) * 12)
+  const fraction = label - years
+  const months = Math.round(fraction * 12)
   
-  if (months === 0) return `Year ${years}`
-  if (years === 0) return `Month ${months}`
-  return `Year ${years}, Month ${months}`
+  // If near a month boundary, show month
+  if (Math.abs(fraction * 12 - months) < 0.05) {
+    if (months === 0) return `Year ${years}`
+    if (years === 0) return `Month ${months}`
+    return `Year ${years}, Month ${months}`
+  }
+
+  // Else show week
+  const weeks = Math.round(fraction * 52)
+  if (years === 0) return `Week ${weeks}`
+  return `Year ${years}, Week ${weeks}`
 }
 
 const AnnualReturnsTooltip = ({ active, payload, label, mode }: any) => {
@@ -400,7 +409,6 @@ export function ReturnProbabilitiesChart({ data, isDark, enableAnimation = true 
 /* ---------------------------------------------------------------------- */
 
 export function LossProbabilitiesChart({ data, isDark, enableAnimation = true }: AnalyticsProps) {
-  // Loss chart uses categorical text X-Axis ("Loss > 10%"), so we apply style only.
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

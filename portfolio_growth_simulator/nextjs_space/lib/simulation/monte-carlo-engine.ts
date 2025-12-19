@@ -41,71 +41,76 @@ export function performMonteCarloSimulation(
     portfolioGoal,
   } = params
 
-  // --- DYNAMIC RESOLUTION LOGIC ---
-  // Goal: Keep load time under ~5s and chart responsive.
+  // 1. CPU BUDGET (Physics Resolution)
+  // We cap total math operations to ensure the loop finishes in ~2-3 seconds.
+  // Standard benchmark: ~100M ops per second on modern JS engines.
+  const MAX_PHYSICS_ITERATIONS = 100_000_000 
   
-  // Constraint A: Memory/Processing Budget.
-  // We limit the total number of recorded points (across all paths) to avoid massive array allocations.
-  // 2,000,000 points is roughly 16MB of doubles, very safe for JS engines.
-  const MAX_TOTAL_DATA_POINTS = 2_000_000 
+  // Calculate potential operations for different resolutions
+  const opsWeekly = numPaths * duration * 52
+  const opsMonthly = numPaths * duration * 12
 
-  // Constraint B: Chart Rendering Budget.
-  // Recharts/SVG gets laggy with > 300-500 points on the X-axis.
-  // We limit the number of time steps recorded to keep the chart snappy.
-  const MAX_CHART_STEPS = 250
+  let timeStepsPerYear = 52 // Default: Weekly (Highest fidelity)
 
-  const timeStepsPerYear = 12
-  const totalSimulationMonths = Math.floor(duration * timeStepsPerYear)
+  if (opsWeekly > MAX_PHYSICS_ITERATIONS) {
+    // If weekly is too heavy, try Monthly
+    if (opsMonthly > MAX_PHYSICS_ITERATIONS) {
+      // If monthly is STILL too heavy (e.g. 100k paths * 200 years = 240M ops),
+      // switch to Annual math (Lowest fidelity, highest speed).
+      timeStepsPerYear = 1
+    } else {
+      timeStepsPerYear = 12
+    }
+  }
 
-  // 1. Calculate max steps allowed by Memory Constraint
-  // (e.g., if 100,000 paths, we can only record 20 steps to stay under 2M total points)
+  // 2. MEMORY & CHART BUDGET (Data Recording Resolution)
+  const MAX_TOTAL_DATA_POINTS = 10_000_000
+  const MAX_CHART_STEPS = 500
+
+  const totalSimulationSteps = Math.floor(duration * timeStepsPerYear)
   const memoryAllowedSteps = Math.floor(MAX_TOTAL_DATA_POINTS / numPaths)
-
-  // 2. Determine Target Steps (The tighter of the two constraints)
-  // We explicitly clamp between 2 (start/end) and our budgets.
-  const targetSteps = Math.max(2, Math.min(memoryAllowedSteps, MAX_CHART_STEPS))
-
-  // 3. Calculate Record Frequency (Steps per Record)
-  // e.g. 600 months / 200 target = record every 3 months.
-  let recordFrequency = Math.ceil(totalSimulationMonths / targetSteps)
   
-  // Ensure we define at least 1 step
+  // Calculate recording frequency
+  const targetSteps = Math.max(2, Math.min(memoryAllowedSteps, MAX_CHART_STEPS))
+  let recordFrequency = Math.ceil(totalSimulationSteps / targetSteps)
   if (recordFrequency < 1) recordFrequency = 1
 
   // -------------------------------
 
   const dt = 1 / timeStepsPerYear
-  const totalTimeSteps = totalSimulationMonths
+  const totalTimeSteps = totalSimulationSteps
 
   const r = expectedReturn / 100
   const sigma = volatility / 100
   const mu = Math.log(1 + r)
   const drift = mu * dt
   const diffusion = sigma * Math.sqrt(dt)
-  const cashflowPerStep =
-    cashflowFrequency === 'monthly' ? cashflowAmount : cashflowAmount / 12
+  
+  // Adjust cashflow based on the decided time step
+  // e.g. if Monthly input ($1k) -> Annual ($12k) -> Weekly ($230) or Monthly ($1k) or Annual ($12k)
+  const annualCashflow = cashflowFrequency === 'monthly' 
+    ? cashflowAmount * 12 
+    : cashflowAmount
+  
+  let cashflowPerStep = annualCashflow / timeStepsPerYear
   
   const inflationFactor = 1 + inflationAdjustment / 100
   const rng = seedrandom(seed ?? `monte-carlo-${Date.now()}-${Math.random()}`)
 
   function normalRandom(): number {
-    let u = 0,
-      v = 0
+    let u = 0, v = 0
     while (u === 0) u = rng()
     while (v === 0) v = rng()
     return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)
   }
 
-  // Calculate actual number of recorded slots based on frequency
   const numRecordedSteps = Math.floor(totalTimeSteps / recordFrequency)
   
-  // Distributions per RECORDED STEP
   const stepDistributions: number[][] = Array.from(
     { length: numRecordedSteps + 1 },
     () => []
   )
 
-  // CAGRs per RECORDED STEP
   const stepCAGRs: number[][] = Array.from(
     { length: numRecordedSteps + 1 },
     () => []
@@ -128,12 +133,11 @@ export function performMonteCarloSimulation(
     let peak = currentValue
     let maxDrawdownForPath = 0
 
-    // Store Time 0 values
+    // Store Time 0
     stepDistributions[0].push(currentValue)
     stepCAGRs[0].push(0)
 
     for (let step = 1; step <= totalTimeSteps; step++) {
-      // -- MATH (Always runs monthly for precision) --
       const growthFactor = Math.exp(drift + diffusion * normalRandom())
       currentValue = currentValue * growthFactor
       pureValue = pureValue * growthFactor 
@@ -153,17 +157,19 @@ export function performMonteCarloSimulation(
         if (dd > maxDrawdownForPath) maxDrawdownForPath = dd
       }
 
-      // -- RECORDING (Conditional based on dynamic frequency) --
+      // Record Data based on Frequency
       if (step % recordFrequency === 0) {
         const recordIndex = step / recordFrequency
         stepDistributions[recordIndex].push(currentValue)
 
-        const timeInYears = step / 12
+        const timeInYears = step / timeStepsPerYear
         const cagr = Math.pow(pureValue / initialValue, 1 / timeInYears) - 1
         stepCAGRs[recordIndex].push(cagr * 100)
       }
 
-      // -- ANNUAL INFLATION (Always at year boundary) --
+      // Apply inflation annually
+      // Since `timeStepsPerYear` changes dynamically, this logic remains correct.
+      // If Weekly -> every 52 steps. If Monthly -> every 12 steps. If Annual -> every 1 step.
       if (step % timeStepsPerYear === 0) {
         currentCashflowPerStep *= inflationFactor
       }
@@ -178,12 +184,10 @@ export function performMonteCarloSimulation(
     if (currentValue > 0) pathsSolvent++
   }
 
-  // --- POST PROCESSING ---
   const sortedEndingValues = [...endingValues].sort((a, b) => a - b)
 
   const annualReturnsData = []
   
-  // Iterate recorded steps
   for (let i = 1; i <= numRecordedSteps; i++) {
     const cagrs = stepCAGRs[i]
     cagrs.sort((a, b) => a - b)
@@ -197,9 +201,8 @@ export function performMonteCarloSimulation(
     const count25 = cagrs.filter((v) => v >= 25).length
     const count30 = cagrs.filter((v) => v >= 30).length
 
-    // Recover the actual time value for this step
     const currentStepNumber = i * recordFrequency
-    const yearValue = currentStepNumber / 12
+    const yearValue = currentStepNumber / timeStepsPerYear
 
     annualReturnsData.push({
       year: yearValue,
@@ -220,13 +223,11 @@ export function performMonteCarloSimulation(
     })
   }
 
-  // --- INVESTMENT DATA ---
   const investmentData = []
   let simInvInitial = initialValue
   let simInvContrib = 0
   let simInvCashflow = cashflowPerStep 
 
-  // Time 0
   investmentData.push({
     year: 0,
     initial: simInvInitial,
@@ -234,14 +235,14 @@ export function performMonteCarloSimulation(
     total: simInvInitial,
   })
 
-  // Deterministic replay matching record frequency
+  // Deterministic replay using the same dynamic step size
   for (let step = 1; step <= totalTimeSteps; step++) {
     const contribution = mode === 'growth' ? simInvCashflow : 0
     simInvContrib += contribution
 
     if (step % recordFrequency === 0) {
       investmentData.push({
-        year: step / 12,
+        year: step / timeStepsPerYear,
         initial: simInvInitial,
         contributions: simInvContrib,
         total: simInvInitial + simInvContrib,
@@ -253,7 +254,6 @@ export function performMonteCarloSimulation(
     }
   }
 
-  // --- LOSS PROBABILITIES ---
   const lossThresholds = [0, 2.5, 5, 10, 15, 20, 30, 50]
   const lossProbData = lossThresholds.map((threshold) => {
     const countEnd = endingValues.filter((val) => {
@@ -274,7 +274,6 @@ export function performMonteCarloSimulation(
     }
   })
 
-  // Stats
   const mean = endingValues.reduce((sum, val) => sum + val, 0) / numPaths
   const median = calculatePercentile(sortedEndingValues, 0.5)
   const p5 = calculatePercentile(sortedEndingValues, 0.05)
@@ -288,10 +287,8 @@ export function performMonteCarloSimulation(
 
   const chartData = stepDistributions.map((values, index) => {
     const sortedPeriodValues = [...values].sort((a, b) => a - b)
-    
-    // Recover actual year for chart X-axis
     const stepNumber = index * recordFrequency
-    const yearValue = stepNumber / 12
+    const yearValue = stepNumber / timeStepsPerYear
 
     return {
       year: yearValue,

@@ -50,11 +50,19 @@ const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
 
   if (label && label > 0) {
     const years = Math.floor(label)
-    const months = Math.round((label - years) * 12)
+    const fraction = label - years
+    const months = Math.round(fraction * 12)
     
-    if (years === 0) timeLabel = `Month ${months}`
-    else if (months === 0) timeLabel = `Year ${years}`
-    else timeLabel = `Year ${years}, Month ${months}`
+    // Logic: If close to a full month, show Month. Else show Week.
+    if (Math.abs(fraction * 12 - months) < 0.05) {
+      if (years === 0) timeLabel = `Month ${months}`
+      else if (months === 0) timeLabel = `Year ${years}`
+      else timeLabel = `Year ${years}, Month ${months}`
+    } else {
+      const weeks = Math.round(fraction * 52)
+      if (years === 0) timeLabel = `Week ${weeks}`
+      else timeLabel = `Year ${years}, Week ${weeks}`
+    }
   }
 
   const rows = [
@@ -96,27 +104,27 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  // 1. Determine max year
   const maxYear = useMemo(() => {
     if (!data || data.length === 0) return 0
     return data[data.length - 1].year
   }, [data])
 
-  const showMonthlyLabels = maxYear <= 2
-
-  // 2. SMART TICK GENERATOR
-  // Dynamically determines ticks based on total duration to prevent crowding
   const customTicks = useMemo(() => {
     if (!maxYear) return [0]
     
-    // Case 1: Short duration (Month by month)
-    if (showMonthlyLabels) {
+    // Case 1: Very Short (<= 6 months) -> Show Weeks
+    if (maxYear <= 0.5) {
+      const totalWeeks = Math.ceil(maxYear * 52)
+      return Array.from({ length: totalWeeks + 1 }, (_, i) => i / 52)
+    }
+
+    // Case 2: Short (<= 2 years) -> Show Months
+    if (maxYear <= 3) {
       const totalMonths = Math.ceil(maxYear * 12)
       return Array.from({ length: totalMonths + 1 }, (_, i) => i / 12)
     }
 
-    // Case 2: Standard or Long duration
-    // Goal: Show ~12-15 ticks total.
+    // Case 3: Standard -> Smart Intervals
     const targetTickCount = 15
     const rawInterval = maxYear / targetTickCount
     
@@ -128,21 +136,24 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
     for (let i = 0; i <= maxYear; i += interval) {
       ticks.push(i)
     }
-    // Always include the very last year if it's not close to the last tick
     if (maxYear - ticks[ticks.length - 1] > interval * 0.5) {
       ticks.push(maxYear)
     }
     
     return ticks
-  }, [maxYear, showMonthlyLabels])
+  }, [maxYear])
 
-  // Custom X-Axis Formatter
   const formatXAxis = (value: number) => {
     if (value === 0) return 'Start'
     
     const isInteger = Math.abs(value % 1) < 0.001
 
-    if (showMonthlyLabels) {
+    if (maxYear <= 0.5) {
+      const weeks = Math.round(value * 52)
+      return `Week ${weeks}`
+    }
+
+    if (maxYear <= 2) {
       if (isInteger) return `Year ${Math.round(value)}`
       const years = Math.floor(value)
       const months = Math.round((value - years) * 12)
@@ -228,7 +239,6 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
                   } as any}
                   height={60} 
                   tickFormatter={formatXAxis}
-                  allowDecimals={showMonthlyLabels}
                   interval={0}
                   minTickGap={1}
                   label={{
