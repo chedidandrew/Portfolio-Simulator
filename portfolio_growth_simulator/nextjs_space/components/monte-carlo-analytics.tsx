@@ -18,6 +18,7 @@ interface AnalyticsProps {
 /* Helpers for Axis Formatting (Smart Ticks)                          */
 /* ------------------------------------------------------------------ */
 
+// Hook to generate "Smart Ticks" dynamically based on duration.
 function useCustomTicks(data: any[]) {
   return useMemo(() => {
     if (!data || data.length === 0) return [0]
@@ -54,7 +55,7 @@ function useCustomTicks(data: any[]) {
 }
 
 const formatXAxis = (value: number, maxYear: number) => {
-  if (value === 0) return 'Start'
+  if (value === 0) return 'Month 1'
   const isInteger = Math.abs(value % 1) < 0.001
 
   if (maxYear <= 0.5) {
@@ -62,12 +63,17 @@ const formatXAxis = (value: number, maxYear: number) => {
     return `Week ${weeks}`
   }
 
-  if (maxYear <= 2) {
+  if (maxYear <= 3) {
     if (isInteger) return `Year ${Math.round(value)}`
     const years = Math.floor(value)
     const months = Math.round((value - years) * 12)
-    if (years === 0) return `Month ${months}`
-    return `Yr ${years} M ${months}`
+    
+    // FIX: Shift month display by +1 so 0.08 -> Month 2
+    const displayMonth = months + 1
+    if (displayMonth > 12) return `Year ${years + 1}`
+
+    if (years === 0) return `Month ${displayMonth}`
+    return `Yr ${years} M ${displayMonth}`
   }
 
   if (!isInteger) return ''
@@ -114,22 +120,54 @@ const commonXAxisProps = (isDark: boolean, data: any[]) => {
 /* ------------------------------------------------------------------ */
 
 const formatTooltipLabel = (label: number) => {
-  if (!label || label <= 0) return 'Start'
+  // "Start" corresponds to Month 1 (Day 0)
+  if (label === 0) return 'Month 1'
+  
   const years = Math.floor(label)
   const fraction = label - years
   const months = Math.round(fraction * 12)
   
-  // If near a month boundary, show month
-  if (Math.abs(fraction * 12 - months) < 0.05) {
+  // FIX: Shift month logic +1
+  // If months = 0 (Start of year), it's "Year X"
+  // If months = 1 (Feb), it's Month 2.
+  
+  // 1. Exact Month Boundary
+  if (Math.abs(fraction * 12 - months) < 0.001) {
     if (months === 0) return `Year ${years}`
-    if (years === 0) return `Month ${months}`
-    return `Year ${years}, Month ${months}`
+    
+    const displayMonth = months + 1
+    if (displayMonth > 12) return `Year ${years + 1}`
+
+    if (years === 0) return `Month ${displayMonth}`
+    return `Year ${years}, Month ${displayMonth}`
   }
 
-  // Else show week
-  const weeks = Math.round(fraction * 52)
-  if (years === 0) return `Week ${weeks}`
-  return `Year ${years}, Week ${weeks}`
+  // 2. Weekly Interval
+  const totalWeeks = Math.round(label * 52)
+  const weekOfYear = totalWeeks % 52
+  
+  // Estimate current month (1-12)
+  const weeksPerMonth = 52 / 12
+  let month = Math.ceil(weekOfYear / weeksPerMonth)
+  
+  // FIX: Shift weeks so Week 1-4 is Month 1, Week 5-8 is Month 2...
+  // However, Month logic is usually "completed months".
+  // If we want "Month 1, Week 2", that means we are IN Month 1.
+  
+  // Adjust month index to be 1-based and align with "Start = Month 1"
+  if (month === 0) month = 1
+  if (month > 12) month = 12
+
+  // Determine Week of that Month
+  const weeksInPriorMonths = Math.round((month - 1) * weeksPerMonth)
+  let weekInMonth = weekOfYear - weeksInPriorMonths
+  if (weekInMonth < 1) weekInMonth = 1
+
+  if (years === 0) {
+    return `Month ${month}, Week ${weekInMonth}`
+  }
+  
+  return `Year ${years}, Month ${month}, Week ${weekInMonth}`
 }
 
 const AnnualReturnsTooltip = ({ active, payload, label, mode }: any) => {
@@ -409,6 +447,7 @@ export function ReturnProbabilitiesChart({ data, isDark, enableAnimation = true 
 /* ---------------------------------------------------------------------- */
 
 export function LossProbabilitiesChart({ data, isDark, enableAnimation = true }: AnalyticsProps) {
+  // Loss chart uses categorical text X-Axis ("Loss > 10%"), so we apply style only.
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

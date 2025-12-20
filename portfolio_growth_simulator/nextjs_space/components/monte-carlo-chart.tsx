@@ -42,28 +42,58 @@ interface TooltipProps {
   mode: 'growth' | 'withdrawal'
 }
 
+/* ------------------------------------------------------------------ */
+/* Shared Helpers (Aligned with Analytics)                            */
+/* ------------------------------------------------------------------ */
+
+const formatTooltipLabel = (label: number) => {
+  if (!label || label <= 0) return 'Month 1'
+  
+  const years = Math.floor(label)
+  const fraction = label - years
+  const months = Math.round(fraction * 12)
+  
+  // 1. Exact Month Boundary
+  if (Math.abs(fraction * 12 - months) < 0.001) {
+    if (months === 0) return `Year ${years}`
+    
+    // Shift display month by +1 so 0.08 -> Month 2
+    const displayMonth = months + 1
+    if (displayMonth > 12) return `Year ${years + 1}`
+
+    if (years === 0) return `Month ${displayMonth}`
+    return `Year ${years}, Month ${displayMonth}`
+  }
+
+  // 2. Weekly Interval
+  const totalWeeks = Math.round(label * 52)
+  const weekOfYear = totalWeeks % 52
+  
+  // Estimate current month (1-12)
+  const weeksPerMonth = 52 / 12
+  let month = Math.ceil(weekOfYear / weeksPerMonth)
+  
+  // Adjust month index
+  if (month === 0) month = 1
+  if (month > 12) month = 12
+
+  // Determine Week of that Month
+  const weeksInPriorMonths = Math.round((month - 1) * weeksPerMonth)
+  let weekInMonth = weekOfYear - weeksInPriorMonths
+  if (weekInMonth < 1) weekInMonth = 1
+
+  if (years === 0) {
+    return `Month ${month}, Week ${weekInMonth}`
+  }
+  
+  return `Year ${years}, Month ${month}, Week ${weekInMonth}`
+}
+
 const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
   if (!active || !payload || !payload.length) return null
 
   const point = payload[0].payload
-  let timeLabel = 'Start'
-
-  if (label && label > 0) {
-    const years = Math.floor(label)
-    const fraction = label - years
-    const months = Math.round(fraction * 12)
-    
-    // Logic: If close to a full month, show Month. Else show Week.
-    if (Math.abs(fraction * 12 - months) < 0.05) {
-      if (years === 0) timeLabel = `Month ${months}`
-      else if (months === 0) timeLabel = `Year ${years}`
-      else timeLabel = `Year ${years}, Month ${months}`
-    } else {
-      const weeks = Math.round(fraction * 52)
-      if (years === 0) timeLabel = `Week ${weeks}`
-      else timeLabel = `Year ${years}, Week ${weeks}`
-    }
-  }
+  const timeLabel = formatTooltipLabel(label ?? 0)
 
   const rows = [
     { key: 'p90', value: point.p90 },
@@ -109,22 +139,26 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
     return data[data.length - 1].year
   }, [data])
 
+  /* ------------------------------------------------------------------ */
+  /* Smart Ticks Logic                                                  */
+  /* ------------------------------------------------------------------ */
+
   const customTicks = useMemo(() => {
     if (!maxYear) return [0]
     
-    // Case 1: Very Short (<= 6 months) -> Show Weeks
+    // Case 1: Very Short (<= 0.5 years / 6 months) -> Weekly ticks
     if (maxYear <= 0.5) {
       const totalWeeks = Math.ceil(maxYear * 52)
       return Array.from({ length: totalWeeks + 1 }, (_, i) => i / 52)
     }
 
-    // Case 2: Short (<= 2 years) -> Show Months
+    // Case 2: Short Duration (<= 3 years) -> Monthly ticks
     if (maxYear <= 3) {
       const totalMonths = Math.ceil(maxYear * 12)
       return Array.from({ length: totalMonths + 1 }, (_, i) => i / 12)
     }
 
-    // Case 3: Standard -> Smart Intervals
+    // Case 3: Smart Interval
     const targetTickCount = 15
     const rawInterval = maxYear / targetTickCount
     
@@ -140,12 +174,13 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
       ticks.push(maxYear)
     }
     
+    // Filter out 0 (Start) to match analytics style if desired, 
+    // though usually main chart keeps Start. Let's keep Start for main chart context.
     return ticks
   }, [maxYear])
 
   const formatXAxis = (value: number) => {
-    if (value === 0) return 'Start'
-    
+    if (value === 0) return 'Month 1'
     const isInteger = Math.abs(value % 1) < 0.001
 
     if (maxYear <= 0.5) {
@@ -153,12 +188,17 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
       return `Week ${weeks}`
     }
 
-    if (maxYear <= 2) {
+    if (maxYear <= 3) {
       if (isInteger) return `Year ${Math.round(value)}`
       const years = Math.floor(value)
       const months = Math.round((value - years) * 12)
-      if (years === 0) return `Month ${months}`
-      return `Yr ${years} M ${months}`
+      
+      // Shift month logic for axis labels too
+      const displayMonth = months + 1
+      if (displayMonth > 12) return `Year ${years + 1}`
+
+      if (years === 0) return `Month ${displayMonth}`
+      return `Yr ${years} M ${displayMonth}`
     }
 
     if (!isInteger) return ''
