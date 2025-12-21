@@ -29,7 +29,10 @@ export function GrowthMode() {
     frequency: 'monthly',
     targetValue: 500000,
     inflationAdjustment: 2.5,
-    excludeInflationAdjustment: true
+    excludeInflationAdjustment: true,
+    taxEnabled: false,
+    taxRate: 0,
+    taxType: 'capital_gains'
   })
 
   const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('growth-show-monte-carlo', false)
@@ -101,9 +104,6 @@ export function GrowthMode() {
       deterministicParams: state,
       params: state, // legacy compatibility
       showFullPrecision,
-      // Note: If you want to share specific MC params/seeds, they need to be lifted up 
-      // from the MonteCarloSimulator or saved to a context. 
-      // Currently, this shares the mode switch but defaults to new random seeds.
     }
 
     // Legacy encoding method: encodeURIComponent -> btoa
@@ -156,7 +156,7 @@ export function GrowthMode() {
     // 1. Summary Sheet
     const wsSummary = workbook.addWorksheet('Summary')
     wsSummary.columns = [
-      { header: 'Key', key: 'Key', width: 20 },
+      { header: 'Key', key: 'Key', width: 25 },
       { header: 'Value', key: 'Value', width: 20 },
     ]
 
@@ -169,10 +169,31 @@ export function GrowthMode() {
       { Key: 'Frequency', Value: state.frequency },
       { Key: 'Inflation Adjustment %', Value: state.inflationAdjustment },
       { Key: 'Target Value', Value: roundToCents(state.targetValue) || 'N/A' },
-      { Key: 'Final Value', Value: roundToCents(calculation.finalValue) },
       { Key: 'Total Contributions', Value: roundToCents(calculation.totalContributions) },
-      { Key: 'Total Profit', Value: roundToCents(calculation.totalProfit) },
+      { Key: 'Total Profit (Gross)', Value: roundToCents(calculation.totalProfit) },
+      { Key: 'Final Value (Gross)', Value: roundToCents(calculation.finalValue) },
     ]
+
+    // Add Tax info if enabled
+    if (state.taxEnabled) {
+      const isIncome = state.taxType === 'income'
+      summaryRows.push(
+        { Key: 'Tax Enabled', Value: 'Yes' },
+        { Key: 'Tax Rate', Value: `${state.taxRate}%` },
+        { Key: 'Tax Type', Value: isIncome ? 'Annual (Income)' : 'Deferred (Capital Gains)' }
+      )
+      
+      if (isIncome) {
+         // Income Tax Mode: Taxes paid annually, final value is net
+         summaryRows.push({ Key: 'Total Tax Paid', Value: roundToCents(calculation.totalTaxPaid) })
+         summaryRows.push({ Key: 'Final Value (Net)', Value: roundToCents(calculation.finalValue) })
+      } else {
+         // Capital Gains Mode: Taxes deferred until end
+         summaryRows.push({ Key: 'Est. Tax Liability', Value: roundToCents(calculation.totalDeferredTax) })
+         summaryRows.push({ Key: 'Final Value (Net)', Value: roundToCents(calculation.finalValueNet) })
+      }
+    }
+
     wsSummary.addRows(summaryRows)
 
     // 2. Data Sheet

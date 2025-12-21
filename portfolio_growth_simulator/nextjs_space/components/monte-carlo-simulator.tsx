@@ -9,6 +9,8 @@ import ExcelJS from 'exceljs'
 import { roundToCents } from '@/lib/utils'
 import { toast } from 'sonner'
 import LZString from 'lz-string'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { AlertCircle } from 'lucide-react'
 import type { SimulationParams, SharePayload } from '@/lib/types'
 
 interface MonteCarloSimulatorProps {
@@ -43,6 +45,18 @@ export function MonteCarloSimulator({
   } = useMonteCarlo(mode, initialValues, initialRngSeed, initialMCParams)
 
   const [exportState, setExportState] = useState<ExportState>('idle')
+
+  // NEW: Track the parameters used for the last successful run to detect changes
+  const [lastRunParamsStr, setLastRunParamsStr] = useState<string>(() => JSON.stringify(params))
+
+  // NEW: Determine if current inputs differ from the results on screen
+  const isOutdated = results && JSON.stringify(params) !== lastRunParamsStr
+
+  const handleRunSimulation = () => {
+    // Sync the "Last Run" params with current params when user clicks Run
+    setLastRunParamsStr(JSON.stringify(params))
+    runSimulation(undefined, `monte-carlo-${Date.now()}-${Math.random()}`)
+  }
 
   const buildShareUrl = () => {
     if (typeof window === 'undefined') return ''
@@ -155,8 +169,8 @@ export function MonteCarloSimulator({
     ]
     wsSummary.addRows(summaryRows)
 
-    // 2. Yearly Percentiles
-    const wsPercentiles = workbook.addWorksheet('Yearly Percentiles')
+    // 2. Percentiles
+    const wsPercentiles = workbook.addWorksheet('Percentiles')
     wsPercentiles.columns = [
       { header: 'Year', key: 'Year', width: 8 },
       { header: 'P10', key: 'P10', width: 16 },
@@ -166,7 +180,7 @@ export function MonteCarloSimulator({
       { header: 'P90', key: 'P90', width: 16 },
     ]
     const percentileRows = (chartData ?? []).map((row: any) => ({
-      Year: row.year,
+      Year: Number(row.year.toFixed(2)),
       P10: roundToCents(row.p10),
       P25: roundToCents(row.p25),
       'Median (P50)': roundToCents(row.p50),
@@ -287,6 +301,9 @@ export function MonteCarloSimulator({
   const handleExportExcel = () => {
     triggerHaptic('light')
     setExportState('excel')
+    
+    // Sync params for the export run
+    setLastRunParamsStr(JSON.stringify(params))
 
     setTimeout(() => {
       runSimulation(undefined, undefined, undefined, (newResults) => {
@@ -302,6 +319,9 @@ export function MonteCarloSimulator({
     triggerHaptic('light')
     if (typeof window !== 'undefined') {
       setExportState('pdf')
+      
+      // Sync params for the pdf export run
+      setLastRunParamsStr(JSON.stringify(params))
 
       setTimeout(() => {
         runSimulation(undefined, undefined, undefined, () => {
@@ -323,9 +343,19 @@ export function MonteCarloSimulator({
         profile={profile}
         setProfile={setProfile}
         isSimulating={isSimulating}
-        onRun={() => runSimulation(undefined, `monte-carlo-${Date.now()}-${Math.random()}`)}
+        onRun={handleRunSimulation}
         presetProfiles={PRESET_PROFILES}
       />
+      
+      {isOutdated && results && !isSimulating && (
+        <Alert className="bg-yellow-500/10 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
+           <AlertCircle className="h-4 w-4" />
+           <AlertTitle>Results Outdated</AlertTitle>
+           <AlertDescription>
+             Your parameters have changed. Please run the simulation again to see updated results.
+           </AlertDescription>
+        </Alert>
+      )}
 
       {results && (
         <MonteCarloResults

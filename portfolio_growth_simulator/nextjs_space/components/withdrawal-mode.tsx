@@ -28,7 +28,9 @@ export function WithdrawalMode() {
     periodicWithdrawal: 3000,
     inflationAdjustment: 2.5,
     frequency: 'monthly',
-    excludeInflationAdjustment: false
+    excludeInflationAdjustment: false,
+    taxEnabled: false,
+    taxRate: 0
   })
 
   const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('withdrawal-show-monte-carlo', false)
@@ -148,7 +150,7 @@ export function WithdrawalMode() {
     // 1. Summary Sheet
     const wsSummary = workbook.addWorksheet('Summary')
     wsSummary.columns = [
-      { header: 'Key', key: 'Key', width: 20 },
+      { header: 'Key', key: 'Key', width: 25 },
       { header: 'Value', key: 'Value', width: 20 },
     ]
 
@@ -161,28 +163,55 @@ export function WithdrawalMode() {
       { Key: 'Inflation Adj %', Value: state.inflationAdjustment },
       { Key: 'Frequency', Value: state.frequency },
       { Key: 'Ending Balance', Value: roundToCents(calculation.endingBalance) },
-      { Key: 'Total Withdrawn', Value: roundToCents(calculation.totalWithdrawn) },
+      { Key: 'Total Withdrawn (Gross)', Value: roundToCents(calculation.totalWithdrawn) },
       { Key: 'Sustainable', Value: calculation.isSustainable ? 'Yes' : 'No' },
     ]
+
+    if (state.taxEnabled) {
+      summaryRows.push(
+        { Key: 'Tax Enabled', Value: 'Yes' },
+        { Key: 'Income Tax Rate', Value: `${state.taxRate}%` },
+        { Key: 'Total Tax Paid', Value: roundToCents(calculation.totalTaxPaid) },
+        { Key: 'Total Withdrawn (Net)', Value: roundToCents(calculation.totalWithdrawnNet) }
+      )
+    }
+
     wsSummary.addRows(summaryRows)
 
     // 2. Data Sheet
     const wsData = workbook.addWorksheet('Balance By Year')
-    wsData.columns = [
+    
+    // Define columns
+    const columns = [
       { header: 'Year', key: 'Year', width: 10 },
       { header: 'Starting Balance', key: 'Starting Balance', width: 20 },
-      { header: 'Withdrawals', key: 'Withdrawals', width: 20 },
-      { header: 'Ending Balance', key: 'Ending Balance', width: 20 },
-      { header: 'Sustainable', key: 'Sustainable', width: 15 },
+      { header: 'Withdrawals (Gross)', key: 'Withdrawals', width: 20 },
     ]
 
-    const excelData = calculation.yearData.map((row) => ({
-      Year: row.year,
-      'Starting Balance': roundToCents(row.startingBalance),
-      Withdrawals: roundToCents(row.withdrawals),
-      'Ending Balance': roundToCents(row.endingBalance),
-      Sustainable: row.isSustainable ? 'Yes' : 'No',
-    }))
+    if (state.taxEnabled) {
+      columns.push({ header: 'Net Income', key: 'Net Income', width: 20 })
+    }
+
+    columns.push(
+      { header: 'Ending Balance', key: 'Ending Balance', width: 20 },
+      { header: 'Sustainable', key: 'Sustainable', width: 15 }
+    )
+    
+    wsData.columns = columns
+
+    const excelData = calculation.yearData.map((row) => {
+      const dataRow: any = {
+        Year: row.year,
+        'Starting Balance': roundToCents(row.startingBalance),
+        'Withdrawals': roundToCents(row.withdrawals),
+        'Ending Balance': roundToCents(row.endingBalance),
+        Sustainable: row.isSustainable ? 'Yes' : 'No',
+      }
+      if (state.taxEnabled) {
+        dataRow['Net Income'] = roundToCents(row.netIncome)
+      }
+      return dataRow
+    })
     wsData.addRows(excelData)
 
     // Generate and Download

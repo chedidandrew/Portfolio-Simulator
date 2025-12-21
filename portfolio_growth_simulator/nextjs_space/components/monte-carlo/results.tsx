@@ -100,6 +100,23 @@ export function MonteCarloResults({
   }, [params, mode])
 
   if (!results) return null
+  
+  const taxEnabled = params.taxEnabled
+  
+  // Adjusted Tax Info Label Logic
+  let taxInfo = ''
+  if (taxEnabled) {
+    if (mode === 'growth') {
+      taxInfo = params.taxType === 'income' 
+        ? '(After Annual Tax Drag)' 
+        : '(Net of Deferred Tax)'
+    } else {
+       // Withdrawal mode: Tax is accounted for via gross-up.
+       // We hide the label here because the input is explicitly "Net Spending",
+       // so the results (Probability of Success, etc.) are already intuitively "Net" capabilities.
+       taxInfo = '' 
+    }
+  }
 
   return (
     <>
@@ -108,7 +125,7 @@ export function MonteCarloResults({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="flex items-center gap-2 shrink-0">
               <Dices className="h-5 w-5 text-violet-500" />
-              Simulation Results
+              Simulation Results {taxInfo && <span className="text-xs font-normal text-muted-foreground ml-1">{taxInfo}</span>}
             </CardTitle>
 
             <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 text-xs sm:text-sm print:hidden">

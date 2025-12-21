@@ -39,60 +39,54 @@ export function performMonteCarloSimulation(
     inflationAdjustment = 0,
     numPaths,
     portfolioGoal,
+    taxEnabled,
+    taxRate = 0,
+    taxType = 'capital_gains'
   } = params
 
-  // 1. CPU BUDGET (Physics Resolution)
-  // We cap total math operations to ensure the loop finishes in ~2-3 seconds.
-  // Standard benchmark: ~100M ops per second on modern JS engines.
   const MAX_PHYSICS_ITERATIONS = 100_000_000 
-  
-  // Calculate potential operations for different resolutions
   const opsWeekly = numPaths * duration * 52
   const opsMonthly = numPaths * duration * 12
 
-  let timeStepsPerYear = 52 // Default: Weekly (Highest fidelity)
-
+  let timeStepsPerYear = 52 
   if (opsWeekly > MAX_PHYSICS_ITERATIONS) {
-    // If weekly is too heavy, try Monthly
-    if (opsMonthly > MAX_PHYSICS_ITERATIONS) {
-      // If monthly is STILL too heavy (e.g. 100k paths * 200 years = 240M ops),
-      // switch to Annual math (Lowest fidelity, highest speed).
-      timeStepsPerYear = 1
-    } else {
-      timeStepsPerYear = 12
-    }
+    if (opsMonthly > MAX_PHYSICS_ITERATIONS) timeStepsPerYear = 1
+    else timeStepsPerYear = 12
   }
 
-  // 2. MEMORY & CHART BUDGET (Data Recording Resolution)
   const MAX_TOTAL_DATA_POINTS = 10_000_000
   const MAX_CHART_STEPS = 500
-
   const totalSimulationSteps = Math.floor(duration * timeStepsPerYear)
   const memoryAllowedSteps = Math.floor(MAX_TOTAL_DATA_POINTS / numPaths)
-  
-  // Calculate recording frequency
   const targetSteps = Math.max(2, Math.min(memoryAllowedSteps, MAX_CHART_STEPS))
   let recordFrequency = Math.ceil(totalSimulationSteps / targetSteps)
   if (recordFrequency < 1) recordFrequency = 1
 
-  // -------------------------------
-
   const dt = 1 / timeStepsPerYear
   const totalTimeSteps = totalSimulationSteps
 
-  const r = expectedReturn / 100
+  let effectiveReturn = expectedReturn
+  if (mode === 'growth' && taxEnabled && taxType === 'income') {
+    effectiveReturn = expectedReturn * (1 - taxRate / 100)
+  }
+
+  // Consistent Rate Conversion (Log Return derived from Effective Annual)
+  const r = effectiveReturn / 100
   const sigma = volatility / 100
   const mu = Math.log(1 + r)
   const drift = mu * dt
   const diffusion = sigma * Math.sqrt(dt)
   
-  // Adjust cashflow based on the decided time step
-  // e.g. if Monthly input ($1k) -> Annual ($12k) -> Weekly ($230) or Monthly ($1k) or Annual ($12k)
-  const annualCashflow = cashflowFrequency === 'monthly' 
-    ? cashflowAmount * 12 
-    : cashflowAmount
-  
-  let cashflowPerStep = annualCashflow / timeStepsPerYear
+  let annualBaseCashflow = cashflowFrequency === 'monthly' ? cashflowAmount * 12 : cashflowAmount
+
+  // FIX: Tax Rate Edge Case Safety (Consistent with Withdrawal Engine)
+  if (mode === 'withdrawal' && taxEnabled) {
+     let t = taxRate / 100
+     if (t >= 0.99) t = 0.99 // Hard clamp to 99% for safety
+     annualBaseCashflow = annualBaseCashflow / (1 - t)
+  }
+
+  let cashflowPerStep = annualBaseCashflow / timeStepsPerYear
   
   const inflationFactor = 1 + inflationAdjustment / 100
   const rng = seedrandom(seed ?? `monte-carlo-${Date.now()}-${Math.random()}`)
@@ -106,15 +100,8 @@ export function performMonteCarloSimulation(
 
   const numRecordedSteps = Math.floor(totalTimeSteps / recordFrequency)
   
-  const stepDistributions: number[][] = Array.from(
-    { length: numRecordedSteps + 1 },
-    () => []
-  )
-
-  const stepCAGRs: number[][] = Array.from(
-    { length: numRecordedSteps + 1 },
-    () => []
-  )
+  const stepDistributions: number[][] = Array.from({ length: numRecordedSteps + 1 }, () => [])
+  const stepCAGRs: number[][] = Array.from({ length: numRecordedSteps + 1 }, () => [])
 
   const endingValues: number[] = []
   const maxDrawdowns: number[] = []
@@ -133,21 +120,24 @@ export function performMonteCarloSimulation(
     let peak = currentValue
     let maxDrawdownForPath = 0
 
-    // Store Time 0
     stepDistributions[0].push(currentValue)
     stepCAGRs[0].push(0)
 
     for (let step = 1; step <= totalTimeSteps; step++) {
       const growthFactor = Math.exp(drift + diffusion * normalRandom())
-      currentValue = currentValue * growthFactor
       pureValue = pureValue * growthFactor 
 
-      if (mode === 'growth') {
-        currentValue += currentCashflowPerStep
-        totalInvestedSoFar += currentCashflowPerStep
-      } else {
+      // FIX: Sequence of Returns Logic for Volatility=0 Equivalence
+      if (mode === 'withdrawal') {
+        // Withdrawal Mode: Withdraw THEN Grow
         currentValue -= currentCashflowPerStep
         currentValue = Math.max(0, currentValue)
+        currentValue = currentValue * growthFactor
+      } else {
+        // Growth Mode: Grow THEN Contribute
+        currentValue = currentValue * growthFactor
+        currentValue += currentCashflowPerStep
+        totalInvestedSoFar += currentCashflowPerStep
       }
 
       if (currentValue < lowestValue) lowestValue = currentValue
@@ -157,41 +147,45 @@ export function performMonteCarloSimulation(
         if (dd > maxDrawdownForPath) maxDrawdownForPath = dd
       }
 
-      // Record Data based on Frequency
       if (step % recordFrequency === 0) {
         const recordIndex = step / recordFrequency
         stepDistributions[recordIndex].push(currentValue)
-
         const timeInYears = step / timeStepsPerYear
         const cagr = Math.pow(pureValue / initialValue, 1 / timeInYears) - 1
         stepCAGRs[recordIndex].push(cagr * 100)
       }
 
-      // Apply inflation annually
-      // Since `timeStepsPerYear` changes dynamically, this logic remains correct.
-      // If Weekly -> every 52 steps. If Monthly -> every 12 steps. If Annual -> every 1 step.
       if (step % timeStepsPerYear === 0) {
         currentCashflowPerStep *= inflationFactor
       }
     }
 
-    endingValues.push(currentValue)
+    // --- TAX LOGIC: DEFERRED CAPITAL GAINS (Growth Mode) ---
+    let finalValueEffective = currentValue
+    if (mode === 'growth' && taxEnabled && taxType === 'capital_gains') {
+      const profit = currentValue - totalInvestedSoFar
+      if (profit > 0) {
+        finalValueEffective = currentValue - (profit * (taxRate / 100))
+      }
+    }
+
+    endingValues.push(finalValueEffective)
     lowestValues.push(lowestValue)
     maxDrawdowns.push(maxDrawdownForPath)
 
-    if (portfolioGoal && currentValue >= portfolioGoal) pathsReachingGoal++
-    if (currentValue > totalInvestedSoFar) pathsProfitable++
-    if (currentValue > 0) pathsSolvent++
+    if (portfolioGoal && finalValueEffective >= portfolioGoal) pathsReachingGoal++
+    if (finalValueEffective > totalInvestedSoFar) pathsProfitable++
+    if (currentValue > 0) pathsSolvent++ 
   }
 
+  // ... (Stats Calculation)
+  
   const sortedEndingValues = [...endingValues].sort((a, b) => a - b)
 
   const annualReturnsData = []
-  
   for (let i = 1; i <= numRecordedSteps; i++) {
     const cagrs = stepCAGRs[i]
     cagrs.sort((a, b) => a - b)
-
     const count5 = cagrs.filter((v) => v >= 5).length
     const count8 = cagrs.filter((v) => v >= 8).length
     const count10 = cagrs.filter((v) => v >= 10).length
@@ -200,7 +194,6 @@ export function performMonteCarloSimulation(
     const count20 = cagrs.filter((v) => v >= 20).length
     const count25 = cagrs.filter((v) => v >= 25).length
     const count30 = cagrs.filter((v) => v >= 30).length
-
     const currentStepNumber = i * recordFrequency
     const yearValue = currentStepNumber / timeStepsPerYear
 
@@ -211,7 +204,6 @@ export function performMonteCarloSimulation(
       median: calculatePercentile(cagrs, 0.5),
       p75: calculatePercentile(cagrs, 0.75),
       p90: calculatePercentile(cagrs, 0.9),
-
       prob5: (count5 / numPaths) * 100,
       prob8: (count8 / numPaths) * 100,
       prob10: (count10 / numPaths) * 100,
@@ -226,7 +218,7 @@ export function performMonteCarloSimulation(
   const investmentData = []
   let simInvInitial = initialValue
   let simInvContrib = 0
-  let simInvCashflow = cashflowPerStep 
+  let simChartCashflow = mode === 'growth' ? cashflowPerStep : 0
 
   investmentData.push({
     year: 0,
@@ -235,10 +227,8 @@ export function performMonteCarloSimulation(
     total: simInvInitial,
   })
 
-  // Deterministic replay using the same dynamic step size
   for (let step = 1; step <= totalTimeSteps; step++) {
-    const contribution = mode === 'growth' ? simInvCashflow : 0
-    simInvContrib += contribution
+    simInvContrib += simChartCashflow
 
     if (step % recordFrequency === 0) {
       investmentData.push({
@@ -248,9 +238,8 @@ export function performMonteCarloSimulation(
         total: simInvInitial + simInvContrib,
       })
     }
-
     if (step % timeStepsPerYear === 0) {
-      simInvCashflow *= inflationFactor
+      simChartCashflow *= inflationFactor
     }
   }
 
@@ -312,9 +301,7 @@ export function performMonteCarloSimulation(
   const worstDrawdown = Math.max(...maxDrawdowns)
   const recommendLogDrawdown = medianDrawdown < 0.1 && worstDrawdown > 0.6
 
-  const goalProbability = portfolioGoal
-    ? (pathsReachingGoal / numPaths) * 100
-    : 0
+  const goalProbability = portfolioGoal ? (pathsReachingGoal / numPaths) * 100 : 0
   const profitableRate = (pathsProfitable / numPaths) * 100
   const solventRate = (pathsSolvent / numPaths) * 100
 

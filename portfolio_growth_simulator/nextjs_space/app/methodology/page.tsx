@@ -179,13 +179,13 @@ export default function MethodologyPage() {
               <div className="space-y-3 p-4 rounded-lg bg-muted/40">
                 <div className="flex items-center gap-2 font-semibold text-foreground">
                   <Calculator className="h-4 w-4 text-emerald-500" />
-                  The Math: Nominal Rate (APR)
+                  The Math: Effective Rate (APY)
                 </div>
                 <p className="text-sm leading-relaxed">
-                  The growth tool uses the <strong>Nominal Annual Rate</strong> divided by 12. This is the industry standard used by banks and online calculators.
+                  The growth tool uses the <strong>Effective Annual Rate</strong>. If you input 8% return, math ensures you get exactly 8% growth by year-end, not a penny more.
                 </p>
                 <div className="mt-2 rounded-md border bg-background/40 px-4 py-3 flex justify-center overflow-x-auto">
-                    <BlockMath math={String.raw`r_m = \frac{r_{\text{annual}}}{12}`} />
+                    <BlockMath math={String.raw`r_m = (1 + r_{\text{annual}})^{\tfrac{1}{12}} - 1`} />
                 </div>
               </div>
 
@@ -327,7 +327,7 @@ export default function MethodologyPage() {
                     <li className="flex gap-3">
                         <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Vₜ</span>
                         <span>
-                        Your portfolio value at the start of the period (for example, this month).
+                        Your portfolio value at the start of the period (for example, this step).
                         </span>
                     </li>
 
@@ -355,21 +355,21 @@ export default function MethodologyPage() {
                     <li className="flex gap-3">
                         <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Δₜ</span>
                         <span>
-                        Time step. In the simulator this is one month, expressed as a fraction of a year.
+                        Time step. In the simulator this is one calculation step (weekly, monthly, or annual), expressed as a fraction of a year.
                         </span>
                     </li>
 
                     <li className="flex gap-3">
                         <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Z</span>
                         <span>
-                        A random number drawn from a normal distribution. This is what makes each month unpredictable.
+                        A random number drawn from a normal distribution. This is what makes each step unpredictable.
                         </span>
                     </li>
 
                     <li className="flex gap-3">
                         <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Logic</span>
                         <span>
-                        Each month starts with your expected growth, then randomness is added to simulate real market behavior.
+                        Each step starts with your expected growth, then randomness is added to simulate real market behavior.
                         </span>
                     </li>
 
@@ -403,7 +403,7 @@ export default function MethodologyPage() {
                   <div>
                     <span className="font-medium text-foreground block text-sm">Gaussian Distribution</span>
                     <p className="text-xs mt-1">
-                        Portfolio Simulator uses a statistical model (Geometric Brownian Motion) to generate random monthly returns based on your inputs.{' '}
+                        Portfolio Simulator uses a statistical model (Geometric Brownian Motion) to generate random step returns based on your inputs.{` `}
                         <a
                             href="https://en.wikipedia.org/wiki/Geometric_Brownian_motion"
                             target="_blank"
@@ -441,7 +441,7 @@ export default function MethodologyPage() {
             >
                 <ul className="list-disc pl-5 space-y-2 text-foreground/80">
                 <li>
-                    <strong>Pre-Tax Results:</strong> Simulations do not account for capital gains tax or income tax. 
+                    <strong>Taxes:</strong> Simulations can optionally include tax modeling, but they are simplified and may not match your exact real-world tax situation.
                 </li>
                 <li>
                     <strong>Inflation on Cashflows:</strong> The simulator assumes your monthly contributions/withdrawals grow annually by the inflation rate to maintain purchasing power, unless disabled in settings.

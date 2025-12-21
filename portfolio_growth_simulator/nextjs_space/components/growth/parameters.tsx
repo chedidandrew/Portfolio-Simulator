@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { DollarSign } from 'lucide-react'
+import { DollarSign, Scale } from 'lucide-react'
 import { GrowthState } from '@/lib/types'
 
 interface GrowthParametersProps {
@@ -179,6 +179,66 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
                 </Label>
               </div>
             </div>
+          </div>
+          
+          {/* Tax Configuration */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="tax-enabled" className="flex items-center gap-2">
+                <Scale className="h-4 w-4" />
+                Enable Taxes
+              </Label>
+              <Switch
+                id="tax-enabled"
+                checked={state.taxEnabled ?? false}
+                onCheckedChange={(checked) => {
+                  // Smart Default: Set 15% for Cap Gains, 25% for Income if currently 0
+                  const currentRate = state.taxRate ?? 0
+                  const newRate = checked && currentRate === 0 
+                    ? (state.taxType === 'income' ? 25 : 15) 
+                    : currentRate
+                    
+                  setState({ ...state, taxEnabled: checked, taxRate: newRate })
+                }}
+              />
+            </div>
+            
+            {state.taxEnabled && (
+               <div className="pt-2 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                 <div className="space-y-1">
+                   <Label htmlFor="tax-rate" className="text-xs">Tax Rate (%)</Label>
+                   <NumericInput
+                     id="tax-rate"
+                     value={state.taxRate ?? 0}
+                     onChange={(value) => setState({ ...state, taxRate: Math.max(0, Math.min(100, value)) })}
+                     min={0}
+                     max={100}
+                   />
+                 </div>
+                 <div className="space-y-1">
+                   <Label htmlFor="tax-type" className="text-xs">Tax Type</Label>
+                   <Select
+                      value={state.taxType ?? 'capital_gains'}
+                      onValueChange={(value: any) => setState({ ...state, taxType: value })}
+                    >
+                      <SelectTrigger id="tax-type" className="h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="capital_gains">Deferred (Cap Gains)</SelectItem>
+                        <SelectItem value="income">Annual (Income)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                 </div>
+               </div>
+            )}
+            {state.taxEnabled && (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {state.taxType === 'income' 
+                    ? 'Reduces annual return by tax rate.' 
+                    : 'Deducts tax from total profit at end.'}
+                </p>
+            )}
           </div>
 
           {/* Target Value */}

@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { DollarSign } from 'lucide-react'
+import { DollarSign, Scale } from 'lucide-react'
 import { WithdrawalState } from '@/lib/types'
 
 interface WithdrawalParametersProps {
@@ -91,7 +91,9 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
 
           {/* Withdrawal Amount */}
           <div className="space-y-2">
-            <Label htmlFor="periodic-withdrawal">Withdrawal Amount ($)</Label>
+            <Label htmlFor="periodic-withdrawal">
+               {state.taxEnabled ? 'Target Withdrawal (Net/After-Tax) ($)' : 'Withdrawal Amount ($)'}
+            </Label>
             <NumericInput
               id="periodic-withdrawal"
               value={state.periodicWithdrawal ?? 0}
@@ -107,6 +109,11 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               max={1_000_000_000_000_000_000}
               maxErrorMessage="Speedrunning bankruptcy? :)"
             />
+            {state.taxEnabled && (
+                <p className="text-[10px] text-muted-foreground pt-1">
+                   We gross up this amount by the tax rate to calculate the actual portfolio drain.
+                </p>
+            )}
           </div>
           
           {/* Inflation Adjustment - With Toggle */}
@@ -151,6 +158,40 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
                 </Label>
               </div>
             </div>
+          </div>
+          
+          {/* Tax Configuration */}
+          <div className="space-y-2">
+             <div className="flex items-center justify-between">
+              <Label htmlFor="tax-enabled-w" className="flex items-center gap-2">
+                <Scale className="h-4 w-4" />
+                Enable Taxes
+              </Label>
+              <Switch
+                id="tax-enabled-w"
+                checked={state.taxEnabled ?? false}
+                onCheckedChange={(checked) => {
+                  const currentRate = state.taxRate ?? 0
+                  const newRate = checked && currentRate === 0 ? 20 : currentRate
+                  setState({ ...state, taxEnabled: checked, taxRate: newRate })
+                }}
+              />
+            </div>
+
+            {state.taxEnabled && (
+               <div className="pt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                 <div className="space-y-1">
+                   <Label htmlFor="tax-rate-w" className="text-xs">Income Tax Rate on Withdrawals (%)</Label>
+                   <NumericInput
+                     id="tax-rate-w"
+                     value={state.taxRate ?? 0}
+                     onChange={(value) => setState({ ...state, taxRate: Math.max(0, Math.min(99, value)) })}
+                     min={0}
+                     max={99}
+                   />
+                 </div>
+               </div>
+            )}
           </div>
 
           {/* Frequency */}

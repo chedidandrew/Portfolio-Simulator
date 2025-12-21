@@ -38,6 +38,8 @@ export function WithdrawalResults({
     endingBalance, 
     endingBalanceInTodaysDollars,
     totalWithdrawn, 
+    totalWithdrawnNet,
+    totalTaxPaid,
     totalWithdrawnInTodaysDollars,
     isSustainable, 
     yearsUntilZero, 
@@ -59,6 +61,8 @@ export function WithdrawalResults({
 
     return formatted
   }
+  
+  const showTax = totalTaxPaid > 0
 
   return (
     <>
@@ -154,7 +158,7 @@ export function WithdrawalResults({
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Primary Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className={`grid grid-cols-1 gap-4 ${showTax ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
               <MetricCard
                 label="Ending Balance"
                 value={renderFormattedResult(endingBalance)}
@@ -166,11 +170,20 @@ export function WithdrawalResults({
               />
 
               <MetricCard
-                label="Total Withdrawn"
-                value={renderFormattedResult(totalWithdrawn)}
+                label={showTax ? "Net Withdrawn (After Tax)" : "Total Withdrawn"}
+                value={renderFormattedResult(showTax ? totalWithdrawnNet : totalWithdrawn)}
                 colorClass="text-blue-500"
                 bgClass="bg-gradient-to-br from-blue-500/10 to-blue-500/5"
               />
+
+              {showTax && (
+                 <MetricCard
+                  label="Total Tax Paid"
+                  value={renderFormattedResult(totalTaxPaid)}
+                  colorClass="text-orange-500"
+                  bgClass="bg-gradient-to-br from-orange-500/10 to-orange-500/5"
+                />
+              )}
 
               <MetricCard
                 label="Portfolio Lasts"

@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { NumericInput } from '@/components/ui/numeric-input'
-import { DollarSign, Zap } from 'lucide-react'
+import { DollarSign, Zap, Scale } from 'lucide-react'
 import { SimulationParams } from '@/lib/types'
 
 interface MonteCarloParametersProps {
@@ -30,6 +31,12 @@ export function MonteCarloParameters({
   presetProfiles
 }: MonteCarloParametersProps) {
   
+  const getCashflowLabel = () => {
+    if (mode === 'growth') return 'Monthly Contribution'
+    if (params.taxEnabled) return 'Monthly Spending (Net/After-Tax)'
+    return 'Monthly Withdrawal'
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -182,7 +189,7 @@ export function MonteCarloParameters({
             {/* Cashflow (Contribution or Withdrawal) */}
             <div className="space-y-2">
               <Label htmlFor="mc-cashflow">
-                {mode === 'growth' ? 'Monthly Contribution' : 'Monthly Withdrawal'} ($)
+                {getCashflowLabel()} ($)
               </Label>
               <NumericInput
                 id="mc-cashflow"
@@ -228,6 +235,78 @@ export function MonteCarloParameters({
                 max={100}
                 maxErrorMessage="Easy there, Zimbabwe :)"
               />
+            </div>
+
+            {/* Tax Options */}
+            <div className="space-y-2 sm:col-span-2">
+               <div className="flex items-center justify-between">
+                <Label htmlFor="mc-tax-enabled" className="flex items-center gap-2">
+                  <Scale className="h-4 w-4" />
+                  Enable Taxes
+                </Label>
+                <Switch
+                  id="mc-tax-enabled"
+                  checked={params.taxEnabled ?? false}
+                  onCheckedChange={(checked) => {
+                    let newRate = params.taxRate ?? 0
+                    
+                    if (checked && newRate === 0) {
+                      if (mode === 'withdrawal') {
+                        newRate = 20 // Withdrawal Income Tax default
+                      } else {
+                         // Growth defaults
+                        newRate = params.taxType === 'income' ? 25 : 15
+                      }
+                    }
+
+                    setParams({ ...params, taxEnabled: checked, taxRate: newRate })
+                  }}
+                />
+              </div>
+
+              {params.taxEnabled && (
+                <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="space-y-1">
+                    <Label htmlFor="mc-tax-rate" className="text-xs">Tax Rate (%)</Label>
+                    <NumericInput
+                      id="mc-tax-rate"
+                      value={params.taxRate ?? 0}
+                      onChange={(value) => setParams({ ...params, taxRate: Math.max(0, Math.min(99, value)) })}
+                      min={0}
+                      max={99}
+                    />
+                  </div>
+                  {mode === 'growth' && (
+                    <div className="space-y-1">
+                      <Label htmlFor="mc-tax-type" className="text-xs">Tax Type</Label>
+                      <Select
+                          value={params.taxType ?? 'capital_gains'}
+                          onValueChange={(value: any) => setParams({ ...params, taxType: value })}
+                        >
+                          <SelectTrigger id="mc-tax-type" className="h-10">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="capital_gains">Deferred (Cap Gains)</SelectItem>
+                            <SelectItem value="income">Annual (Income)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[10px] text-muted-foreground pt-1">
+                          {params.taxType === 'income' 
+                            ? 'Reduces annual drift by tax rate.' 
+                            : 'Deducts tax from final profit.'}
+                        </p>
+                    </div>
+                  )}
+                  {mode === 'withdrawal' && (
+                    <div className="flex items-center pt-5">
+                       <p className="text-xs text-muted-foreground">
+                         We gross up the withdrawal to give you this Net amount.
+                       </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Portfolio Goal (Growth Mode Only) */}

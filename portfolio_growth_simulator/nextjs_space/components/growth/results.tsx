@@ -33,16 +33,18 @@ export function GrowthResults({
 }: GrowthResultsProps) {
   const {
     finalValue,
+    finalValueNet,
     finalValueInTodaysDollars,
     totalContributions,
     totalProfit,
+    totalDeferredTax,
+    totalTaxPaid,
     yearsToTarget,
     yearData,
   } = data
 
   const isProfitNegative = totalProfit < 0
   
-  // Calculate Return on Investment (ROI)
   const roi = totalContributions > 0 
     ? (totalProfit / totalContributions) * 100 
     : 0
@@ -60,6 +62,15 @@ export function GrowthResults({
 
     return formatted
   }
+
+  // Logic to determine which tax to show
+  const showDeferredTax = totalDeferredTax > 0
+  const showPaidTax = totalTaxPaid > 0
+  const showAnyTax = showDeferredTax || showPaidTax
+
+  // For Capital Gains: Main number is Net.
+  // For Income: Main number is Net (which is same as Gross/FinalValue in this engine structure).
+  const displayValue = showDeferredTax ? finalValueNet : finalValue
 
   return (
     <div className="space-y-6">
@@ -85,10 +96,10 @@ export function GrowthResults({
         </CardHeader>
 
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className={`grid grid-cols-1 gap-4 ${showAnyTax ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
             <MetricCard 
-              label="Final Portfolio Value" 
-              value={formatResult(finalValue)} 
+              label={showDeferredTax ? "Final Value (After Tax)" : "Final Portfolio Value"} 
+              value={formatResult(displayValue)} 
               colorClass="text-primary" 
               bgClass="bg-gradient-to-br from-primary/10 to-primary/5"
             />
@@ -107,6 +118,24 @@ export function GrowthResults({
                 : 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5'
               }
             />
+            
+            {showDeferredTax && (
+               <MetricCard 
+                label="Est. Tax Liability" 
+                value={formatResult(totalDeferredTax)} 
+                colorClass="text-orange-500" 
+                bgClass="bg-gradient-to-br from-orange-500/10 to-orange-500/5"
+              />
+            )}
+
+            {showPaidTax && (
+               <MetricCard 
+                label="Total Tax Paid" 
+                value={formatResult(totalTaxPaid)} 
+                colorClass="text-orange-500" 
+                bgClass="bg-gradient-to-br from-orange-500/10 to-orange-500/5"
+              />
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -153,7 +182,7 @@ export function GrowthResults({
             </motion.div>
           ) : null}
 
-          <GrowthMilestones finalValue={finalValue} />
+          <GrowthMilestones finalValue={displayValue} />
         </CardContent>
       </Card>
 

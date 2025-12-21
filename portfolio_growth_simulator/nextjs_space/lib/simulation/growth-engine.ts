@@ -2,10 +2,13 @@ import { GrowthState } from '@/lib/types'
 
 export interface GrowthProjectionResult {
   finalValue: number
+  finalValueNet: number
   finalValueInTodaysDollars: number
   totalContributions: number
   totalInterest: number
   totalProfit: number
+  totalDeferredTax: number
+  totalTaxPaid: number
   yearData: Array<{
     year: number
     startingValue: number
@@ -25,25 +28,34 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     frequency, 
     inflationAdjustment,
     targetValue,
-    excludeInflationAdjustment // <--- Make sure to destructure this
+    excludeInflationAdjustment,
+    taxEnabled,
+    taxRate = 0,
+    taxType = 'capital_gains'
   } = state
 
-  // --- 1. Engine Configuration ---
   const totalMonths = duration * 12
-  const monthlyRate = (annualReturn / 100) / 12
+  
+  // Tax Logic: If 'income' (Annual), apply tax drag to the return rate
+  let effectiveAnnualReturn = annualReturn
+  if (taxEnabled && taxType === 'income') {
+    effectiveAnnualReturn = annualReturn * (1 - (taxRate / 100))
+  }
+
+  // Consistent: Use Effective Monthly Rate
+  const monthlyRate = Math.pow(1 + effectiveAnnualReturn / 100, 1 / 12) - 1
   const inflationFactor = 1 + (inflationAdjustment / 100)
 
-  // --- 2. Simulation State ---
   let currentBalance = startingBalance
   let totalContributions = startingBalance
   let currentPeriodicAddition = periodicAddition
+  let totalTaxPaid = 0
 
   const yearData = []
   let yearStartBalance = startingBalance
   let yearContributions = 0
   let yearInterest = 0
 
-  // --- 3. Run Simulation ---
   for (let month = 1; month <= totalMonths; month++) {
     const balanceBeforeInterest = currentBalance
     
@@ -51,6 +63,14 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     currentBalance = currentBalance * (1 + monthlyRate)
     const monthlyInterest = currentBalance - balanceBeforeInterest
     yearInterest += monthlyInterest
+
+    if (taxEnabled && taxType === 'income') {
+      // EDGE CASE SAFETY: Clamp tax rate to 99% max for the 'implied tax' division
+      let t = taxRate / 100
+      if (t >= 0.99) t = 0.99
+      const impliedTax = monthlyInterest * (t / (1 - t))
+      totalTaxPaid += impliedTax
+    }
 
     // B. Apply Contributions
     let contributionThisMonth = 0
@@ -65,7 +85,6 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
       yearContributions += contributionThisMonth
     }
 
-    // C. End of Year Processing
     if (month % 12 === 0) {
       yearData.push({
         year: month / 12,
@@ -79,8 +98,6 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
       yearContributions = 0
       yearInterest = 0
 
-      // D. Apply Inflation to Contributions (CONDITIONAL)
-      // Only increase contributions if the user has NOT checked "Exclude Inflation Adjustment"
       if (!excludeInflationAdjustment) {
         currentPeriodicAddition *= inflationFactor
       }
@@ -91,11 +108,16 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
   const totalProfit = finalValue - totalContributions
   const totalInterest = finalValue - totalContributions
 
-  // --- 4. Real Value Calculation ---
-  // Always discount by inflation to show purchasing power, regardless of contribution strategy
-  const finalValueInTodaysDollars = finalValue / Math.pow(1 + inflationAdjustment / 100, duration)
+  let totalDeferredTax = 0
+  if (taxEnabled && taxType === 'capital_gains') {
+    if (totalProfit > 0) {
+      totalDeferredTax = totalProfit * (taxRate / 100)
+    }
+  } 
 
-  // --- 5. Years to Target ---
+  const finalValueNet = finalValue - totalDeferredTax
+  const finalValueInTodaysDollars = finalValueNet / Math.pow(1 + inflationAdjustment / 100, duration)
+
   let yearsToTarget: number | null = null
 
   if (targetValue && targetValue > startingBalance) {
@@ -118,7 +140,6 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
         break
       }
 
-      // Apply inflation to target loop only if enabled
       if (m % 12 === 0 && !excludeInflationAdjustment) {
         tContribution *= inflationFactor
       }
@@ -127,10 +148,13 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
   
   return { 
     finalValue, 
+    finalValueNet,
     finalValueInTodaysDollars,
     totalContributions, 
     totalInterest, 
     totalProfit, 
+    totalDeferredTax,
+    totalTaxPaid,
     yearData, 
     yearsToTarget 
   }

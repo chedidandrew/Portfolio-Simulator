@@ -7,6 +7,10 @@ export interface GrowthState {
   targetValue?: number
   inflationAdjustment: number
   excludeInflationAdjustment?: boolean
+  // Tax Options
+  taxEnabled?: boolean
+  taxRate?: number
+  taxType?: 'capital_gains' | 'income' // capital_gains = deferred (end), income = annual (drag)
 }
 
 export interface WithdrawalState {
@@ -17,6 +21,10 @@ export interface WithdrawalState {
   inflationAdjustment: number
   frequency: 'yearly' | 'quarterly' | 'monthly' | 'weekly'
   excludeInflationAdjustment?: boolean
+  // Tax Options
+  taxEnabled?: boolean
+  taxRate?: number
+  taxType?: 'income' | 'capital_gains' // income = tax on withdrawal, capital_gains = treated as income for simplicity in withdrawal mode
 }
 
 export interface SimulationParams {
@@ -29,6 +37,10 @@ export interface SimulationParams {
   inflationAdjustment?: number
   numPaths: number
   portfolioGoal?: number
+  // Tax Options
+  taxEnabled?: boolean
+  taxRate?: number
+  taxType?: 'capital_gains' | 'income'
 }
 
 export interface SharePayload {
