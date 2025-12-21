@@ -14,7 +14,8 @@ import {
   ChevronDown,
   Percent,
   Scale,
-  HelpCircle
+  HelpCircle,
+  AlertTriangle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -277,6 +278,13 @@ export default function MethodologyPage() {
                     <BlockMath math={String.raw`\text{Real Value} = \frac{\text{Future Value}}{(1 + \text{Inflation Rate})^{\text{Years}}}`} />
                 </div>
               </div>
+
+              <div className="rounded-md bg-pink-500/10 p-3 border border-pink-500/20">
+                <p className="text-xs text-foreground/90">
+                  <strong>Note on Contributions:</strong> By default, the simulator assumes your monthly contributions (or withdrawals) increase annually to match the inflation rate. 
+                  This models the real-world scenario where your salary (and savings capacity) tends to rise with the cost of living.
+                </p>
+              </div>
             </div>
           </MethodologySection>
         </motion.div>
@@ -333,7 +341,7 @@ export default function MethodologyPage() {
                     <li className="flex gap-3">
                         <span className="font-bold text-foreground shrink-0 min-w-[3rem]">μ</span>
                         <span>
-                        Your expected average annual return. If you input 8%, this is the 8%.
+                        Your expected average annual return. <span className="text-muted-foreground italic">(Technically derived as the natural log of your input return: ln(1+r)).</span>
                         </span>
                     </li>
 
@@ -407,9 +415,42 @@ export default function MethodologyPage() {
                     </p>
                   </div>
                 </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-violet-500/10 text-violet-500 text-xs font-bold shrink-0 mt-0.5">4</div>
+                  <div>
+                    <span className="font-medium text-foreground block text-sm">Dynamic Fidelity</span>
+                    <span className="text-xs mt-1">To ensure instant results, the engine intelligently switches between weekly, monthly, or annual calculation steps based on your simulation duration (Dynamic Time-Stepping).</span>
+                  </div>
+                </div>
               </div>
             </div>
           </MethodologySection>
+        </motion.div>
+
+        {/* 5. Limitations */}
+        <motion.div variants={itemVariants}>
+            <MethodologySection 
+                title="Assumptions & Limitations" 
+                icon={AlertTriangle} 
+                description="Important constraints to keep in mind"
+                defaultOpen={false}
+                iconColorClass="text-amber-500"
+                iconWrapperClass="bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/20"
+                className="border-amber-500/20"
+            >
+                <ul className="list-disc pl-5 space-y-2 text-foreground/80">
+                <li>
+                    <strong>Pre-Tax Results:</strong> Simulations do not account for capital gains tax or income tax. 
+                </li>
+                <li>
+                    <strong>Inflation on Cashflows:</strong> The simulator assumes your monthly contributions/withdrawals grow annually by the inflation rate to maintain purchasing power, unless disabled in settings.
+                </li>
+                <li>
+                    <strong>Rebalancing:</strong> The model assumes your portfolio maintains its target allocation and volatility profile constantly without rebalancing fees.
+                </li>
+                </ul>
+            </MethodologySection>
         </motion.div>
 
       </motion.div>
