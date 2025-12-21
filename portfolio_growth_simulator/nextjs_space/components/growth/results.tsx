@@ -15,6 +15,9 @@ import { GrowthProjectionResult } from '@/lib/simulation/growth-engine'
 interface GrowthResultsProps {
   data: GrowthProjectionResult
   targetValue?: number
+  // NEW: Tax props for header label
+  taxEnabled?: boolean
+  taxType?: 'capital_gains' | 'income'
   showFullPrecision: boolean
   setShowFullPrecision: (v: boolean) => void
   onShare: () => void
@@ -25,6 +28,8 @@ interface GrowthResultsProps {
 export function GrowthResults({
   data,
   targetValue,
+  taxEnabled,
+  taxType,
   showFullPrecision,
   setShowFullPrecision,
   onShare,
@@ -72,6 +77,14 @@ export function GrowthResults({
   // For Income: Main number is Net (which is same as Gross/FinalValue in this engine structure).
   const displayValue = showDeferredTax ? finalValueNet : finalValue
 
+  // Header Label Logic
+  let headerLabel = ''
+  if (taxEnabled) {
+    headerLabel = taxType === 'income' 
+      ? '(After Annual Tax Drag)' 
+      : '(Net of Deferred Tax)'
+  }
+
   return (
     <div className="space-y-6">
       <Card className="border-primary/20 print-section">
@@ -79,7 +92,10 @@ export function GrowthResults({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="flex items-center gap-2 shrink-0">
               <TrendingUp className="h-5 w-5 text-primary" />
-              Projected Results
+              <span>
+                Projected Results 
+                {headerLabel && <span className="text-xs font-normal text-muted-foreground ml-1.5">{headerLabel}</span>}
+              </span>
             </CardTitle>
 
             <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 text-xs sm:text-sm print:hidden">
@@ -110,8 +126,8 @@ export function GrowthResults({
               bgClass="bg-gradient-to-br from-blue-500/10 to-blue-500/5"
             />
             <MetricCard
-              label="Total Profit"
-              value={formatResult(totalProfit)}
+              label={showDeferredTax ? "Total Profit (After Tax)" : "Total Profit"}
+              value={formatResult(showDeferredTax ? totalProfit - totalDeferredTax : totalProfit)}
               colorClass={isProfitNegative ? 'text-destructive' : 'text-emerald-500'}
               bgClass={isProfitNegative 
                 ? 'bg-gradient-to-br from-destructive/10 to-destructive/5' 
@@ -144,7 +160,9 @@ export function GrowthResults({
                 <ShoppingCart className="h-4 w-4 text-indigo-500" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">Purchasing Power (Real Value)</p>
+                <p className="text-sm font-medium text-foreground">
+                  {showDeferredTax ? "Purchasing Power (Real Value After Tax)" : "Purchasing Power (Real Value)"}
+                </p>
                 <p className="text-2xl font-bold text-indigo-500 my-1">{formatResult(finalValueInTodaysDollars)}</p>
                 <p className="text-xs text-muted-foreground leading-tight">
                   This is what your final balance would be worth in today&apos;s money, adjusted for inflation.

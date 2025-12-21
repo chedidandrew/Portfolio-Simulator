@@ -276,6 +276,8 @@ export function GrowthMode() {
             <GrowthResults
               data={calculation}
               targetValue={state.targetValue}
+              taxEnabled={state.taxEnabled}
+              taxType={state.taxType}
               showFullPrecision={showFullPrecision}
               setShowFullPrecision={setShowFullPrecision}
               onShare={handleShareLink}
