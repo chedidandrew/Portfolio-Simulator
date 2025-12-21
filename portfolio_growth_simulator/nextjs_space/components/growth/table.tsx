@@ -9,12 +9,32 @@ interface GrowthTableProps {
     year: number
     startingValue: number
     contributions: number
+    interest: number
     endingValue: number
   }>
+  taxEnabled?: boolean
+  taxType?: 'capital_gains' | 'income'
+  taxRate?: number
 }
 
-export function GrowthTable({ data }: GrowthTableProps) {
+export function GrowthTable({ data, taxEnabled, taxType, taxRate }: GrowthTableProps) {
   if (!data || data.length === 0) return null
+
+  const showTaxColumn = !!taxEnabled && taxType === 'income'
+
+  let t = (taxRate || 0) / 100
+  if (t >= 0.99) t = 0.99
+  const taxMultiplier = showTaxColumn ? (t / (1 - t)) : 0
+
+  const totals = data.reduce(
+    (acc, row) => {
+      acc.contributions += row.contributions
+      acc.interest += row.interest
+      if (showTaxColumn) acc.taxPaid += row.interest * taxMultiplier
+      return acc
+    },
+    { contributions: 0, interest: 0, taxPaid: 0 }
+  )
 
   return (
     <Card>
@@ -32,6 +52,10 @@ export function GrowthTable({ data }: GrowthTableProps) {
                 <th className="p-3 text-left text-sm font-semibold">Year</th>
                 <th className="p-3 text-right text-sm font-semibold">Starting Value</th>
                 <th className="p-3 text-right text-sm font-semibold">Contributions</th>
+                <th className="p-3 text-right text-sm font-semibold">Interest Earned</th>
+                {showTaxColumn && (
+                  <th className="p-3 text-right text-sm font-semibold">Tax Paid</th>
+                )}
                 <th className="p-3 text-right text-sm font-semibold">Ending Value</th>
               </tr>
             </thead>
@@ -51,11 +75,36 @@ export function GrowthTable({ data }: GrowthTableProps) {
                   <td className="p-3 text-sm text-right text-muted-foreground">
                     ${row.contributions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </td>
+                  <td className="p-3 text-sm text-right">
+                    ${row.interest.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </td>
+                  {showTaxColumn && (
+                    <td className="p-3 text-sm text-right text-muted-foreground">
+                      ${(row.interest * taxMultiplier).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </td>
+                  )}
                   <td className="p-3 text-sm text-right font-semibold text-primary">
                     ${row.endingValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </td>
                 </motion.tr>
               ))}
+
+              <tr className="border-t bg-muted/40">
+                <td className="p-3 text-sm font-semibold">Total</td>
+                <td className="p-3" />
+                <td className="p-3 text-sm text-right font-semibold">
+                  ${totals.contributions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </td>
+                <td className="p-3 text-sm text-right font-semibold">
+                  ${totals.interest.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </td>
+                {showTaxColumn && (
+                  <td className="p-3 text-sm text-right font-semibold">
+                    ${totals.taxPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </td>
+                )}
+                <td className="p-3" />
+              </tr>
             </tbody>
           </table>
         </div>
