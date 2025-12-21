@@ -170,8 +170,8 @@ export function WithdrawalResults({
               />
 
               <MetricCard
-                label={showTax ? "Net Withdrawn (After Tax)" : "Total Withdrawn"}
-                value={renderFormattedResult(showTax ? totalWithdrawnNet : totalWithdrawn)}
+                label={showTax ? "Total Withdrawn (Before Tax)" : "Total Withdrawn"}
+                value={renderFormattedResult(totalWithdrawn)}
                 colorClass="text-blue-500"
                 bgClass="bg-gradient-to-br from-blue-500/10 to-blue-500/5"
               />

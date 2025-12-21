@@ -110,9 +110,22 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               maxErrorMessage="Speedrunning bankruptcy? :)"
             />
             {state.taxEnabled && (
-                <p className="text-[10px] text-muted-foreground pt-1">
-                   We gross up this amount by the tax rate to calculate the actual portfolio drain.
-                </p>
+              <p className="text-[10px] text-muted-foreground pt-1">
+                You should withdraw{' '}
+                <span className="font-semibold text-primary">
+                  {(
+                    (state.periodicWithdrawal ?? 0) /
+                    (1 - Math.min(state.taxRate ?? 0, 99) / 100)
+                  ).toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+                </span>{' '}
+                per {state.frequency?.replace('ly', '') || 'month'} to have an effective net
+                withdrawal of{' '}
+                {(state.periodicWithdrawal ?? 0).toLocaleString(undefined, {
+                  style: 'currency',
+                  currency: 'USD',
+                })}
+                .
+              </p>
             )}
           </div>
           
