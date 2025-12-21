@@ -51,7 +51,7 @@ export function GrowthResults({
   const isProfitNegative = totalProfit < 0
   
   const roi = totalContributions > 0 
-    ? (totalProfit / totalContributions) * 100 
+    ? ((totalProfit - totalDeferredTax) / totalContributions) * 100 
     : 0
 
   const formatResult = (val: number) => {
@@ -138,18 +138,18 @@ export function GrowthResults({
             {showDeferredTax && (
                <MetricCard 
                 label="Est. Tax Liability" 
-                value={formatResult(totalDeferredTax)} 
-                colorClass="text-orange-500" 
-                bgClass="bg-gradient-to-br from-orange-500/10 to-orange-500/5"
+                value={formatResult(-totalDeferredTax)}
+                colorClass="text-red-500" 
+                bgClass="bg-gradient-to-br from-red-500/10 to-red-500/5"
               />
             )}
 
             {showPaidTax && (
                <MetricCard 
                 label="Total Tax Paid" 
-                value={formatResult(totalTaxPaid)} 
-                colorClass="text-orange-500" 
-                bgClass="bg-gradient-to-br from-orange-500/10 to-orange-500/5"
+                value={formatResult(-totalTaxPaid)} 
+                colorClass="text-red-500" 
+                bgClass="bg-gradient-to-br from-red-500/10 to-red-500/5"
               />
             )}
           </div>
@@ -175,7 +175,7 @@ export function GrowthResults({
                 <Percent className="h-4 w-4 text-amber-500" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">Return on Investment (ROI)</p>
+                <p className="text-sm font-medium text-foreground">{taxEnabled ? "Return on Investment (ROI After Tax)" : "Return on Investment (ROI)"}</p>
                 <p className={`text-2xl font-bold my-1 ${roi < 0 ? 'text-destructive' : 'text-amber-500'}`}>
                   {roi > 0 ? '+' : ''}{roi.toFixed(1)}%
                 </p>

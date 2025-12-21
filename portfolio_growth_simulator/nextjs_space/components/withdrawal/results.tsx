@@ -179,9 +179,9 @@ export function WithdrawalResults({
               {showTax && (
                  <MetricCard
                   label="Total Tax Paid"
-                  value={renderFormattedResult(totalTaxPaid)}
-                  colorClass="text-orange-500"
-                  bgClass="bg-gradient-to-br from-orange-500/10 to-orange-500/5"
+                  value={renderFormattedResult(-totalTaxPaid)}
+                  colorClass="text-red-500"
+                  bgClass="bg-gradient-to-br from-red-500/10 to-red-500/5"
                 />
               )}
 
