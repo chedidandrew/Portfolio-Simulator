@@ -13,7 +13,8 @@ import {
   BookOpen,
   ChevronDown,
   Percent,
-  Scale
+  Scale,
+  HelpCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -148,14 +149,15 @@ export default function MethodologyPage() {
           <Card className="border-l-4 border-l-primary bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-primary">
-                <Scale className="h-5 w-5" />
-                Core Philosophy: "Optimistic Growth, Conservative Withdrawal"
+                <Scale className="h-5 w-5 shrink-0" />
+                Core Philosophy
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="leading-relaxed text-foreground/80">
-                My Portfolio Simulator is designed to prevent "retirement failure." When you are saving (Growth), it uses standard banking formulas so your numbers match other tools. 
-                However, when you are retiring (Withdrawal), it switches to stricter math to help you avoid overestimating how long your money will last.
+                Portfolio Simulator uses industry standard growth math while you are building wealth. 
+                Once withdrawals begin, it shifts to a more conservative modeling approach designed 
+                to test sustainability under adverse conditions rather than maximize projections.
               </p>
             </CardContent>
           </Card>
@@ -179,7 +181,7 @@ export default function MethodologyPage() {
                   The Math: Nominal Rate (APR)
                 </div>
                 <p className="text-sm leading-relaxed">
-                  Portfolio Simulator uses the <strong>Nominal Annual Rate</strong> divided by 12. This is the industry standard used by banks and online calculators (like Investor.gov).
+                  The growth tool uses the <strong>Nominal Annual Rate</strong> divided by 12. This is the industry standard used by banks and online calculators.
                 </p>
                 <div className="mt-2 rounded-md border bg-background/40 px-4 py-3 flex justify-center overflow-x-auto">
                     <BlockMath math={String.raw`r_m = \frac{r_{\text{annual}}}{12}`} />
@@ -192,7 +194,7 @@ export default function MethodologyPage() {
                   Timing: End-of-Month
                 </div>
                 <p className="text-sm leading-relaxed">
-                  Portfolio Simulator assumes you contribute money at the <strong>end</strong> of the month. This means your new contributions don't earn interest in the very first month they are added.
+                  Growth assumes you contribute money at the <strong>end</strong> of the month. This means your new contributions don't earn interest in the very first month they are added.
                 </p>
                 <Badge variant="outline" className="mt-1 text-emerald-600 border-emerald-500/30">
                   Prevents Over-Estimation
@@ -220,7 +222,7 @@ export default function MethodologyPage() {
                   The Math: Effective Rate (APY)
                 </div>
                 <p className="text-sm leading-relaxed">
-                  Portfolio Simulator switches to the <strong>Effective Annual Rate</strong>. If you input 8% return, math ensures you get exactly 8% growth by year-end, not a penny more.
+                  The withdrawal tool switches to the <strong>Effective Annual Rate</strong>. If you input 8% return, math ensures you get exactly 8% growth by year-end, not a penny more.
                 </p>
                 <div className="mt-2 rounded-md border bg-background/40 px-4 py-3 flex justify-center overflow-x-auto">
                     <BlockMath math={String.raw`r_m = (1 + r_{\text{annual}})^{\tfrac{1}{12}} - 1`} />
@@ -292,9 +294,85 @@ export default function MethodologyPage() {
           >
              <div className="space-y-4">
               <p className="text-sm leading-relaxed">
-                Standard calculators assume returns are a straight line (e.g., 8% every single year). The Monte Carlo simulation introduces <strong>Volatility (Risk)</strong>.
+                Standard calculators assume returns follow a straight line (e.g., 8% every year), which is not how the real world works. 
+                The Monte Carlo simulation models this uncertainty by introducing <strong>volatility (Risk)</strong> and generating many possible return paths.
               </p>
 
+              <div className="mt-3 rounded-md border bg-background/40 px-4 py-3 flex justify-center overflow-x-auto">
+                <BlockMath
+                    math={String.raw`
+                    V_{t+\Delta t}
+                    =
+                    V_t \cdot
+                    e^{\left(\mu - \tfrac{1}{2}\sigma^2\right)\Delta t + \sigma \sqrt{\Delta t}\, Z}
+                    `}
+                />
+              </div>
+
+              {/* Translation for Retail Investors */}
+                <div className="rounded-lg border bg-violet-500/5 border-violet-500/20 p-4">
+                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-3 text-violet-700 dark:text-violet-300">
+                        <HelpCircle className="h-4 w-4" />
+                        Plain English Translation
+                    </h4>
+                    <ul className="space-y-3 text-sm text-muted-foreground">
+                    <li className="flex gap-3">
+                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Vₜ</span>
+                        <span>
+                        Your portfolio value at the start of the period (for example, this month).
+                        </span>
+                    </li>
+
+                    <li className="flex gap-3">
+                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Vₜ₊Δₜ</span>
+                        <span>
+                        Your portfolio value at the end of the period after growth and volatility are applied.
+                        </span>
+                    </li>
+
+                    <li className="flex gap-3">
+                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">μ</span>
+                        <span>
+                        Your expected average annual return. If you input 8%, this is the 8%.
+                        </span>
+                    </li>
+
+                    <li className="flex gap-3">
+                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">σ</span>
+                        <span>
+                        Volatility. This measures how wild the ups and downs are. Higher values mean bigger swings.
+                        </span>
+                    </li>
+
+                    <li className="flex gap-3">
+                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Δₜ</span>
+                        <span>
+                        Time step. In the simulator this is one month, expressed as a fraction of a year.
+                        </span>
+                    </li>
+
+                    <li className="flex gap-3">
+                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Z</span>
+                        <span>
+                        A random number drawn from a normal distribution. This is what makes each month unpredictable.
+                        </span>
+                    </li>
+
+                    <li className="flex gap-3">
+                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Logic</span>
+                        <span>
+                        Each month starts with your expected growth, then randomness is added to simulate real market behavior.
+                        </span>
+                    </li>
+
+                    <li className="flex gap-3">
+                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Result</span>
+                        <span>
+                        Running this thousands of times shows best-case, worst-case, and most-likely outcomes instead of a single straight-line forecast.
+                        </span>
+                    </li>
+                    </ul>
+                </div>
               <div className="grid gap-3">
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
                   <div className="flex items-center justify-center w-6 h-6 rounded-full bg-violet-500/10 text-violet-500 text-xs font-bold shrink-0 mt-0.5">1</div>
