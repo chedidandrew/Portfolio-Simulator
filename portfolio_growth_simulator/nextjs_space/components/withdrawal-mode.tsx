@@ -1,4 +1,3 @@
-// components/withdrawal-mode.tsx
 'use client'
 
 import { useEffect, useState } from 'react'

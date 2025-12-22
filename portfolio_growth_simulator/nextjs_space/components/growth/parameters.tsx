@@ -135,7 +135,7 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
 
           {/* Inflation Adjustment */}
           <div className="space-y-2">
-            <Label htmlFor="inflation">Annual Inflation Adjustment (%)</Label>
+            <Label htmlFor="inflation">Annual Inflation (%)</Label>
 
             <div className="flex flex-col gap-3">
               <NumericInput
@@ -182,8 +182,8 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
           </div>
           
           {/* Tax Configuration */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center justify-left gap-2">
               <Label htmlFor="tax-enabled" className="flex items-center gap-2">
                 <Scale className="h-4 w-4" />
                 Enable Taxes
@@ -213,6 +213,7 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
                      onChange={(value) => setState({ ...state, taxRate: Math.max(0, Math.min(100, value)) })}
                      min={0}
                      max={100}
+                     maxErrorMessage="Congrats, you invented slavery. :)"
                    />
                  </div>
                  <div className="space-y-1">
@@ -233,7 +234,7 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
                </div>
             )}
             {state.taxEnabled && (
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-[10px] text-muted-foreground pt-4">
                   {state.taxType === 'income' 
                     ? 'Reduces annual return by tax rate.' 
                     : 'Deducts tax from total profit at end.'}

@@ -754,6 +754,36 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
           </GuideSection>
         </motion.div>
 
+        <motion.div variants={itemVariants}>
+          <GuideSection
+            title="Curious about the Math?"
+            icon={Divide}
+            description="Behind the scenes"
+            iconColorClass="text-emerald-500"
+            iconWrapperClass="bg-muted text-muted-foreground group-hover:bg-muted/80"
+          >
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
+                <Divide className="h-5 w-5 text-indigo-500 shrink-0 mt-0.5" />
+                <div className="w-full">
+                  <p className="font-medium text-foreground text-sm">View Methodology & Logic</p>
+                  <p className="text-xs mt-1 text-muted-foreground">
+                    I value transparency. See exactly how Portfolio Simulator calculates interest, inflation, and withdrawals.
+                  </p>
+
+                  <div className="mt-3">
+                    <Link href="/methodology">
+                      <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/80">
+                        View Methodology & Logic
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </GuideSection>
+        </motion.div>
+
         {/* Disclaimer */}
         <motion.div variants={itemVariants}>
           <GuideSection
@@ -778,38 +808,8 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
             </div>
           </GuideSection>
         </motion.div>
+
       </div>
-
-      <motion.div variants={itemVariants}>
-        <GuideSection
-          title="Curious about the Math?"
-          icon={Divide}
-          description="Behind the scenes"
-          iconColorClass="text-emerald-500"
-          iconWrapperClass="bg-muted text-muted-foreground group-hover:bg-muted/80"
-        >
-          <div className="space-y-3">
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
-              <Divide className="h-5 w-5 text-indigo-500 shrink-0 mt-0.5" />
-              <div className="w-full">
-                <p className="font-medium text-foreground text-sm">View Methodology & Logic</p>
-                <p className="text-xs mt-1 text-muted-foreground">
-                  I value transparency. See exactly how Portfolio Simulator calculates interest, inflation, and withdrawals.
-                </p>
-
-                <div className="mt-3">
-                  <Link href="/methodology">
-                    <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/80">
-                      View Methodology & Logic
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </GuideSection>
-      </motion.div>
-
       {/* Donation Section */}
       <DonationSection />
     </motion.div>

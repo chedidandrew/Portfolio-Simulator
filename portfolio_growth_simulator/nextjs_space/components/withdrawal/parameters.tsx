@@ -110,7 +110,7 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               maxErrorMessage="Speedrunning bankruptcy? :)"
             />
             {state.taxEnabled && (
-              <p className="text-[10px] text-muted-foreground pt-1">
+              <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
                 You should withdraw{' '}
                 <span className="font-semibold text-primary">
                   {(
@@ -131,7 +131,7 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
           
           {/* Inflation Adjustment - With Toggle */}
           <div className="space-y-2">
-            <Label htmlFor="inflation">Annual Inflation Adjustment (%)</Label>
+            <Label htmlFor="inflation">Annual Inflation (%)</Label>
             <div className="flex flex-col gap-3">
               <NumericInput
                 id="inflation"
@@ -175,7 +175,7 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
           
           {/* Tax Configuration */}
           <div className="space-y-2">
-             <div className="flex items-center justify-between">
+             <div className="flex items-center justify-left gap-2">
               <Label htmlFor="tax-enabled-w" className="flex items-center gap-2">
                 <Scale className="h-4 w-4" />
                 Enable Taxes

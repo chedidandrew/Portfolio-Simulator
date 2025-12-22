@@ -212,7 +212,7 @@ export function MonteCarloParameters({
             {/* Inflation */}
             <div className="space-y-2">
               <Label htmlFor="mc-inflation">
-                Inflation Adjustment (%)
+                Annual Inflation (%)
               </Label>
               <NumericInput
                 id="mc-inflation"
@@ -238,8 +238,8 @@ export function MonteCarloParameters({
             </div>
 
             {/* Tax Options */}
-            <div className="space-y-2 sm:col-span-2">
-               <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-left gap-2">
                 <Label htmlFor="mc-tax-enabled" className="flex items-center gap-2">
                   <Scale className="h-4 w-4" />
                   Enable Taxes
@@ -249,12 +249,12 @@ export function MonteCarloParameters({
                   checked={params.taxEnabled ?? false}
                   onCheckedChange={(checked) => {
                     let newRate = params.taxRate ?? 0
-                    
+
                     if (checked && newRate === 0) {
                       if (mode === 'withdrawal') {
                         newRate = 20 // Withdrawal Income Tax default
                       } else {
-                         // Growth defaults
+                        // Growth defaults
                         newRate = params.taxType === 'income' ? 25 : 15
                       }
                     }
@@ -265,8 +265,8 @@ export function MonteCarloParameters({
               </div>
 
               {params.taxEnabled && (
-                <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="space-y-1">
+                <div className="pt-0 grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="space-y-2">
                     <Label htmlFor="mc-tax-rate" className="text-xs">Tax Rate (%)</Label>
                     <NumericInput
                       id="mc-tax-rate"
@@ -274,35 +274,35 @@ export function MonteCarloParameters({
                       onChange={(value) => setParams({ ...params, taxRate: Math.max(0, Math.min(99, value)) })}
                       min={0}
                       max={99}
+                      maxErrorMessage="At 100% you are officially working for free :)"
                     />
+                    {mode === 'withdrawal' && (
+                      <p className="text-xs text-muted-foreground pt-3">
+                        We gross up the withdrawal to give you this Net amount.
+                      </p>
+                    )}
                   </div>
+
                   {mode === 'growth' && (
                     <div className="space-y-1">
                       <Label htmlFor="mc-tax-type" className="text-xs">Tax Type</Label>
                       <Select
-                          value={params.taxType ?? 'capital_gains'}
-                          onValueChange={(value: any) => setParams({ ...params, taxType: value })}
-                        >
-                          <SelectTrigger id="mc-tax-type" className="h-10">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="capital_gains">Deferred (Cap Gains)</SelectItem>
-                            <SelectItem value="income">Annual (Income)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <p className="text-[10px] text-muted-foreground pt-1">
-                          {params.taxType === 'income' 
-                            ? 'Reduces annual drift by tax rate.' 
-                            : 'Deducts tax from final profit.'}
-                        </p>
-                    </div>
-                  )}
-                  {mode === 'withdrawal' && (
-                    <div className="flex items-center pt-5">
-                       <p className="text-xs text-muted-foreground">
-                         We gross up the withdrawal to give you this Net amount.
-                       </p>
+                        value={params.taxType ?? 'capital_gains'}
+                        onValueChange={(value: any) => setParams({ ...params, taxType: value })}
+                      >
+                        <SelectTrigger id="mc-tax-type" className="h-10">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="capital_gains">Deferred (Cap Gains)</SelectItem>
+                          <SelectItem value="income">Annual (Income)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground pt-1">
+                        {params.taxType === 'income'
+                          ? 'Reduces annual drift by tax rate.'
+                          : 'Deducts tax from final profit.'}
+                      </p>
                     </div>
                   )}
                 </div>
