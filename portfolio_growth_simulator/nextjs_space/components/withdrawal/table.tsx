@@ -1,3 +1,4 @@
+// components/withdrawal/table.tsx
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,6 +22,17 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
   // Check if we need to show Net Income (if it differs from Gross Withdrawal)
   const hasTax = data.some(row => row.withdrawals !== row.netIncome)
 
+  const totals = data.reduce(
+    (acc, row) => {
+      acc.withdrawals += row.withdrawals
+      acc.netIncome += row.netIncome
+      acc.taxPaid += (row.withdrawals - row.netIncome)
+      acc.growth += (row.endingBalance - row.startingBalance + row.withdrawals)
+      return acc
+    },
+    { withdrawals: 0, netIncome: 0, taxPaid: 0, growth: 0 }
+  )
+
   return (
     <Card>
       <CardHeader>
@@ -41,6 +53,10 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
                   {hasTax && (
                     <th className="p-3 text-right text-sm font-semibold text-emerald-600">Net Income</th>
                   )}
+                  <th className="p-3 text-right text-sm font-semibold">Growth Earned</th>
+                  {hasTax && (
+                    <th className="p-3 text-right text-sm font-semibold">Tax Paid</th>
+                  )}
                   <th className="p-3 text-right text-sm font-semibold">Ending Balance</th>
                 </tr>
               </thead>
@@ -50,7 +66,7 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
                     key={row.year}
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0 }} 
+                    transition={{ delay: idx * 0 }}
                     className={`border-b hover:bg-muted/50 transition-colors ${
                       !row.isSustainable ? 'bg-destructive/5' : ''
                     }`}
@@ -72,6 +88,14 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
                         ${row.netIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </td>
                     )}
+                    <td className="p-3 text-sm text-right">
+                      ${(row.endingBalance - row.startingBalance + row.withdrawals).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </td>
+                    {hasTax && (
+                      <td className="p-3 text-sm text-right text-muted-foreground">
+                        ${(row.withdrawals - row.netIncome).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </td>
+                    )}
                     <td className={`p-3 text-sm text-right font-semibold ${
                       row.isSustainable ? 'text-primary' : 'text-destructive'
                     }`}>
@@ -79,6 +103,28 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
                     </td>
                   </motion.tr>
                 ))}
+
+                <tr className="border-t bg-muted/40">
+                  <td className="p-3 text-sm font-semibold">Total</td>
+                  <td className="p-3" />
+                  <td className="p-3 text-sm text-right font-semibold">
+                    ${totals.withdrawals.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </td>
+                  {hasTax && (
+                    <td className="p-3 text-sm text-right font-semibold text-emerald-600">
+                      ${totals.netIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </td>
+                  )}
+                  <td className="p-3 text-sm text-right font-semibold">
+                    ${totals.growth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </td>
+                  {hasTax && (
+                    <td className="p-3 text-sm text-right font-semibold">
+                      ${totals.taxPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </td>
+                  )}
+                  <td className="p-3" />
+                </tr>
               </tbody>
             </table>
           </div>

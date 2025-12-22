@@ -1,3 +1,4 @@
+// components/withdrawal-mode.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -190,28 +191,58 @@ export function WithdrawalMode() {
 
     if (state.taxEnabled) {
       columns.push({ header: 'Net Income', key: 'Net Income', width: 20 })
+      columns.push({ header: 'Tax Paid', key: 'Tax Paid', width: 20 })
     }
 
     columns.push(
+      { header: 'Growth Earned', key: 'Growth Earned', width: 20 },
       { header: 'Ending Balance', key: 'Ending Balance', width: 20 },
       { header: 'Sustainable', key: 'Sustainable', width: 15 }
     )
     
     wsData.columns = columns
 
+    const totals = calculation.yearData.reduce(
+      (acc, row) => {
+        acc.withdrawals += row.withdrawals
+        acc.netIncome += row.netIncome
+        acc.taxPaid += (row.withdrawals - row.netIncome)
+        acc.growth += (row.endingBalance - row.startingBalance + row.withdrawals)
+        return acc
+      },
+      { withdrawals: 0, netIncome: 0, taxPaid: 0, growth: 0 }
+    )
+
     const excelData = calculation.yearData.map((row) => {
       const dataRow: any = {
         Year: row.year,
         'Starting Balance': roundToCents(row.startingBalance),
         'Withdrawals': roundToCents(row.withdrawals),
+        'Growth Earned': roundToCents(row.endingBalance - row.startingBalance + row.withdrawals),
         'Ending Balance': roundToCents(row.endingBalance),
         Sustainable: row.isSustainable ? 'Yes' : 'No',
       }
       if (state.taxEnabled) {
         dataRow['Net Income'] = roundToCents(row.netIncome)
+        dataRow['Tax Paid'] = roundToCents(row.withdrawals - row.netIncome)
       }
       return dataRow
     })
+
+    const totalsRow: any = {
+      Year: 'Total',
+      'Starting Balance': '',
+      'Withdrawals': roundToCents(totals.withdrawals),
+      'Growth Earned': roundToCents(totals.growth),
+      'Ending Balance': '',
+      Sustainable: '',
+    }
+    if (state.taxEnabled) {
+      totalsRow['Net Income'] = roundToCents(totals.netIncome)
+      totalsRow['Tax Paid'] = roundToCents(totals.taxPaid)
+    }
+    excelData.push(totalsRow)
+
     wsData.addRows(excelData)
 
     // Generate and Download
