@@ -67,19 +67,23 @@ export function performMonteCarloSimulation(
 const dt = 1 / timeStepsPerYear
   const totalTimeSteps = totalSimulationSteps
 
-  // --- 1. Handle Rate Calculation Mode ---
-  let baseAnnualReturn = expectedReturn
-  if (calculationMode === 'nominal') {
-    // Convert Nominal (Monthly Compounding) to Effective Annual
-    // Formula: APY = (1 + r/12)^12 - 1
-    baseAnnualReturn = (Math.pow(1 + expectedReturn / 100 / 12, 12) - 1) * 100
+  // --- REVISED RATE LOGIC START ---
+  let effectiveReturn = expectedReturn
+  
+  // 1. Apply Tax Drag (Income Tax)
+  // We apply this to the raw input rate (whether Nominal or Effective)
+  if (mode === 'growth' && taxEnabled && taxType === 'income') {
+    effectiveReturn = expectedReturn * (1 - taxRate / 100)
   }
 
-  // --- 2. Apply Tax Drag ---
-  let effectiveReturn = baseAnnualReturn
-  if (mode === 'growth' && taxEnabled && taxType === 'income') {
-    effectiveReturn = baseAnnualReturn * (1 - taxRate / 100)
+  // 2. Convert to Effective Annual (if needed) for Geometric Brownian Motion
+  if (calculationMode === 'nominal') {
+    // If Nominal, we now have the "Net Nominal Rate". 
+    // We must convert this Net Nominal Rate to an Effective Annual Rate (Net APY)
+    // to determine the correct drift for the simulation.
+    effectiveReturn = (Math.pow(1 + effectiveReturn / 100 / 12, 12) - 1) * 100
   }
+  // --- REVISED RATE LOGIC END ---
 
   // Consistent Rate Conversion (Log Return derived from Effective Annual)
   const r = effectiveReturn / 100
