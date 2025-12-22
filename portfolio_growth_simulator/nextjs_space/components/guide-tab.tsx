@@ -464,7 +464,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
               </div>
 
               <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
-                <TrendingDown className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                <TrendingUp className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-foreground text-sm">Account for Inflation</p>
                   <p className="text-xs mt-1 text-muted-foreground">
