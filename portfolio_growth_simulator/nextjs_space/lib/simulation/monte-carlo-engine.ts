@@ -37,6 +37,7 @@ export function performMonteCarloSimulation(
     cashflowAmount,
     cashflowFrequency,
     inflationAdjustment = 0,
+    excludeInflationAdjustment,
     numPaths,
     portfolioGoal,
     taxEnabled,
@@ -170,7 +171,7 @@ const dt = 1 / timeStepsPerYear
         stepCAGRs[recordIndex].push(cagr * 100)
       }
 
-      if (step % timeStepsPerYear === 0) {
+      if (step % timeStepsPerYear === 0 && !excludeInflationAdjustment) {
         currentCashflowPerStep *= inflationFactor
       }
     }

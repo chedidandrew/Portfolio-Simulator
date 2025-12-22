@@ -30,18 +30,24 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
     excludeInflationAdjustment,
     taxEnabled,
     taxRate = 0,
+    taxType = 'capital_gains',
     calculationMode = 'effective'
   } = state
 
   // --- 1. Engine Configuration ---
   const totalMonths = duration * 12
   
-  // Effective vs Nominal Rate Calculation
+// Effective vs Nominal Rate Calculation
+  let effectiveAnnualReturn = annualReturn
+  if (taxEnabled && taxType === 'income') {
+    effectiveAnnualReturn = annualReturn * (1 - (taxRate / 100))
+  }
+
   let monthlyRate
   if (calculationMode === 'nominal') {
-    monthlyRate = annualReturn / 100 / 12
+    monthlyRate = effectiveAnnualReturn / 100 / 12
   } else {
-    monthlyRate = Math.pow(1 + annualReturn / 100, 1 / 12) - 1
+    monthlyRate = Math.pow(1 + effectiveAnnualReturn / 100, 1 / 12) - 1
   }
 
   const inflationFactor = 1 + inflationAdjustment / 100
@@ -74,9 +80,10 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
     // Execute Withdrawal
     if (targetNetThisMonth > 0) {
       // GROSS UP Logic: Gross = Net / (1 - Rate)
+      // Only apply Gross Up if NOT 'income' type (Income type uses Tax Drag instead)
       let requiredGross = targetNetThisMonth
       
-      if (taxEnabled) {
+      if (taxEnabled && taxType !== 'income') {
          // EDGE CASE SAFETY: Clamp tax rate to 99% max to prevent divide-by-zero or infinity.
          // This ensures we never divide by less than 0.01.
          let t = taxRate / 100
@@ -91,7 +98,7 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
       // Calculate actual Tax paid on this gross amount
       // (If partial withdrawal, tax is proportional)
       let taxPaid = 0
-      if (taxEnabled) {
+      if (taxEnabled && taxType !== 'income') {
         // We use the original rate for calculation, effectively clamped by the logic above 
         // if it was extreme, but here we just apply the rate to the gross.
         // Consistency: If t was clamped to 99% for gross-up, we should nominally 
@@ -119,7 +126,21 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
 
     // --- STEP 2: Apply Growth ---
     if (currentBalance > 0) {
+      const balanceBefore = currentBalance
       currentBalance = currentBalance * (1 + monthlyRate)
+      
+      if (taxEnabled && taxType === 'income') {
+        // Track the tax drag amount for reporting
+        // Rate was already reduced, so we calculate what the tax portion *would* have been
+        // implied_growth = balance * raw_rate
+        // actual_growth = balance * reduced_rate
+        // diff approx tax
+        const growth = currentBalance - balanceBefore
+        // Re-derive tax paid from the net growth: Tax = Growth * (Rate / (1 - Rate))
+        let t = taxRate / 100
+        if (t >= 0.99) t = 0.99
+        totalTaxPaid += growth * (t / (1 - t))
+      }
     }
 
     // Check for depletion

@@ -39,6 +39,7 @@ export interface SimulationParams {
   cashflowAmount: number
   cashflowFrequency: 'yearly' | 'monthly'
   inflationAdjustment?: number
+  excludeInflationAdjustment?: boolean
   numPaths: number
   portfolioGoal?: number
   // Tax Options
