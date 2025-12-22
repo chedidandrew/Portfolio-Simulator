@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button'
 import { motion, AnimatePresence } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
 
+let sessionHidden = false
+
 export function DonationSection() {
   const [isOpen, setIsOpen] = useState(false)
-  const [hideForSession, setHideForSession] = useState(false)
+  const [hideForSession, setHideForSession] = useState(sessionHidden)
   const [hasSupported, setHasSupported] = useState(false)
   const donationPopupUrl = 'https://buymeacoffee.com/chedidandrew'
 
@@ -52,7 +54,7 @@ export function DonationSection() {
       const url =
         typeof window !== 'undefined'
           ? window.location.href
-          : 'https://portfolio-sim.example'
+          : 'https://www.portfoliosimulator.org'
       const text =
         'Check out this Portfolio Simulator that models long term growth, withdrawals, and Monte Carlo scenarios.'
 
@@ -79,9 +81,9 @@ export function DonationSection() {
   return (
     <>
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ delay: 0.5, type: 'spring', stiffness: 260, damping: 20 }}
         className="mt-8 print:hidden"
       >
         <motion.div
@@ -91,6 +93,7 @@ export function DonationSection() {
           onDragEnd={(_, info) => {
             if (Math.abs(info.offset.x) > 80 || Math.abs(info.velocity.x) > 800) {
               setHideForSession(true)
+              sessionHidden = true
             }
           }}
           className="cursor-grab active:cursor-grabbing"
