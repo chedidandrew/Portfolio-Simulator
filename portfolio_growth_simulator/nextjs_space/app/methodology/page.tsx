@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import 'katex/dist/katex.min.css'
 import { BlockMath } from 'react-katex'
+import { DonationSection } from '@/components/donation-section'
 
 // --- 1. Reusing Animation Variants from GuideTab ---
 const containerVariants = {
@@ -452,7 +453,7 @@ export default function MethodologyPage() {
                 </ul>
             </MethodologySection>
         </motion.div>
-
+        <DonationSection />
       </motion.div>
     </div>
   )
