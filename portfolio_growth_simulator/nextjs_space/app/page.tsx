@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Moon, Sun, TrendingUp, TrendingDown, BookOpen, Settings, Check, CreditCard, Heart } from 'lucide-react'
+import { Moon, Sun, TrendingUp, TrendingDown, BookOpen, Settings, Check, CreditCard, Heart, RotateCcw } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
 import {
@@ -176,6 +176,13 @@ export default function Home() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  const handleFactoryReset = () => {
+    if (typeof window !== 'undefined' && window.confirm('Are you sure you want to reset all settings and data? This cannot be undone.')) {
+      localStorage.clear()
+      window.location.reload()
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
       {/* Header - Hidden in Print*/}
@@ -259,6 +266,11 @@ export default function Home() {
                     Show Donation Card
                    </span>
                 </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleFactoryReset} className="text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-900/10">
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  <span>Reset</span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}

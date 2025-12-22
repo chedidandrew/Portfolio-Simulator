@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Coffee, ExternalLink, X, Share2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -14,8 +14,52 @@ export function DonationSection() {
   const [isOpen, setIsOpen] = useState(false)
   const [hideForSession, setHideForSession] = useState(sessionHidden)
   const [hasSupported, setHasSupported] = useState(false)
-  const [showDonations] = useLocalStorage('portfolio-sim-show-donations', true)
+  const [showDonations, setShowDonations] = useLocalStorage<boolean>('portfolio-sim-show-donations', true)
+  const [donationsHiddenUntil, setDonationsHiddenUntil] = useLocalStorage<number>('portfolio-sim-donations-hidden-until', 0)
   const donationPopupUrl = 'https://buymeacoffee.com/chedidandrew'
+  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000
+
+  useEffect(() => {
+    if (showDonations && hideForSession) {
+      setHideForSession(false)
+      sessionHidden = false
+    }
+  }, [showDonations, hideForSession])
+
+  useEffect(() => {
+    if (showDonations && donationsHiddenUntil !== 0) {
+      setDonationsHiddenUntil(0)
+    }
+  }, [showDonations, donationsHiddenUntil, setDonationsHiddenUntil])
+
+  useEffect(() => {
+    if (!showDonations && donationsHiddenUntil === 0) {
+      setDonationsHiddenUntil(Date.now() + ONE_WEEK_MS)
+    }
+  }, [showDonations, donationsHiddenUntil, setDonationsHiddenUntil])
+
+  useEffect(() => {
+    if (showDonations) return
+    if (!donationsHiddenUntil) return
+
+    const now = Date.now()
+    if (now >= donationsHiddenUntil) {
+      setShowDonations(true)
+      setDonationsHiddenUntil(0)
+      setHideForSession(false)
+      sessionHidden = false
+      return
+    }
+
+    const ms = donationsHiddenUntil - now
+    const t = window.setTimeout(() => {
+      setShowDonations(true)
+      setDonationsHiddenUntil(0)
+      setHideForSession(false)
+      sessionHidden = false
+    }, ms)
+    return () => window.clearTimeout(t)
+  }, [showDonations, donationsHiddenUntil, setShowDonations, setDonationsHiddenUntil])
 
   const donations = [
     {
@@ -96,6 +140,8 @@ export function DonationSection() {
             if (Math.abs(info.offset.x) > 80 || Math.abs(info.velocity.x) > 800) {
               setHideForSession(true)
               sessionHidden = true
+              setShowDonations(false)
+              setDonationsHiddenUntil(Date.now() + ONE_WEEK_MS)
             }
           }}
           className="cursor-grab active:cursor-grabbing"

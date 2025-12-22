@@ -16,6 +16,25 @@ interface WithdrawalParametersProps {
 
 export function WithdrawalParameters({ state, setState }: WithdrawalParametersProps) {
   const currencySymbol = getAppCurrency().symbol
+  const formatCurrencyFullUnder100m = (amount: number) => {
+    const n = Number(amount)
+    if (!isFinite(n)) return formatCurrency(0)
+    if (Math.abs(n) >= 100_000_000) return formatCurrency(n)
+    const appCurrency: any = getAppCurrency()
+    const code = appCurrency?.code || appCurrency?.currency || 'USD'
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: code,
+        currencyDisplay: 'symbol',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(n)
+    } catch {
+      const symbol = appCurrency?.symbol ?? ''
+      return `${symbol}${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    }
+  }
 
   return (
     <Card>
@@ -116,14 +135,14 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
                 You should withdraw{' '}
                 <span className="font-semibold text-primary">
-                  {formatCurrency(
+                  {formatCurrencyFullUnder100m(
                     (state.periodicWithdrawal ?? 0) /
                     (1 - Math.min(state.taxRate ?? 0, 99) / 100)
                   )}
                 </span>{' '}
                 per {state.frequency?.replace('ly', '') || 'month'} to have an effective net
                 withdrawal of{' '}
-                {formatCurrency(state.periodicWithdrawal ?? 0)}
+                {formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}
                 .
               </p>
             )}
