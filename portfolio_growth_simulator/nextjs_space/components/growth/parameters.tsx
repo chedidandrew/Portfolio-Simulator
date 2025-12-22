@@ -128,7 +128,7 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
               value={state.frequency ?? 'monthly'}
               onValueChange={(value: any) => setState({ ...state, frequency: value })}
             >
-              <SelectTrigger id="frequency">
+              <SelectTrigger id="frequency" className="print:hidden">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -138,6 +138,9 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
                 <SelectItem value="yearly">Yearly</SelectItem>
               </SelectContent>
             </Select>
+            <p className="hidden print:block text-xs text-muted-foreground pt-1 capitalize">
+              Selected: {state.frequency ?? 'monthly'}
+            </p>
           </div>
 
           {/* Inflation Adjustment */}
@@ -194,9 +197,13 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
               <Label htmlFor="tax-enabled" className="flex items-center gap-2">
                 <Scale className="h-4 w-4" />
                 Enable Taxes
+                <span className="hidden print:inline font-normal text-muted-foreground">
+                  {state.taxEnabled ? '(Enabled)' : '(Disabled)'}
+                </span>
               </Label>
               <Switch
                 id="tax-enabled"
+                className="print:hidden"
                 checked={state.taxEnabled ?? false}
                 onCheckedChange={(checked) => {
                   // Smart Default: Set 15% for Cap Gains, 25% for Income if currently 0
@@ -229,7 +236,7 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
                       value={state.taxType ?? 'capital_gains'}
                       onValueChange={(value: any) => setState({ ...state, taxType: value })}
                     >
-                      <SelectTrigger id="tax-type" className="h-10">
+                      <SelectTrigger id="tax-type" className="h-10 print:hidden">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -237,6 +244,9 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
                         <SelectItem value="income">Annual (Income)</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="hidden print:block text-xs text-muted-foreground pt-1">
+                      Selected: {state.taxType === 'income' ? 'Annual (Income)' : 'Deferred (Cap Gains)'}
+                    </p>
                  </div>
                </div>
             )}
@@ -283,15 +293,25 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="flex items-center gap-2 p-0 h-auto font-medium hover:bg-transparent hover:text-primary"
+            className="flex items-center gap-2 p-0 h-auto font-medium hover:bg-transparent hover:text-primary print:hidden"
             onClick={() => setShowAdvanced(!showAdvanced)}
           >
             <Settings2 className="h-4 w-4" />
             Advanced Settings
           </Button>
+
+          <div className="hidden print:block pt-1">
+             <div className="flex items-center gap-2 font-medium text-sm">
+                <Settings2 className="h-4 w-4" />
+                Advanced Settings
+             </div>
+             <p className="text-xs text-muted-foreground pt-1">
+                Interest Rate Calculation: {(state.calculationMode ?? 'effective') === 'nominal' ? 'Nominal Rate (APR)' : 'Effective Rate (APY)'}
+             </p>
+          </div>
           
           {showAdvanced && (
-            <div className="pt-4 animate-in fade-in slide-in-from-top-2 duration-200 space-y-4">
+            <div className="pt-4 animate-in fade-in slide-in-from-top-2 duration-200 space-y-4 print:hidden">
                <div className="space-y-2">
                 <Label htmlFor="calc-mode">Interest Rate Calculation</Label>
                 <Select

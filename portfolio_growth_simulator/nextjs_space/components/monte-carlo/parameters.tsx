@@ -250,9 +250,13 @@ export function MonteCarloParameters({
                 <Label htmlFor="mc-tax-enabled" className="flex items-center gap-2">
                   <Scale className="h-4 w-4" />
                   Enable Taxes
+                  <span className="hidden print:inline font-normal text-muted-foreground">
+                    {params.taxEnabled ? '(Enabled)' : '(Disabled)'}
+                  </span>
                 </Label>
                 <Switch
                   id="mc-tax-enabled"
+                  className="print:hidden"
                   checked={params.taxEnabled ?? false}
                   onCheckedChange={(checked) => {
                     let newRate = params.taxRate ?? 0
@@ -297,7 +301,7 @@ export function MonteCarloParameters({
                         value={params.taxType ?? 'capital_gains'}
                         onValueChange={(value: any) => setParams({ ...params, taxType: value })}
                       >
-                        <SelectTrigger id="mc-tax-type" className="h-10">
+                        <SelectTrigger id="mc-tax-type" className="h-10 print:hidden">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -307,7 +311,12 @@ export function MonteCarloParameters({
                           <SelectItem value="income">Annual (Tax Drag)</SelectItem>
                         </SelectContent>
                       </Select>
-                      <p className="text-[10px] text-muted-foreground pt-1">
+                      <p className="hidden print:block text-xs text-muted-foreground pt-1">
+                        Selected: {params.taxType === 'income' 
+                          ? 'Annual (Tax Drag)' 
+                          : (mode === 'growth' ? 'Deferred (Cap Gains)' : 'Transaction (Gross Up)')}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground pt-1 print:hidden">
                         {params.taxType === 'income'
                           ? 'Reduces annual return rate.'
                           : (mode === 'growth' ? 'Deducts tax from final profit.' : 'Increases withdrawal amount to cover tax.')}
@@ -381,19 +390,29 @@ export function MonteCarloParameters({
           </div>
 
           {/* Advanced Settings */}
-          <div className="pt-4 border-t print:hidden">
+          <div className="pt-4 border-t">
             <Button
               variant="ghost"
               size="sm"
-              className="flex items-center gap-2 p-0 h-auto font-medium hover:bg-transparent hover:text-primary"
+              className="flex items-center gap-2 p-0 h-auto font-medium hover:bg-transparent hover:text-primary print:hidden"
               onClick={() => setShowAdvanced(!showAdvanced)}
             >
               <Settings2 className="h-4 w-4" />
               Advanced Settings
             </Button>
+
+            <div className="hidden print:block pt-1">
+               <div className="flex items-center gap-2 font-medium text-sm">
+                  <Settings2 className="h-4 w-4" />
+                  Advanced Settings
+               </div>
+               <p className="text-xs text-muted-foreground pt-1">
+                  Interest Rate Calculation: {(params.calculationMode ?? 'effective') === 'nominal' ? 'Nominal Rate (APR)' : 'Effective Rate (APY)'}
+               </p>
+            </div>
             
             {showAdvanced && (
-              <div className="pt-4 animate-in fade-in slide-in-from-top-2 duration-200 space-y-4">
+              <div className="pt-4 animate-in fade-in slide-in-from-top-2 duration-200 space-y-4 print:hidden">
                  <div className="space-y-2">
                   <Label htmlFor="mc-calc-mode">Interest Rate Calculation</Label>
                   <Select
