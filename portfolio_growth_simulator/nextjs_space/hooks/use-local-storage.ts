@@ -11,30 +11,51 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T 
 
   useEffect(() => {
     setIsMounted(true)
-    try {
-      if (typeof window !== 'undefined') {
-        const item = window.localStorage.getItem(key)
-        if (item) {
-          const parsed = JSON.parse(item)
-          const initVal = initialValueRef.current
-          
-          // Merge defaults (initVal) with saved data (parsed) if both are objects
-          if (
-            typeof initVal === 'object' && 
-            initVal !== null && 
-            !Array.isArray(initVal) &&
-            typeof parsed === 'object' &&
-            parsed !== null &&
-            !Array.isArray(parsed)
-          ) {
-            setStoredValue({ ...initVal, ...parsed })
-          } else {
-            setStoredValue(parsed)
+
+    const loadValue = () => {
+      try {
+        if (typeof window !== 'undefined') {
+          const item = window.localStorage.getItem(key)
+          if (item) {
+            const parsed = JSON.parse(item)
+            const initVal = initialValueRef.current
+            
+            // Merge defaults (initVal) with saved data (parsed) if both are objects
+            if (
+              typeof initVal === 'object' && 
+              initVal !== null && 
+              !Array.isArray(initVal) &&
+              typeof parsed === 'object' &&
+              parsed !== null &&
+              !Array.isArray(parsed)
+            ) {
+              setStoredValue({ ...initVal, ...parsed })
+            } else {
+              setStoredValue(parsed)
+            }
           }
         }
+      } catch (error) {
+        console.error(`Error loading ${key} from localStorage:`, error)
       }
-    } catch (error) {
-      console.error(`Error loading ${key} from localStorage:`, error)
+    }
+
+    // Initial load
+    loadValue()
+
+    // Listen for changes
+    const handleStorageChange = (e: StorageEvent | CustomEvent) => {
+      if ((e as StorageEvent).key === key || (e as CustomEvent).detail?.key === key) {
+        loadValue()
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    window.addEventListener('local-storage-update', handleStorageChange as EventListener)
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('local-storage-update', handleStorageChange as EventListener)
     }
   }, [key])
 
@@ -50,6 +71,7 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T 
         // Save to local storage inside the updater to ensure we have the correct new value
         if (typeof window !== 'undefined') {
           window.localStorage.setItem(key, JSON.stringify(valueToStore))
+          window.dispatchEvent(new CustomEvent('local-storage-update', { detail: { key } }))
         }
         
         return valueToStore

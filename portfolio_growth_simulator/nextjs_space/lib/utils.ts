@@ -1,5 +1,67 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+
+export const CURRENCIES = [
+  // Major reserve / most common
+  { code: 'USD', symbol: '$', label: 'USD ($)' },
+  { code: 'EUR', symbol: '€', label: 'EUR (€)' },
+  { code: 'GBP', symbol: '£', label: 'GBP (£)' },
+  { code: 'JPY', symbol: '¥', label: 'JPY (¥)' },
+  { code: 'CHF', symbol: 'Fr', label: 'CHF (Fr)' },
+
+  // Americas
+  { code: 'CAD', symbol: '$', label: 'CAD ($)' },
+  { code: 'MXN', symbol: '$', label: 'MXN ($)' },
+  { code: 'BRL', symbol: 'R$', label: 'BRL (R$)' },
+  { code: 'CLP', symbol: '$', label: 'CLP ($)' },
+  { code: 'COP', symbol: '$', label: 'COP ($)' },
+  { code: 'ARS', symbol: '$', label: 'ARS ($)' },
+
+  // Europe
+  { code: 'SEK', symbol: 'kr', label: 'SEK (kr)' },
+  { code: 'NOK', symbol: 'kr', label: 'NOK (kr)' },
+  { code: 'DKK', symbol: 'kr', label: 'DKK (kr)' },
+  { code: 'PLN', symbol: 'zł', label: 'PLN (zł)' },
+  { code: 'CZK', symbol: 'Kč', label: 'CZK (Kč)' },
+  { code: 'HUF', symbol: 'Ft', label: 'HUF (Ft)' },
+  { code: 'TRY', symbol: '₺', label: 'TRY (₺)' },
+  { code: 'RUB', symbol: '₽', label: 'RUB (₽)' },
+
+  // Asia Pacific
+  { code: 'CNY', symbol: '¥', label: 'CNY (¥)' },
+  { code: 'HKD', symbol: '$', label: 'HKD ($)' },
+  { code: 'SGD', symbol: '$', label: 'SGD ($)' },
+  { code: 'AUD', symbol: '$', label: 'AUD ($)' },
+  { code: 'NZD', symbol: '$', label: 'NZD ($)' },
+  { code: 'INR', symbol: '₹', label: 'INR (₹)' },
+  { code: 'KRW', symbol: '₩', label: 'KRW (₩)' },
+  { code: 'THB', symbol: '฿', label: 'THB (฿)' },
+  { code: 'MYR', symbol: 'RM', label: 'MYR (RM)' },
+  { code: 'PHP', symbol: '₱', label: 'PHP (₱)' },
+  { code: 'IDR', symbol: 'Rp', label: 'IDR (Rp)' },
+
+  // Middle East and Africa
+  { code: 'AED', symbol: 'د.إ', label: 'AED (د.إ)' },
+  { code: 'SAR', symbol: '﷼', label: 'SAR (﷼)' },
+  { code: 'ILS', symbol: '₪', label: 'ILS (₪)' },
+  { code: 'ZAR', symbol: 'R', label: 'ZAR (R)' },
+] as const
+
+
+export type CurrencyCode = typeof CURRENCIES[number]['code']
+
+let appCurrency: CurrencyCode = 'USD'
+
+export function setAppCurrency(code: string) {
+  const valid = CURRENCIES.find((c) => c.code === code)
+  if (valid) {
+    appCurrency = valid.code
+  }
+}
+
+export function getAppCurrency() {
+  return CURRENCIES.find((c) => c.code === appCurrency) || CURRENCIES[0]
+}
  
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -132,8 +194,10 @@ export function formatCurrency(
   decimals: number = 2,
   compact: boolean = true
 ): string {
+  const currency = getAppCurrency()
+
   if (value === undefined || value === null) {
-    return showDollarSign ? '$0' : '0'
+    return showDollarSign ? `${currency.symbol}0` : '0'
   }
 
   // Handle Infinity
@@ -141,7 +205,7 @@ export function formatCurrency(
      if (Number.isNaN(value)) return 'NaN';
      const sign = value < 0 ? '-' : '';
      const symbol = '∞'; 
-     return showDollarSign ? `${sign}$${symbol}` : `${sign}${symbol}`;
+     return showDollarSign ? `${sign}${currency.symbol}${symbol}` : `${sign}${symbol}`;
   }
 
   const absValue = Math.abs(value)
@@ -150,15 +214,15 @@ export function formatCurrency(
     for (const unit of UNITS) {
       if (absValue >= unit.value) {
         const sign = value < 0 ? '-' : ''
-        const dollarSign = showDollarSign ? '$' : ''
-        return `${sign}${dollarSign}${(absValue / unit.value).toFixed(decimals)}${unit.suffix}`
+        const currencySymbol = showDollarSign ? currency.symbol : ''
+        return `${sign}${currencySymbol}${(absValue / unit.value).toFixed(decimals)}${unit.suffix}`
       }
     }
   }
 
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD',
+    currency: currency.code,
     maximumFractionDigits: compact ? 0 : 2, 
     minimumFractionDigits: compact ? 0 : 2,
   })
@@ -166,7 +230,11 @@ export function formatCurrency(
   let formatted = formatter.format(value)
   
   if (!showDollarSign) {
-      formatted = formatted.replace('$', '')
+      formatted = formatted.replace(currency.symbol, '').trim()
+      // Fallback for codes like CAD/AUD where symbol is same as USD or others
+      if (currency.symbol === '$') formatted = formatted.replace('$', '').trim()
+      // Fallback for cases where Intl includes code (e.g. CHF 100)
+      if (formatted.includes(currency.code)) formatted = formatted.replace(currency.code, '').trim()
   }
   
   return formatted

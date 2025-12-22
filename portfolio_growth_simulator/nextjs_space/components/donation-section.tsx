@@ -6,6 +6,7 @@ import { Coffee, ExternalLink, X, Share2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { motion, AnimatePresence } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
+import { useLocalStorage } from '@/hooks/use-local-storage'
 
 let sessionHidden = false
 
@@ -13,6 +14,7 @@ export function DonationSection() {
   const [isOpen, setIsOpen] = useState(false)
   const [hideForSession, setHideForSession] = useState(sessionHidden)
   const [hasSupported, setHasSupported] = useState(false)
+  const [showDonations] = useLocalStorage('portfolio-sim-show-donations', true)
   const donationPopupUrl = 'https://buymeacoffee.com/chedidandrew'
 
   const donations = [
@@ -74,7 +76,7 @@ export function DonationSection() {
     }
   }
 
-  if (hideForSession) {
+  if (hideForSession || !showDonations) {
     return null
   }
 

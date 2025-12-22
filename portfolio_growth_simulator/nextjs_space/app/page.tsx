@@ -2,25 +2,47 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Moon, Sun, TrendingUp, TrendingDown, BookOpen } from 'lucide-react'
+import { Moon, Sun, TrendingUp, TrendingDown, BookOpen, Settings, Check, CreditCard, Heart } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuCheckboxItem,
+} from '@/components/ui/dropdown-menu'
 import { GrowthMode } from '@/components/growth-mode'
 import { WithdrawalMode } from '@/components/withdrawal-mode'
 import { GuideTab } from '@/components/guide-tab'
 import LZString from 'lz-string'
+import { setAppCurrency, CURRENCIES } from '@/lib/utils'
+import { useLocalStorage } from '@/hooks/use-local-storage'
 
 export default function Home() {
   const { theme, setTheme } = useTheme()
   const [activeTab, setActiveTab] = useState<'growth' | 'withdrawal' | 'guide'>('growth')
   const [mounted, setMounted] = useState(false)
   const [headerVisible, setHeaderVisible] = useState(true)
+  const [currency, setCurrency] = useLocalStorage<string>('portfolio-sim-currency', 'USD')
+  const [showDonations, setShowDonations] = useLocalStorage<boolean>('portfolio-sim-show-donations', true)
   const lastScrollY = useRef(0)
   const scrollThreshold = 10
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    setAppCurrency(currency) // Initialize currency on mount
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update currency global state when it changes
+  useEffect(() => {
+    setAppCurrency(currency)
+  }, [currency])
 
   // Decide which tab to show on first load and on return
   useEffect(() => {
@@ -179,14 +201,66 @@ export default function Home() {
             </h1>
           </div>
           {mounted && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setTheme?.(theme === 'dark' ? 'light' : 'dark')}
-              className="rounded-full"
-            >
-              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Appearance</DropdownMenuLabel>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    {theme === 'dark' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
+                    <span>Theme</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onClick={() => setTheme?.('light')}>
+                      <Sun className="mr-2 h-4 w-4" />
+                      <span>Light</span>
+                      {theme === 'light' && <Check className="ml-auto h-4 w-4" />}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setTheme?.('dark')}>
+                      <Moon className="mr-2 h-4 w-4" />
+                      <span>Dark</span>
+                      {theme === 'dark' && <Check className="ml-auto h-4 w-4" />}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setTheme?.('system')}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>System</span>
+                      {theme === 'system' && <Check className="ml-auto h-4 w-4" />}
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+
+                <DropdownMenuSeparator />
+                
+                <DropdownMenuLabel>Preferences</DropdownMenuLabel>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      <span>Currency</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="max-h-[300px] overflow-y-auto">
+                      {CURRENCIES.map((c) => (
+                        <DropdownMenuItem key={c.code} onClick={() => setCurrency(c.code)}>
+                          <span>{c.label}</span>
+                          {currency === c.code && <Check className="ml-auto h-4 w-4" />}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                <DropdownMenuCheckboxItem
+                  checked={showDonations}
+                  onCheckedChange={setShowDonations}
+                >
+                   <span className="flex items-center">
+                    <Heart className="mr-2 h-4 w-4" />
+                    Show Donation Card
+                   </span>
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </header>
@@ -205,7 +279,7 @@ export default function Home() {
 
       {/* Main */}
       <main className="container mx-auto max-w-6xl px-4 py-6 pb-20 print:p-0 print:max-w-none">
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <Tabs key={currency} value={activeTab} onValueChange={handleTabChange} className="w-full">
           {/* Tabs List - Hidden in Print */}
           <TabsList className="grid w-full grid-cols-3 mb-6 h-auto print:hidden">
             {/* Guide tab moved to the left */}
