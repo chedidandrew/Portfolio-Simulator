@@ -11,6 +11,8 @@ export interface GrowthState {
   taxEnabled?: boolean
   taxRate?: number
   taxType?: 'capital_gains' | 'income' // capital_gains = deferred (end), income = annual (drag)
+  // Advanced Settings
+  calculationMode?: 'effective' | 'nominal'
 }
 
 export interface WithdrawalState {
@@ -24,7 +26,9 @@ export interface WithdrawalState {
   // Tax Options
   taxEnabled?: boolean
   taxRate?: number
-  taxType?: 'income' | 'capital_gains' // income = tax on withdrawal, capital_gains = treated as income for simplicity in withdrawal mode
+  taxType?: 'income' | 'capital_gains'
+  // Advanced Settings
+  calculationMode?: 'effective' | 'nominal'
 }
 
 export interface SimulationParams {
@@ -41,6 +45,8 @@ export interface SimulationParams {
   taxEnabled?: boolean
   taxRate?: number
   taxType?: 'capital_gains' | 'income'
+  // Advanced Settings
+  calculationMode?: 'effective' | 'nominal'
 }
 
 export interface SharePayload {

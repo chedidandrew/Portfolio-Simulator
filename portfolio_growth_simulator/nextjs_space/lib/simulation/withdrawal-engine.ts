@@ -29,12 +29,21 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
     frequency,
     excludeInflationAdjustment,
     taxEnabled,
-    taxRate = 0
+    taxRate = 0,
+    calculationMode = 'effective'
   } = state
 
   // --- 1. Engine Configuration ---
   const totalMonths = duration * 12
-  const monthlyRate = Math.pow(1 + annualReturn / 100, 1 / 12) - 1
+  
+  // Effective vs Nominal Rate Calculation
+  let monthlyRate
+  if (calculationMode === 'nominal') {
+    monthlyRate = annualReturn / 100 / 12
+  } else {
+    monthlyRate = Math.pow(1 + annualReturn / 100, 1 / 12) - 1
+  }
+
   const inflationFactor = 1 + inflationAdjustment / 100
 
   // --- 2. Simulation State ---

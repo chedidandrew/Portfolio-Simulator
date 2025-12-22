@@ -31,7 +31,8 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     excludeInflationAdjustment,
     taxEnabled,
     taxRate = 0,
-    taxType = 'capital_gains'
+    taxType = 'capital_gains',
+    calculationMode = 'effective'
   } = state
 
   const totalMonths = duration * 12
@@ -42,8 +43,14 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     effectiveAnnualReturn = annualReturn * (1 - (taxRate / 100))
   }
 
-  // Consistent: Use Effective Monthly Rate
-  const monthlyRate = Math.pow(1 + effectiveAnnualReturn / 100, 1 / 12) - 1
+  // Consistent: Use Effective Monthly Rate or Nominal Monthly Rate
+  let monthlyRate
+  if (calculationMode === 'nominal') {
+    monthlyRate = effectiveAnnualReturn / 100 / 12
+  } else {
+    monthlyRate = Math.pow(1 + effectiveAnnualReturn / 100, 1 / 12) - 1
+  }
+
   const inflationFactor = 1 + (inflationAdjustment / 100)
 
   let currentBalance = startingBalance

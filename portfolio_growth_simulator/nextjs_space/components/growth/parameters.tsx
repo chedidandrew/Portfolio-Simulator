@@ -1,3 +1,4 @@
+// [file] components/growth/parameters.tsx
 'use client'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -5,9 +6,11 @@ import { Label } from '@/components/ui/label'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Coins, Scale } from 'lucide-react'
+import { Coins, Scale, Settings2 } from 'lucide-react'
 import { GrowthState } from '@/lib/types'
 import { getAppCurrency } from '@/lib/utils'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 
 interface GrowthParametersProps {
   state: GrowthState
@@ -16,6 +19,7 @@ interface GrowthParametersProps {
 
 export function GrowthParameters({ state, setState }: GrowthParametersProps) {
   const currencySymbol = getAppCurrency().symbol
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   return (
     <Card>
@@ -272,6 +276,44 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
               maxErrorMessage="Trying to buy the moon? :)"
             />
           </div>
+        </div>
+
+        {/* Advanced Settings */}
+        <div className="pt-4 border-t">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex items-center gap-2 p-0 h-auto font-medium hover:bg-transparent hover:text-primary"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            <Settings2 className="h-4 w-4" />
+            Advanced Settings
+          </Button>
+          
+          {showAdvanced && (
+            <div className="pt-4 animate-in fade-in slide-in-from-top-2 duration-200 space-y-4">
+               <div className="space-y-2">
+                <Label htmlFor="calc-mode">Interest Rate Calculation</Label>
+                <Select
+                  value={state.calculationMode ?? 'effective'}
+                  onValueChange={(value: any) => setState({ ...state, calculationMode: value })}
+                >
+                  <SelectTrigger id="calc-mode">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="effective">Effective Rate (APY)</SelectItem>
+                    <SelectItem value="nominal">Nominal Rate (APR)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {state.calculationMode === 'nominal'
+                    ? "Divides annual rate by 12. Actual yield will be higher than the input rate due to compounding."
+                    : "Calculates monthly rate so the annual yield matches exactly. Best for comparing advertised APYs."}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

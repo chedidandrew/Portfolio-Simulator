@@ -5,9 +5,11 @@ import { Label } from '@/components/ui/label'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Coins, Scale } from 'lucide-react'
+import { Coins, Scale, Settings2 } from 'lucide-react'
 import { WithdrawalState } from '@/lib/types'
 import { getAppCurrency, formatCurrency } from '@/lib/utils'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 
 interface WithdrawalParametersProps {
   state: WithdrawalState
@@ -16,6 +18,8 @@ interface WithdrawalParametersProps {
 
 export function WithdrawalParameters({ state, setState }: WithdrawalParametersProps) {
   const currencySymbol = getAppCurrency().symbol
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
   const formatCurrencyFullUnder100m = (amount: number) => {
     const n = Number(amount)
     if (!isFinite(n)) return formatCurrency(0)
@@ -246,6 +250,44 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        {/* Advanced Settings */}
+        <div className="pt-4 border-t">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex items-center gap-2 p-0 h-auto font-medium hover:bg-transparent hover:text-primary"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            <Settings2 className="h-4 w-4" />
+            Advanced Settings
+          </Button>
+          
+          {showAdvanced && (
+            <div className="pt-4 animate-in fade-in slide-in-from-top-2 duration-200 space-y-4">
+               <div className="space-y-2">
+                <Label htmlFor="calc-mode-w">Interest Rate Calculation</Label>
+                <Select
+                  value={state.calculationMode ?? 'effective'}
+                  onValueChange={(value: any) => setState({ ...state, calculationMode: value })}
+                >
+                  <SelectTrigger id="calc-mode-w">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="effective">Effective Rate (APY)</SelectItem>
+                    <SelectItem value="nominal">Nominal Rate (APR)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {state.calculationMode === 'nominal'
+                    ? "Divides annual rate by 12. Actual yield will be higher than the input rate due to compounding."
+                    : "Calculates monthly rate so the annual yield matches exactly. Best for comparing advertised APYs."}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -1,3 +1,4 @@
+// [file] components/monte-carlo/parameters.tsx
 'use client'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,9 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { NumericInput } from '@/components/ui/numeric-input'
-import { Coins, Zap, Scale } from 'lucide-react'
+import { Coins, Zap, Scale, Settings2 } from 'lucide-react'
 import { SimulationParams } from '@/lib/types'
 import { getAppCurrency } from '@/lib/utils'
+import { useState } from 'react'
 
 interface MonteCarloParametersProps {
   mode: 'growth' | 'withdrawal'
@@ -33,6 +35,7 @@ export function MonteCarloParameters({
 }: MonteCarloParametersProps) {
   
   const currencySymbol = getAppCurrency().symbol
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const getCashflowLabel = () => {
     if (mode === 'growth') return 'Monthly Contribution'
@@ -43,7 +46,8 @@ export function MonteCarloParameters({
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
+         {/* ... (Existing Profile Selection Card Code) ... */}
+         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Monte Carlo Simulation
           </CardTitle>
@@ -373,6 +377,45 @@ export function MonteCarloParameters({
             </div>
 
           </div>
+
+          {/* Advanced Settings */}
+          <div className="pt-4 border-t print:hidden">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-2 p-0 h-auto font-medium hover:bg-transparent hover:text-primary"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              <Settings2 className="h-4 w-4" />
+              Advanced Settings
+            </Button>
+            
+            {showAdvanced && (
+              <div className="pt-4 animate-in fade-in slide-in-from-top-2 duration-200 space-y-4">
+                 <div className="space-y-2">
+                  <Label htmlFor="mc-calc-mode">Interest Rate Calculation</Label>
+                  <Select
+                    value={params.calculationMode ?? 'effective'}
+                    onValueChange={(value: any) => setParams({ ...params, calculationMode: value })}
+                  >
+                    <SelectTrigger id="mc-calc-mode" className="w-full sm:w-[50%]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="effective">Effective Rate (APY)</SelectItem>
+                      <SelectItem value="nominal">Nominal Rate (APR)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {params.calculationMode === 'nominal'
+                      ? "Uses input as Nominal Rate (monthly compounding). We convert this to an Effective Annual Rate before running the stochastic process."
+                      : "Uses input as Effective Annual Rate (APY) directly. The expected geometric drift will match this rate exactly (before volatility drag)."}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
           <Button
             onClick={onRun}
             disabled={isSimulating}

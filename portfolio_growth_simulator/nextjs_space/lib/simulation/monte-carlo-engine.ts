@@ -41,9 +41,11 @@ export function performMonteCarloSimulation(
     portfolioGoal,
     taxEnabled,
     taxRate = 0,
-    taxType = 'capital_gains'
+    taxType = 'capital_gains',
+    calculationMode = 'effective'
   } = params
 
+  // ... (MAX_PHYSICS_ITERATIONS and timing logic) ...
   const MAX_PHYSICS_ITERATIONS = 100_000_000 
   const opsWeekly = numPaths * duration * 52
   const opsMonthly = numPaths * duration * 12
@@ -62,12 +64,21 @@ export function performMonteCarloSimulation(
   let recordFrequency = Math.ceil(totalSimulationSteps / targetSteps)
   if (recordFrequency < 1) recordFrequency = 1
 
-  const dt = 1 / timeStepsPerYear
+const dt = 1 / timeStepsPerYear
   const totalTimeSteps = totalSimulationSteps
 
-  let effectiveReturn = expectedReturn
+  // --- 1. Handle Rate Calculation Mode ---
+  let baseAnnualReturn = expectedReturn
+  if (calculationMode === 'nominal') {
+    // Convert Nominal (Monthly Compounding) to Effective Annual
+    // Formula: APY = (1 + r/12)^12 - 1
+    baseAnnualReturn = (Math.pow(1 + expectedReturn / 100 / 12, 12) - 1) * 100
+  }
+
+  // --- 2. Apply Tax Drag ---
+  let effectiveReturn = baseAnnualReturn
   if (mode === 'growth' && taxEnabled && taxType === 'income') {
-    effectiveReturn = expectedReturn * (1 - taxRate / 100)
+    effectiveReturn = baseAnnualReturn * (1 - taxRate / 100)
   }
 
   // Consistent Rate Conversion (Log Return derived from Effective Annual)
