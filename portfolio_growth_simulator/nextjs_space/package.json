@@ -8,7 +8,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "currencies:update": "node scripts/update-currencies.mjs"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"

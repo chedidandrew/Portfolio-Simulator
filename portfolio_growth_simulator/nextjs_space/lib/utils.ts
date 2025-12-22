@@ -1,54 +1,32 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import iso4217 from '@/data/iso4217.json'
 
-export const CURRENCIES = [
-  // Major reserve / most common
-  { code: 'USD', symbol: '$', label: 'USD ($)' },
-  { code: 'EUR', symbol: '€', label: 'EUR (€)' },
-  { code: 'GBP', symbol: '£', label: 'GBP (£)' },
-  { code: 'JPY', symbol: '¥', label: 'JPY (¥)' },
-  { code: 'CHF', symbol: 'Fr', label: 'CHF (Fr)' },
+const DEFAULT_CURRENCY = { code: 'USD', symbol: '$', label: 'USD ($)' }
 
-  // Americas
-  { code: 'CAD', symbol: '$', label: 'CAD ($)' },
-  { code: 'MXN', symbol: '$', label: 'MXN ($)' },
-  { code: 'BRL', symbol: 'R$', label: 'BRL (R$)' },
-  { code: 'CLP', symbol: '$', label: 'CLP ($)' },
-  { code: 'COP', symbol: '$', label: 'COP ($)' },
-  { code: 'ARS', symbol: '$', label: 'ARS ($)' },
+function getCurrencySymbol(code: string) {
+  try {
+    const parts = new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: code,
+      currencyDisplay: 'narrowSymbol',
+    }).formatToParts(0)
 
-  // Europe
-  { code: 'SEK', symbol: 'kr', label: 'SEK (kr)' },
-  { code: 'NOK', symbol: 'kr', label: 'NOK (kr)' },
-  { code: 'DKK', symbol: 'kr', label: 'DKK (kr)' },
-  { code: 'PLN', symbol: 'zł', label: 'PLN (zł)' },
-  { code: 'CZK', symbol: 'Kč', label: 'CZK (Kč)' },
-  { code: 'HUF', symbol: 'Ft', label: 'HUF (Ft)' },
-  { code: 'TRY', symbol: '₺', label: 'TRY (₺)' },
-  { code: 'RUB', symbol: '₽', label: 'RUB (₽)' },
+    const cur = parts.find((p) => p.type === 'currency')?.value
+    return (cur || code).trim()
+  } catch {
+    return code.trim()
+  }
+}
 
-  // Asia Pacific
-  { code: 'CNY', symbol: '¥', label: 'CNY (¥)' },
-  { code: 'HKD', symbol: '$', label: 'HKD ($)' },
-  { code: 'SGD', symbol: '$', label: 'SGD ($)' },
-  { code: 'AUD', symbol: '$', label: 'AUD ($)' },
-  { code: 'NZD', symbol: '$', label: 'NZD ($)' },
-  { code: 'INR', symbol: '₹', label: 'INR (₹)' },
-  { code: 'KRW', symbol: '₩', label: 'KRW (₩)' },
-  { code: 'THB', symbol: '฿', label: 'THB (฿)' },
-  { code: 'MYR', symbol: 'RM', label: 'MYR (RM)' },
-  { code: 'PHP', symbol: '₱', label: 'PHP (₱)' },
-  { code: 'IDR', symbol: 'Rp', label: 'IDR (Rp)' },
+export const CURRENCIES = (iso4217 as { code: string; name: string }[])
+  .map(({ code }) => {
+    const symbol = getCurrencySymbol(code)
+    return { code, symbol, label: `${code} (${symbol})` }
+  })
+  .sort((a, b) => a.code.localeCompare(b.code))
 
-  // Middle East and Africa
-  { code: 'AED', symbol: 'د.إ', label: 'AED (د.إ)' },
-  { code: 'SAR', symbol: '﷼', label: 'SAR (﷼)' },
-  { code: 'ILS', symbol: '₪', label: 'ILS (₪)' },
-  { code: 'ZAR', symbol: 'R', label: 'ZAR (R)' },
-] as const
-
-
-export type CurrencyCode = typeof CURRENCIES[number]['code']
+export type CurrencyCode = string
 
 let appCurrency: CurrencyCode = 'USD'
 
@@ -60,7 +38,7 @@ export function setAppCurrency(code: string) {
 }
 
 export function getAppCurrency() {
-  return CURRENCIES.find((c) => c.code === appCurrency) || CURRENCIES[0]
+  return CURRENCIES.find((c) => c.code === appCurrency) || CURRENCIES[0] || DEFAULT_CURRENCY
 }
  
 export function cn(...inputs: ClassValue[]) {
@@ -162,32 +140,20 @@ export const UNITS = [
   { value: 1e3,   suffix: 'k', name: 'Thousand' },
 ]
 
-/**
- * Returns the full descriptive name for a number > 1 million,
- * e.g. "1.50 Quinquagintillion"
- */
 export function getLargeNumberName(value: number | undefined | null): string | null {
   if (value === undefined || value === null) return null
   const absValue = Math.abs(value)
-  
-  // Only apply past a million
+
   if (absValue < 1e6) return null
 
   for (const unit of UNITS) {
     if (absValue >= unit.value) {
-      // Don't show tooltip for just Thousand (filtered by < 1e6 check above effectively, but explicit logic:
-      // The prompt said "Apply this only past a million". 1e6 is Million. 
-      // If we are at 1e6, we show Million.
       return `${(absValue / unit.value).toFixed(2)} ${unit.name}`
     }
   }
   return null
 }
 
-/**
- * UPDATED: Fully populated units list to prevent massive prefixes.
- * Covers every 10^3 step from Thousand to Centillion.
- */
 export function formatCurrency(
   value: number | undefined | null,
   showDollarSign: boolean = true,
