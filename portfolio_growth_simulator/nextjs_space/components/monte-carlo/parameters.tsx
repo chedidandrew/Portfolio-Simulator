@@ -283,7 +283,7 @@ export function MonteCarloParameters({
                       max={99}
                       maxErrorMessage="At 100% you are officially working for free :)"
                     />
-                    {mode === 'withdrawal' && (
+                    {mode === 'withdrawal' && params.taxType !== 'income' && (
                       <p className="text-xs text-muted-foreground pt-3">
                         We gross up the withdrawal to give you this Net amount.
                       </p>
@@ -301,14 +301,16 @@ export function MonteCarloParameters({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="capital_gains">Deferred (Cap Gains)</SelectItem>
-                          <SelectItem value="income">Annual (Income)</SelectItem>
+                          <SelectItem value="capital_gains">
+                            {mode === 'growth' ? 'Deferred (Cap Gains)' : 'Transaction (Gross Up)'}
+                          </SelectItem>
+                          <SelectItem value="income">Annual (Tax Drag)</SelectItem>
                         </SelectContent>
                       </Select>
                       <p className="text-[10px] text-muted-foreground pt-1">
                         {params.taxType === 'income'
-                          ? 'Reduces annual drift by tax rate.'
-                          : 'Deducts tax from final profit.'}
+                          ? 'Reduces annual return rate.'
+                          : (mode === 'growth' ? 'Deducts tax from final profit.' : 'Increases withdrawal amount to cover tax.')}
                       </p>
                     </div>
                   )}

@@ -135,7 +135,7 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               max={1_000_000_000_000_000_000}
               maxErrorMessage="Speedrunning bankruptcy? :)"
             />
-            {state.taxEnabled && (
+            {state.taxEnabled && state.taxType !== 'income' && (
               <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
                 You should withdraw{' '}
                 <span className="font-semibold text-primary">
@@ -148,6 +148,11 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
                 withdrawal of{' '}
                 {formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}
                 .
+              </p>
+            )}
+            {state.taxEnabled && state.taxType === 'income' && (
+              <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                With Annual Tax Drag, the portfolio return is reduced by the tax rate. You withdraw exactly {formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}.
               </p>
             )}
           </div>
@@ -215,9 +220,9 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
             </div>
 
             {state.taxEnabled && (
-               <div className="pt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+               <div className="pt-2 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
                  <div className="space-y-1">
-                   <Label htmlFor="tax-rate-w" className="text-xs">Income Tax Rate on Withdrawals (%)</Label>
+                   <Label htmlFor="tax-rate-w" className="text-xs">Tax Rate (%)</Label>
                    <NumericInput
                      id="tax-rate-w"
                      value={state.taxRate ?? 0}
@@ -225,6 +230,21 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
                      min={0}
                      max={99}
                    />
+                 </div>
+                 <div className="space-y-1">
+                   <Label htmlFor="tax-type-w" className="text-xs">Tax Type</Label>
+                   <Select
+                      value={state.taxType ?? 'capital_gains'}
+                      onValueChange={(value: any) => setState({ ...state, taxType: value })}
+                    >
+                      <SelectTrigger id="tax-type-w" className="h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="capital_gains">Transaction (Gross Up)</SelectItem>
+                        <SelectItem value="income">Annual (Tax Drag)</SelectItem>
+                      </SelectContent>
+                    </Select>
                  </div>
                </div>
             )}
