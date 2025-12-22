@@ -73,7 +73,8 @@ const dt = 1 / timeStepsPerYear
   
   // 1. Apply Tax Drag (Income Tax)
   // We apply this to the raw input rate (whether Nominal or Effective)
-  if (mode === 'growth' && taxEnabled && taxType === 'income') {
+  // APPLIES TO BOTH: Growth (Drag) and Withdrawal (Bank/Income Style)
+  if (taxEnabled && taxType === 'income') {
     effectiveReturn = expectedReturn * (1 - taxRate / 100)
   }
 
@@ -96,7 +97,8 @@ const dt = 1 / timeStepsPerYear
   let annualBaseCashflow = cashflowFrequency === 'monthly' ? cashflowAmount * 12 : cashflowAmount
 
   // FIX: Tax Rate Edge Case Safety (Consistent with Withdrawal Engine)
-  if (mode === 'withdrawal' && taxEnabled) {
+  // Only Gross Up if NOT 'income' type (Income type uses Tax Drag instead)
+  if (mode === 'withdrawal' && taxEnabled && taxType !== 'income') {
      let t = taxRate / 100
      if (t >= 0.99) t = 0.99 // Hard clamp to 99% for safety
      annualBaseCashflow = annualBaseCashflow / (1 - t)
