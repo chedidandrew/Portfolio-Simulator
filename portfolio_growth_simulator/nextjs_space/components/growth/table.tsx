@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Calendar } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { formatCurrency } from '@/lib/utils'
 
 interface GrowthTableProps {
   data: Array<{
@@ -70,21 +71,21 @@ export function GrowthTable({ data, taxEnabled, taxType, taxRate }: GrowthTableP
                 >
                   <td className="p-3 text-sm font-medium">{row.year}</td>
                   <td className="p-3 text-sm text-right">
-                    ${row.startingValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    {formatCurrency(row.startingValue, true, 2, false)}
                   </td>
                   <td className="p-3 text-sm text-right text-muted-foreground">
-                    ${row.contributions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    {formatCurrency(row.contributions, true, 2, false)}
                   </td>
                   <td className="p-3 text-sm text-right">
-                    ${row.interest.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    {formatCurrency(row.interest, true, 2, false)}
                   </td>
                   {showTaxColumn && (
                     <td className="p-3 text-sm text-right text-muted-foreground">
-                      ${(row.interest * taxMultiplier).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      {formatCurrency(row.interest * taxMultiplier, true, 2, false)}
                     </td>
                   )}
                   <td className="p-3 text-sm text-right font-semibold text-primary">
-                    ${row.endingValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    {formatCurrency(row.endingValue, true, 2, false)}
                   </td>
                 </motion.tr>
               ))}
@@ -93,14 +94,14 @@ export function GrowthTable({ data, taxEnabled, taxType, taxRate }: GrowthTableP
                 <td className="p-3 text-sm font-semibold">Total</td>
                 <td className="p-3" />
                 <td className="p-3 text-sm text-right font-semibold">
-                  ${totals.contributions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  {formatCurrency(totals.contributions, true, 2, false)}
                 </td>
                 <td className="p-3 text-sm text-right font-semibold">
-                  ${totals.interest.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  {formatCurrency(totals.interest, true, 2, false)}
                 </td>
                 {showTaxColumn && (
                   <td className="p-3 text-sm text-right font-semibold">
-                    ${totals.taxPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    {formatCurrency(totals.taxPaid, true, 2, false)}
                   </td>
                 )}
                 <td className="p-3" />

@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Calendar, XCircle } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { formatCurrency } from '@/lib/utils'
 
 interface WithdrawalTableProps {
   data: Array<{
@@ -77,28 +78,28 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
                       )}
                     </td>
                     <td className="p-3 text-sm text-right">
-                      ${row.startingBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      {formatCurrency(row.startingBalance, true, 2, false)}
                     </td>
                     <td className="p-3 text-sm text-right text-muted-foreground">
-                      ${row.withdrawals.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      {formatCurrency(row.withdrawals, true, 2, false)}
                     </td>
                     {hasTax && (
                       <td className="p-3 text-sm text-right font-medium text-emerald-600">
-                        ${row.netIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        {formatCurrency(row.netIncome, true, 2, false)}
                       </td>
                     )}
                     <td className="p-3 text-sm text-right">
-                      ${(row.endingBalance - row.startingBalance + row.withdrawals).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      {formatCurrency(row.endingBalance - row.startingBalance + row.withdrawals, true, 2, false)}
                     </td>
                     {hasTax && (
                       <td className="p-3 text-sm text-right text-muted-foreground">
-                        ${(row.withdrawals - row.netIncome).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                         {formatCurrency(row.withdrawals - row.netIncome, true, 2, false)}
                       </td>
                     )}
                     <td className={`p-3 text-sm text-right font-semibold ${
                       row.isSustainable ? 'text-primary' : 'text-destructive'
                     }`}>
-                      ${row.endingBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      {formatCurrency(row.endingBalance, true, 2, false)}
                     </td>
                   </motion.tr>
                 ))}
@@ -107,19 +108,19 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
                   <td className="p-3 text-sm font-semibold">Total</td>
                   <td className="p-3" />
                   <td className="p-3 text-sm text-right font-semibold">
-                    ${totals.withdrawals.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    {formatCurrency(totals.withdrawals, true, 2, false)}
                   </td>
                   {hasTax && (
                     <td className="p-3 text-sm text-right font-semibold text-emerald-600">
-                      ${totals.netIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      {formatCurrency(totals.netIncome, true, 2, false)}
                     </td>
                   )}
                   <td className="p-3 text-sm text-right font-semibold">
-                    ${totals.growth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    {formatCurrency(totals.growth, true, 2, false)}
                   </td>
                   {hasTax && (
                     <td className="p-3 text-sm text-right font-semibold">
-                      ${totals.taxPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      {formatCurrency(totals.taxPaid, true, 2, false)}
                     </td>
                   )}
                   <td className="p-3" />

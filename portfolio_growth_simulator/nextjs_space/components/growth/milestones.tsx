@@ -8,9 +8,9 @@ import { Award } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 
 const MILESTONES = [
-  { value: 10000, label: 'First $10K', icon: '🎯' },
-  { value: 50000, label: '$50K Club', icon: '⭐' },
-  { value: 100000, label: '$100K Milestone', icon: '💎' },
+  { value: 10000, label: 'First 10K', icon: '🎯' },
+  { value: 50000, label: '50K Club', icon: '⭐' },
+  { value: 100000, label: '100K Milestone', icon: '💎' },
   { value: 250000, label: 'Quarter Million', icon: '🏆' },
   { value: 500000, label: 'Half Million', icon: '👑' },
   { value: 1000000, label: 'Millionaire!', icon: '🚀' },

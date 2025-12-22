@@ -55,7 +55,7 @@ export function GrowthResults({
     : 0
 
   const formatResult = (val: number) => {
-    if (val === undefined || isNaN(val)) return '$0'
+    if (val === undefined || isNaN(val)) return formatCurrency(0)
 
     const shouldUseCompact = val >= 1e100 || !showFullPrecision
     const formatted = formatCurrency(val, true, 2, shouldUseCompact)
@@ -194,7 +194,7 @@ export function GrowthResults({
             >
               <Target className="h-5 w-5 text-primary" />
               <p className="text-sm">
-                You&apos;ll reach your target of <span className="font-bold">${targetValue.toLocaleString()}</span> in
+                You&apos;ll reach your target of <span className="font-bold">{formatCurrency(targetValue)}</span> in
                 approximately <span className="font-bold text-primary">{yearsToTarget} years</span>
               </p>
             </motion.div>

@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { NumericInput } from '@/components/ui/numeric-input'
-import { DollarSign, Zap, Scale } from 'lucide-react'
+import { Coins, Zap, Scale } from 'lucide-react'
 import { SimulationParams } from '@/lib/types'
+import { getAppCurrency } from '@/lib/utils'
 
 interface MonteCarloParametersProps {
   mode: 'growth' | 'withdrawal'
@@ -31,6 +32,8 @@ export function MonteCarloParameters({
   presetProfiles
 }: MonteCarloParametersProps) {
   
+  const currencySymbol = getAppCurrency().symbol
+
   const getCashflowLabel = () => {
     if (mode === 'growth') return 'Monthly Contribution'
     if (params.taxEnabled) return 'Monthly Spending (Net/After-Tax)'
@@ -86,7 +89,7 @@ export function MonteCarloParameters({
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2 shrink-0 -ml-1">
-              <DollarSign className="h-5 w-5 text-violet-500" />
+              <Coins className="h-5 w-5 text-violet-500" />
               <CardTitle>Simulation Parameters</CardTitle>
             </div>
           </div>
@@ -96,7 +99,7 @@ export function MonteCarloParameters({
             
             {/* Initial Value */}
             <div className="space-y-2">
-              <Label htmlFor="mc-initial">Initial Portfolio Value ($)</Label>
+              <Label htmlFor="mc-initial">Initial Portfolio Value ({currencySymbol})</Label>
               <NumericInput
                 id="mc-initial"
                 value={params.initialValue}
@@ -189,7 +192,7 @@ export function MonteCarloParameters({
             {/* Cashflow (Contribution or Withdrawal) */}
             <div className="space-y-2">
               <Label htmlFor="mc-cashflow">
-                {getCashflowLabel()} ($)
+                {getCashflowLabel()} ({currencySymbol})
               </Label>
               <NumericInput
                 id="mc-cashflow"

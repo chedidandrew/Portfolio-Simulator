@@ -63,7 +63,7 @@ export function MonteCarloResults({
   const isExporting = exportState !== 'idle'
 
   const renderFormattedResult = (val: number | undefined) => {
-    if (val === undefined) return '$0'
+    if (val === undefined) return formatCurrency(0)
 
     const shouldUseCompact = val >= 1e100 || !showFullPrecision
     const formatted = formatCurrency(val, true, 2, shouldUseCompact)
@@ -202,7 +202,7 @@ export function MonteCarloResults({
               <Target className="h-6 w-6 text-primary" />
               <div className="flex-1">
                 <p className="font-semibold">
-                  {results.goalProbability?.toFixed(1) ?? '0'}% chance of reaching ${(results.portfolioGoalSnapshot ?? params.portfolioGoal).toLocaleString()}
+                  {results.goalProbability?.toFixed(1) ?? '0'}% chance of reaching {formatCurrency(results.portfolioGoalSnapshot ?? params.portfolioGoal)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   In {results.pathsReachingGoal ?? 0} out of {results.numPathsUsed ?? params.numPaths} scenarios, you reached your goal

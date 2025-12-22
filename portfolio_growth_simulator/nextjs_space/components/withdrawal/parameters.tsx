@@ -5,8 +5,9 @@ import { Label } from '@/components/ui/label'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { DollarSign, Scale } from 'lucide-react'
+import { Coins, Scale } from 'lucide-react'
 import { WithdrawalState } from '@/lib/types'
+import { getAppCurrency, formatCurrency } from '@/lib/utils'
 
 interface WithdrawalParametersProps {
   state: WithdrawalState
@@ -14,11 +15,13 @@ interface WithdrawalParametersProps {
 }
 
 export function WithdrawalParameters({ state, setState }: WithdrawalParametersProps) {
+  const currencySymbol = getAppCurrency().symbol
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <DollarSign className="h-5 w-5 text-blue-500" />
+          <Coins className="h-5 w-5 text-blue-500" />
           Withdrawal Parameters
         </CardTitle>
         <CardDescription>Configure your retirement spending plan</CardDescription>
@@ -28,7 +31,7 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
           
           {/* Starting Balance */}
           <div className="space-y-2">
-            <Label htmlFor="starting-balance-w">Starting Balance ($)</Label>
+            <Label htmlFor="starting-balance-w">Starting Balance ({currencySymbol})</Label>
             <NumericInput
               id="starting-balance-w"
               value={state.startingBalance ?? 0}
@@ -92,7 +95,7 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
           {/* Withdrawal Amount */}
           <div className="space-y-2">
             <Label htmlFor="periodic-withdrawal">
-               {state.taxEnabled ? 'Target Withdrawal (Net/After-Tax) ($)' : 'Withdrawal Amount ($)'}
+               {state.taxEnabled ? `Target Withdrawal (Net/After-Tax) (${currencySymbol})` : `Withdrawal Amount (${currencySymbol})`}
             </Label>
             <NumericInput
               id="periodic-withdrawal"
@@ -113,17 +116,14 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
                 You should withdraw{' '}
                 <span className="font-semibold text-primary">
-                  {(
+                  {formatCurrency(
                     (state.periodicWithdrawal ?? 0) /
                     (1 - Math.min(state.taxRate ?? 0, 99) / 100)
-                  ).toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+                  )}
                 </span>{' '}
                 per {state.frequency?.replace('ly', '') || 'month'} to have an effective net
                 withdrawal of{' '}
-                {(state.periodicWithdrawal ?? 0).toLocaleString(undefined, {
-                  style: 'currency',
-                  currency: 'USD',
-                })}
+                {formatCurrency(state.periodicWithdrawal ?? 0)}
                 .
               </p>
             )}

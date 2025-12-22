@@ -49,7 +49,7 @@ export function WithdrawalResults({
   const sustainabilityColor = isSustainable ? 'text-emerald-500' : 'text-destructive'
 
   const renderFormattedResult = (val: number | undefined) => {
-    if (val === undefined || isNaN(val)) return '$0'
+    if (val === undefined || isNaN(val)) return formatCurrency(0)
 
     const shouldUseCompact = val >= 1e100 || !showFullPrecision
     const formatted = formatCurrency(val, true, 2, shouldUseCompact)

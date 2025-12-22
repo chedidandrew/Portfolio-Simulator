@@ -5,8 +5,9 @@ import { Label } from '@/components/ui/label'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { DollarSign, Scale } from 'lucide-react'
+import { Coins, Scale } from 'lucide-react'
 import { GrowthState } from '@/lib/types'
+import { getAppCurrency } from '@/lib/utils'
 
 interface GrowthParametersProps {
   state: GrowthState
@@ -14,11 +15,13 @@ interface GrowthParametersProps {
 }
 
 export function GrowthParameters({ state, setState }: GrowthParametersProps) {
+  const currencySymbol = getAppCurrency().symbol
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <DollarSign className="h-5 w-5 text-primary" />
+          <Coins className="h-5 w-5 text-primary" />
           Growth Parameters
         </CardTitle>
         <CardDescription>Configure your investment scenario</CardDescription>
@@ -28,7 +31,7 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Starting Balance */}
           <div className="space-y-2">
-            <Label htmlFor="starting-balance">Starting Balance ($)</Label>
+            <Label htmlFor="starting-balance">Starting Balance ({currencySymbol})</Label>
             <NumericInput
               id="starting-balance"
               value={state.startingBalance ?? 0}
@@ -94,7 +97,7 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
 
           {/* Contribution Amount */}
           <div className="space-y-2">
-            <Label htmlFor="periodic-addition">Contribution Amount ($)</Label>
+            <Label htmlFor="periodic-addition">Contribution Amount ({currencySymbol})</Label>
             <NumericInput
               id="periodic-addition"
               value={state.periodicAddition ?? 0}
