@@ -4,6 +4,20 @@ import iso4217 from '@/data/iso4217.json'
 
 const DEFAULT_CURRENCY = { code: 'USD', symbol: '$', label: 'USD ($)' }
 
+const TOP_CURRENCY_CODES = [
+  'USD',
+  'EUR',
+  'GBP',
+  'JPY',
+  'CHF',
+  'CAD',
+  'AUD',
+  'CNY',
+  'HKD',
+  'SGD',
+  'INR',
+]
+
 function getCurrencySymbol(code: string) {
   try {
     const parts = new Intl.NumberFormat(undefined, {
@@ -24,7 +38,18 @@ export const CURRENCIES = (iso4217 as { code: string; name: string }[])
     const symbol = getCurrencySymbol(code)
     return { code, symbol, label: `${code} (${symbol})` }
   })
-  .sort((a, b) => a.code.localeCompare(b.code))
+  .sort((a, b) => {
+    const ai = TOP_CURRENCY_CODES.indexOf(a.code)
+    const bi = TOP_CURRENCY_CODES.indexOf(b.code)
+
+    if (ai !== -1 || bi !== -1) {
+      if (ai === -1) return 1
+      if (bi === -1) return -1
+      return ai - bi
+    }
+
+    return a.code.localeCompare(b.code)
+  })
 
 export type CurrencyCode = string
 
@@ -189,17 +214,22 @@ export function formatCurrency(
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency.code,
-    maximumFractionDigits: compact ? 0 : 2, 
-    minimumFractionDigits: compact ? 0 : 2,
+    currencyDisplay: 'narrowSymbol',
+    maximumFractionDigits: decimals, 
+    minimumFractionDigits: decimals,
   })
   
   let formatted = formatter.format(value)
-  
+
+  if (showDollarSign && currency.symbol && currency.symbol !== currency.code) {
+    if (formatted.includes(currency.code) && !formatted.includes(currency.symbol)) {
+      formatted = formatted.replace(currency.code, currency.symbol).trim()
+    }
+  }
+
   if (!showDollarSign) {
       formatted = formatted.replace(currency.symbol, '').trim()
-      // Fallback for codes like CAD/AUD where symbol is same as USD or others
       if (currency.symbol === '$') formatted = formatted.replace('$', '').trim()
-      // Fallback for cases where Intl includes code (e.g. CHF 100)
       if (formatted.includes(currency.code)) formatted = formatted.replace(currency.code, '').trim()
   }
   
