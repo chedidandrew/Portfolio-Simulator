@@ -410,8 +410,8 @@ export function MonteCarloParameters({
                   </Select>
                   <p className="text-xs text-muted-foreground">
                     {params.calculationMode === 'nominal'
-                      ? "Uses input as Nominal Rate (monthly compounding). We convert this to an Effective Annual Rate before running the stochastic process."
-                      : "Uses input as Effective Annual Rate (APY) directly. The expected geometric drift will match this rate exactly (before volatility drag)."}
+                      ? "Input is Nominal (APR). We convert this to a higher Effective Annual Rate for the simulation to account for monthly compounding."
+                      : "Input is Effective (APY). The simulation's Median (most likely) outcome will match this return rate exactly."}
                   </p>
                 </div>
               </div>

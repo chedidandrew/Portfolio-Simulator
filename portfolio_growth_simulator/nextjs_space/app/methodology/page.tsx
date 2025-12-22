@@ -176,17 +176,34 @@ export default function MethodologyPage() {
             iconWrapperClass="bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20"
             className="border-emerald-500/20"
           >
-            <div className="grid gap-6 md:grid-cols-2">
+            {/* CHANGED: Removed md:grid-cols-2 to force vertical stacking */}
+            <div className="grid gap-6">
               <div className="space-y-3 p-4 rounded-lg bg-muted/40">
                 <div className="flex items-center gap-2 font-semibold text-foreground">
                   <Calculator className="h-4 w-4 text-emerald-500" />
-                  The Math: Effective Rate (APY)
+                  The Math: Nominal vs. Effective
                 </div>
                 <p className="text-sm leading-relaxed">
-                  The growth tool uses the <strong>Effective Annual Rate</strong>. If you input 8% return, math ensures you get exactly 8% growth by year-end, not a penny more.
+                  The simulator supports two calculation modes. <strong>Effective (APY)</strong> ensures your annual result matches your input exactly. <strong>Nominal (APR)</strong> simply divides the rate by 12, which results in slightly higher returns due to monthly compounding.
                 </p>
-                <div className="mt-2 rounded-md border bg-background/40 px-4 py-3 flex justify-center overflow-x-auto">
+
+                <div className="p-3 bg-background/50 rounded-md border border-border/50">
+                  <p className="text-xs font-semibold text-foreground mb-1">Which should I use?</p>
+                  <p className="text-xs text-muted-foreground">
+                    Stick with <strong>Effective (Default)</strong>. This matches how investment returns (CAGR) are typically quoted. Only use Nominal if you are modeling a debt payoff (like a mortgage) calculated as APR.
+                  </p>
+                </div>
+
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-md border bg-background/40 px-3 py-2">
+                    <p className="text-xs text-center text-muted-foreground mb-1">Effective (Default)</p>
                     <BlockMath math={String.raw`r_m = (1 + r_{\text{annual}})^{\tfrac{1}{12}} - 1`} />
+                  </div>
+                  
+                  <div className="rounded-md border bg-background/40 px-3 py-2">
+                    <p className="text-xs text-center text-muted-foreground mb-1">Nominal (Advanced Settings)</p>
+                    <BlockMath math={String.raw`r_m = \frac{r_{\text{annual}}}{12}`} />
+                  </div>
                 </div>
               </div>
 
@@ -217,17 +234,34 @@ export default function MethodologyPage() {
             iconWrapperClass="bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20"
             className="border-blue-500/20"
           >
-            <div className="grid gap-6 md:grid-cols-2">
+            {/* CHANGED: Removed md:grid-cols-2 to force vertical stacking */}
+            <div className="grid gap-6">
               <div className="space-y-3 p-4 rounded-lg bg-muted/40">
                 <div className="flex items-center gap-2 font-semibold text-foreground">
                   <Calculator className="h-4 w-4 text-blue-500" />
-                  The Math: Effective Rate (APY)
+                  The Math: Nominal vs. Effective
                 </div>
                 <p className="text-sm leading-relaxed">
-                  The withdrawal tool switches to the <strong>Effective Annual Rate</strong>. If you input 8% return, math ensures you get exactly 8% growth by year-end, not a penny more.
+                  Just like growth, withdrawals support two modes. <strong>Effective (APY)</strong> pays out interest based on strict annual equivalence. <strong>Nominal (APR)</strong> uses a simple division by 12, often resulting in slightly different monthly interest credits.
                 </p>
-                <div className="mt-2 rounded-md border bg-background/40 px-4 py-3 flex justify-center overflow-x-auto">
+
+                <div className="p-3 bg-background/50 rounded-md border border-border/50">
+                  <p className="text-xs font-semibold text-foreground mb-1">Which should I use?</p>
+                  <p className="text-xs text-muted-foreground">
+                    Stick with <strong>Effective (Default)</strong>. This matches how investment returns (CAGR) are typically quoted. Only use Nominal if you are modeling a debt payoff (like a mortgage) calculated as APR.
+                  </p>
+                </div>
+
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-md border bg-background/40 px-3 py-2">
+                    <p className="text-xs text-center text-muted-foreground mb-1">Effective (Default)</p>
                     <BlockMath math={String.raw`r_m = (1 + r_{\text{annual}})^{\tfrac{1}{12}} - 1`} />
+                  </div>
+                  
+                  <div className="rounded-md border bg-background/40 px-3 py-2">
+                    <p className="text-xs text-center text-muted-foreground mb-1">Nominal (Advanced Settings)</p>
+                    <BlockMath math={String.raw`r_m = \frac{r_{\text{annual}}}{12}`} />
+                  </div>
                 </div>
               </div>
 
@@ -301,21 +335,41 @@ export default function MethodologyPage() {
             iconWrapperClass="bg-violet-500/10 text-violet-500 group-hover:bg-violet-500/20"
             className="border-violet-500/20"
           >
-             <div className="space-y-4">
+              <div className="space-y-4">
               <p className="text-sm leading-relaxed">
                 Standard calculators assume returns follow a straight line (e.g., 8% every year), which is not how the real world works. 
                 The Monte Carlo simulation models this uncertainty by introducing <strong>volatility (Risk)</strong> and generating many possible return paths.
               </p>
 
-              <div className="mt-3 rounded-md border bg-background/40 px-4 py-3 flex justify-center overflow-x-auto">
-                <BlockMath
-                    math={String.raw`
-                    V_{t+\Delta t}
-                    =
-                    V_t \cdot
-                    e^{\left(\mu - \tfrac{1}{2}\sigma^2\right)\Delta t + \sigma \sqrt{\Delta t}\, Z}
-                    `}
-                />
+              {/* Nominal vs Effective Explanation */}
+              <div className="space-y-3 p-4 rounded-lg bg-muted/40">
+                <div className="flex items-center gap-2 font-semibold text-foreground">
+                  <Calculator className="h-4 w-4 text-violet-500" />
+                  The Math: Nominal vs. Effective
+                </div>
+                <p className="text-sm leading-relaxed">
+                  The simulation relies on "Drift" μ to generate returns. <strong>Effective (Default)</strong> derives drift directly from your input, ensuring the median result matches your target. <strong>Nominal (APR)</strong> converts the rate to an Effective Annual Rate first.
+                </p>
+
+                <div className="p-3 bg-background/50 rounded-md border border-border/50">
+                  <p className="text-xs font-semibold text-foreground mb-1">Which should I use?</p>
+                  <p className="text-xs text-muted-foreground">
+                    Stick with <strong>Effective (Default)</strong>. This guarantees that the "most likely" (median) outcome of the simulation aligns exactly with the return rate you entered.
+                  </p>
+                </div>
+              </div>
+
+              {/* The Formula Title and Block */}
+              <div className="space-y-2 mt-4">
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-violet-500" />
+                    The Core Formula: Geometric Brownian Motion
+                </h4>
+                <div className="rounded-md border bg-background/40 px-4 py-3 flex justify-center overflow-x-auto">
+                    <BlockMath
+                        math={String.raw`V_{t+\Delta t}=V_t \cdot e^{\mu \Delta t + \sigma \sqrt{\Delta t}\, Z}`}
+                    />
+                </div>
               </div>
 
               {/* Translation for Retail Investors */}
