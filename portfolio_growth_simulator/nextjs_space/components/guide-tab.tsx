@@ -30,7 +30,8 @@ import {
   Laptop,
   Download,
   Info,
-  KeyRound
+  KeyRound,
+  Scale
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { DonationSection } from '@/components/donation-section'
@@ -367,6 +368,17 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   The process where investment returns generate their own returns over time. Your money grows exponentially rather than linearly, making it one of the most powerful wealth-building concepts.
+                </p>
+              </div>
+
+              <div className="space-y-2 p-3 rounded-lg bg-muted/40">
+                <div className="flex items-center gap-2 font-semibold text-foreground">
+                  <Scale className="h-4 w-4 text-rose-500" />
+                  Tax Drag vs. Gross Up
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  <strong>Tax Drag (Income):</strong> Taxes are paid annually on growth (like a bank account), slowing down compounding. <br/>
+                  <strong>Gross Up (Transaction):</strong> Taxes are only paid when you withdraw. We withdraw *extra* to cover the tax bill so your net pocket money stays the same.
                 </p>
               </div>
 
