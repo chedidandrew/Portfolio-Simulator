@@ -151,9 +151,9 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
 
             {state.taxEnabled && state.taxType === 'capital_gains' && (
               <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                 The simulator will automatically increase your withdrawal to cover capital gains tax, ensuring you net exactly <span className="font-semibold">{formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}</span>.
+                 Withdrawing <span className="font-semibold">{formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}</span> (Gross), capital gains tax will be deducted from this amount.
                  <br/>
-                 <span className="opacity-80">This gross-up amount varies each year based on your profit margin.</span>
+                 <span className="opacity-80">Your net pocket money will vary each year as your cost basis changes.</span>
               </p>
             )}
 

@@ -157,9 +157,9 @@ export function performMonteCarloSimulation(
              let effectiveTaxRate = (taxRate / 100) * gainFraction
              if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99
              
-             stepWithdrawal = detCashflow / (1 - effectiveTaxRate)
+             stepWithdrawal = detCashflow
              stepTaxPaid = stepWithdrawal * effectiveTaxRate
-             stepNet = detCashflow 
+             stepNet = stepWithdrawal - stepTaxPaid
          }
        }
 
@@ -262,7 +262,7 @@ export function performMonteCarloSimulation(
                 const gainFraction = currentValue > totalBasis ? (currentValue - totalBasis) / currentValue : 0
                 let effectiveTaxRate = (taxRate / 100) * gainFraction
                 if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99
-                stepWithdrawal = currentCashflowPerStep / (1 - effectiveTaxRate)
+                stepWithdrawal = currentCashflowPerStep
             }
         }
 

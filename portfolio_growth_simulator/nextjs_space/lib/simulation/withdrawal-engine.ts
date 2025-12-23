@@ -103,7 +103,7 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
            let effectiveTaxRate = (taxRate / 100) * gainFraction
            if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99 
            
-           requiredGross = inputAmountThisMonth / (1 - effectiveTaxRate)
+           requiredGross = inputAmountThisMonth
            calculatedTax = requiredGross * effectiveTaxRate
          }
       }
