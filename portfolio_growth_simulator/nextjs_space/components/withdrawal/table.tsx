@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Calendar, XCircle, ArrowUpRight } from 'lucide-react'
+import { Calendar, XCircle } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { formatCurrency } from '@/lib/utils'
 
@@ -11,6 +11,7 @@ interface WithdrawalTableProps {
     startingBalance: number
     withdrawals: number
     netIncome: number
+    taxPaid: number
     endingBalance: number
     isSustainable: boolean
   }>
@@ -19,15 +20,23 @@ interface WithdrawalTableProps {
 export function WithdrawalTable({ data }: WithdrawalTableProps) {
   if (!data || data.length === 0) return null
 
-  // Check if we need to show Net Income (if it differs from Gross Withdrawal)
-  const hasTax = data.some(row => Math.abs(row.withdrawals - row.netIncome) > 0.01)
+  // Show tax if any tax was paid (explicit field)
+  const hasTax = data.some(row => row.taxPaid > 0.01)
+  
+  // Detect if this is "Income" mode (Net == Gross but Tax > 0)
+  const isIncomeMode = data.some(row => row.taxPaid > 0.01 && Math.abs(row.withdrawals - row.netIncome) < 0.01)
 
   const totals = data.reduce(
     (acc, row) => {
       acc.withdrawals += row.withdrawals
       acc.netIncome += row.netIncome
-      acc.taxPaid += (row.withdrawals - row.netIncome)
+      acc.taxPaid += row.taxPaid
+      // Net Growth = End - Start + GrossWithdrawal. (This is net of drag)
       acc.growth += (row.endingBalance - row.startingBalance + row.withdrawals)
+      if (isIncomeMode) {
+          // If we want to show Gross Growth for income mode, add back the tax
+          acc.growth += row.taxPaid
+      }
       return acc
     },
     { withdrawals: 0, netIncome: 0, taxPaid: 0, growth: 0 }
@@ -50,36 +59,40 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
                   <th className="p-3 text-left text-sm font-semibold">Year</th>
                   <th className="p-3 text-right text-sm font-semibold">Start Balance</th>
                   
-                  {/* Gross Column */}
                   <th className="p-3 text-right text-sm font-semibold">
-                    {hasTax ? 'Gross Withdrawal' : 'Withdrawal'}
+                    {hasTax && !isIncomeMode ? 'Gross Withdrawal' : 'Withdrawal'}
                   </th>
                   
-                  {/* Net Column */}
-                  {hasTax && (
+                  {/* Hide Net/Eff columns for Income Mode to reduce noise */}
+                  {hasTax && !isIncomeMode && (
                     <th className="p-3 text-right text-sm font-semibold text-emerald-600">Net Pocket</th>
                   )}
                   
-                  {/* Effective Rate Column - NEW */}
-                  {hasTax && (
+                  {hasTax && !isIncomeMode && (
                     <th className="p-3 text-right text-sm font-semibold text-muted-foreground whitespace-nowrap">
                       Eff. Tax %
                     </th>
                   )}
 
-                  {/* Tax Amount Column */}
                   {hasTax && (
-                    <th className="p-3 text-right text-sm font-semibold text-red-500/80">Tax Paid</th>
+                    <th className="p-3 text-right text-sm font-semibold text-red-500/80">
+                       {isIncomeMode ? 'Tax Drag Paid' : 'Tax Paid'}
+                    </th>
                   )}
 
-                  <th className="p-3 text-right text-sm font-semibold">Growth Earned</th>
+                  <th className="p-3 text-right text-sm font-semibold">
+                      {isIncomeMode ? 'Growth (Gross)' : 'Growth Earned'}
+                  </th>
                   <th className="p-3 text-right text-sm font-semibold">End Balance</th>
                 </tr>
               </thead>
               <tbody>
                 {data.map((row, idx) => {
-                  const taxPaid = row.withdrawals - row.netIncome
-                  const effectiveRate = row.withdrawals > 0 ? (taxPaid / row.withdrawals) * 100 : 0
+                  const effectiveRate = row.withdrawals > 0 ? (row.taxPaid / row.withdrawals) * 100 : 0
+                  
+                  // Calculate Growth for display
+                  let growthDisplay = row.endingBalance - row.startingBalance + row.withdrawals
+                  if (isIncomeMode) growthDisplay += row.taxPaid
 
                   return (
                     <motion.tr
@@ -101,34 +114,31 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
                         {formatCurrency(row.startingBalance, true, 2, false)}
                       </td>
                       
-                      {/* Gross Withdrawal */}
                       <td className="p-3 text-sm text-right font-medium">
                         {formatCurrency(row.withdrawals, true, 2, false)}
                       </td>
                       
-                      {/* Net Pocket */}
-                      {hasTax && (
+                      {hasTax && !isIncomeMode && (
                         <td className="p-3 text-sm text-right font-medium text-emerald-600">
                           {formatCurrency(row.netIncome, true, 2, false)}
                         </td>
                       )}
 
-                      {/* Effective Tax Rate % */}
-                      {hasTax && (
-                        <td className="p-3 text-sm text-right text-xs text-muted-foreground">
+                      {/* FIXED: Removed conflicting 'text-sm' class */}
+                      {hasTax && !isIncomeMode && (
+                        <td className="p-3 text-right text-xs text-muted-foreground">
                            {effectiveRate.toFixed(1)}%
                         </td>
                       )}
 
-                      {/* Tax Paid */}
                       {hasTax && (
                         <td className="p-3 text-sm text-right text-red-500/80">
-                           {formatCurrency(taxPaid, true, 2, false)}
+                           {formatCurrency(row.taxPaid, true, 2, false)}
                         </td>
                       )}
                       
                       <td className="p-3 text-sm text-right text-muted-foreground">
-                        {formatCurrency(row.endingBalance - row.startingBalance + row.withdrawals, true, 2, false)}
+                        {formatCurrency(growthDisplay, true, 2, false)}
                       </td>
                       
                       <td className={`p-3 text-sm text-right font-semibold ${
@@ -146,12 +156,13 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
                   <td className="p-3 text-sm text-right">
                     {formatCurrency(totals.withdrawals, true, 2, false)}
                   </td>
-                  {hasTax && (
+                  {hasTax && !isIncomeMode && (
                     <td className="p-3 text-sm text-right text-emerald-600">
                       {formatCurrency(totals.netIncome, true, 2, false)}
                     </td>
                   )}
-                  {hasTax && <td className="p-3" />}
+                  {hasTax && !isIncomeMode && <td className="p-3" />}
+                  
                   {hasTax && (
                     <td className="p-3 text-sm text-right text-red-500/80">
                       {formatCurrency(totals.taxPaid, true, 2, false)}

@@ -13,7 +13,8 @@ export interface WithdrawalProjectionResult {
     year: number
     startingBalance: number
     withdrawals: number
-    netIncome: number // New: what user actually got
+    netIncome: number // what user actually got
+    taxPaid: number   // New: explicit tax tracking
     endingBalance: number
     isSustainable: boolean
   }>
@@ -55,7 +56,7 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
   // --- 2. Simulation State ---
   let currentBalance = startingBalance
   let totalBasis = startingBalance
-  let currentPeriodicWithdrawal = periodicWithdrawal // This is Input (Gross for 401k, Net for Taxable)
+  let currentPeriodicWithdrawal = periodicWithdrawal 
   
   let yearsUntilZero: number | null = null
   let totalWithdrawn = 0
@@ -67,6 +68,7 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
   let yearStartBalance = startingBalance
   let yearWithdrawals = 0
   let yearNetIncome = 0
+  let yearTaxPaid = 0 // New accumulator
 
   // --- 3. Run Simulation ---
   for (let month = 1; month <= totalMonths; month++) {
@@ -86,45 +88,28 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
       // TAX LOGIC BRANCH
       if (taxEnabled && taxType !== 'income') {
          if (taxType === 'tax_deferred') {
-           // --- NEW LOGIC: GROSS INPUT ---
-           // Input is Gross. We simply take it out.
-           // Tax = Gross * Rate
-           // Net = Gross - Tax
            const effectiveRate = taxRate / 100
            requiredGross = inputAmountThisMonth
            calculatedTax = requiredGross * effectiveRate
            
          } else {
-           // --- EXISTING LOGIC: NET INPUT (Capital Gains) ---
-           // Input is Target Net. We Gross Up.
-           
-           // Calculate Gain Fraction
+           // Capital Gains
            let gainFraction = 0
            if (currentBalance > totalBasis) {
              gainFraction = (currentBalance - totalBasis) / currentBalance
            }
            if (gainFraction < 0) gainFraction = 0
            
-           // Effective Rate on the Gross Amount
-           // Net = Gross * (1 - GainFrac * Rate)
-           // Gross = Net / (1 - GainFrac * Rate)
            let effectiveTaxRate = (taxRate / 100) * gainFraction
-           
-           // Safety clamp
            if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99 
            
            requiredGross = inputAmountThisMonth / (1 - effectiveTaxRate)
-           
-           // We calculate tax here purely for the record, 
-           // but the engine uses requiredGross to deplete balance
            calculatedTax = requiredGross * effectiveTaxRate
          }
       }
 
-      // The portfolio pays the Gross amount (or whatever is left)
       const actualGrossWithdrawal = Math.min(currentBalance, requiredGross)
       
-      // If we hit the balance limit (ran out of money), we need to scale the tax down proportionally
       let actualTaxPaid = 0
       if (requiredGross > 0) {
           actualTaxPaid = calculatedTax * (actualGrossWithdrawal / requiredGross)
@@ -132,7 +117,6 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
       
       const actualNetReceived = actualGrossWithdrawal - actualTaxPaid
 
-      // Update Basis (Only relevant for Capital Gains logic)
       if (taxType === 'capital_gains') {
         if (currentBalance > 0) {
           const withdrawalRatio = actualGrossWithdrawal / currentBalance
@@ -150,8 +134,8 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
       
       yearWithdrawals += actualGrossWithdrawal
       yearNetIncome += actualNetReceived
+      yearTaxPaid += actualTaxPaid // Accumulate withdrawal tax
 
-      // Real Value Calculation
       const discountFactor = Math.pow(inflationFactor, month / 12)
       totalWithdrawnInTodaysDollars += (actualNetReceived / discountFactor)
     }
@@ -165,11 +149,17 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
         const growth = currentBalance - balanceBefore
         let t = taxRate / 100
         if (t >= 0.99) t = 0.99
-        totalTaxPaid += growth * (t / (1 - t))
+        
+        // "Implied Tax" calculation: Tax = Growth_PreTax - Growth_PostTax
+        // Growth_PreTax = Growth_PostTax / (1 - Rate)
+        // Tax = Growth_PostTax * (Rate / (1 - Rate))
+        const dragAmount = growth * (t / (1 - t))
+        
+        totalTaxPaid += dragAmount
+        yearTaxPaid += dragAmount // Accumulate drag tax
       }
     }
 
-    // Check for depletion
     if (currentBalance <= 0.01 && yearsUntilZero === null) {
       currentBalance = 0
       yearsUntilZero = parseFloat((month / 12).toFixed(1))
@@ -182,6 +172,7 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
         startingBalance: yearStartBalance,
         withdrawals: yearWithdrawals,
         netIncome: yearNetIncome,
+        taxPaid: yearTaxPaid, // Pass the tracked total
         endingBalance: Math.max(0, currentBalance),
         isSustainable: currentBalance > 0,
       })
@@ -189,8 +180,8 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
       yearStartBalance = currentBalance
       yearWithdrawals = 0
       yearNetIncome = 0
+      yearTaxPaid = 0
 
-      // E. Apply Inflation
       if (!excludeInflationAdjustment) {
         currentPeriodicWithdrawal *= inflationFactor
       }

@@ -76,7 +76,7 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
 
           {/* Annual Return */}
           <div className="space-y-2">
-            <Label htmlFor="annual-return-w">Annual Return (Geometric/CAGR) (%)</Label>
+            <Label htmlFor="annual-return-w">Expected Annual Growth Rate (%)</Label>
             <NumericInput
               id="annual-return-w"
               step={0.1}

@@ -130,7 +130,7 @@ export function MonteCarloParameters({
 
             {/* Expected Return */}
             <div className="space-y-2">
-              <Label htmlFor="mc-return">Expected Annual Growth Rate (Geometric/CAGR) (%)</Label>
+              <Label htmlFor="mc-return">Expected Annual Growth Rate (%)</Label>
               <NumericInput
                 id="mc-return"
                 step={0.1}
