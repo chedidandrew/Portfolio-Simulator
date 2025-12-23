@@ -253,8 +253,8 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
             {state.taxEnabled && (
                 <p className="text-[10px] text-muted-foreground pt-4">
                   {state.taxType === 'income' 
-                    ? 'Reduces annual return by tax rate.' 
-                    : 'Deducts tax from total profit at end.'}
+                    ? 'Like a CD/Bond: Reduces annual return by tax rate.' 
+                    : 'Like a Brokerage: Deducts tax from total profit at end.'}
                 </p>
             )}
           </div>
