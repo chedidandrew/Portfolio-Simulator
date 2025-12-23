@@ -15,6 +15,10 @@ export function CashflowChart({ params, mode }: { params: SimulationParams, mode
   const baseAnnual = params.cashflowFrequency === 'monthly' ? params.cashflowAmount * 12 : params.cashflowAmount
   const steps = Math.min(params.duration, 30) // Cap at 30 bars for readability
   
+  // Dynamically extract the currency symbol (e.g., "$", "€", "¥")
+  // We format a zero value and remove all digits, punctuation, and whitespace.
+  const currencySymbol = formatCurrency(0).replace(/[\d,.\s]/g, '') || '$'
+
   const data = Array.from({ length: steps + 1 }, (_, i) => {
     // If inflation is excluded in simulation, nominal = real (flat)
     // Otherwise nominal grows by inflation
@@ -66,14 +70,14 @@ export function CashflowChart({ params, mode }: { params: SimulationParams, mode
                 <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, paddingBottom: '10px' }} />
                 <Bar 
                   dataKey="nominal" 
-                  name="Nominal (Future $)" 
+                  name={`Nominal (Future ${currencySymbol})`}
                   fill="#3b82f6" 
                   radius={[2, 2, 0, 0]} 
                   fillOpacity={0.8}
                 />
                 <Bar 
                   dataKey="real" 
-                  name="Real (Today's $)" 
+                  name={`Real (Today's ${currencySymbol})`} 
                   fill="#10b981" 
                   radius={[2, 2, 0, 0]} 
                   fillOpacity={0.8}
