@@ -168,10 +168,16 @@ export function WithdrawalMode() {
     ]
 
     if (state.taxEnabled) {
+      const taxTypeLabel =
+        state.taxType === 'income'
+          ? 'Annual income tax drag'
+          : (state.taxType === 'tax_deferred'
+            ? 'Tax deferred (401k/IRA), taxed on withdrawal'
+            : 'Taxable Account (capital gains on liquidation)')
       summaryRows.push(
         { Key: 'Tax Enabled', Value: 'Yes' },
         { Key: 'Tax Rate', Value: `${state.taxRate}%` },
-        { Key: 'Tax Type', Value: state.taxType === 'income' ? 'Annual income tax drag' : 'Taxable Account (capital gains on liquidation)' },
+        { Key: 'Tax Type', Value: taxTypeLabel },
         { Key: 'Total Tax Paid', Value: roundToCents(calculation.totalTaxPaid) },
         { Key: 'Total Withdrawn (Net)', Value: roundToCents(calculation.totalWithdrawnNet) }
       )

@@ -175,10 +175,16 @@ export function GrowthMode() {
     // Add Tax info if enabled
     if (state.taxEnabled) {
       const isIncome = state.taxType === 'income'
+      const taxTypeLabel =
+        state.taxType === 'income'
+          ? 'Annual income tax drag'
+          : (state.taxType === 'tax_deferred'
+            ? 'Tax deferred (401k/IRA), taxed on withdrawal'
+            : 'Taxable Account (capital gains on liquidation)')
       summaryRows.push(
         { Key: 'Tax Enabled', Value: 'Yes' },
         { Key: 'Tax Rate', Value: `${state.taxRate}%` },
-        { Key: 'Tax Type', Value: isIncome ? 'Annual income tax drag' : 'Taxable Account (capital gains on liquidation)' }
+        { Key: 'Tax Type', Value: taxTypeLabel }
       )
       
       if (isIncome) {
