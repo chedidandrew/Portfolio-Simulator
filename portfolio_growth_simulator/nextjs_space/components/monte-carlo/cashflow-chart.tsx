@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { ArrowLeftRight } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getAppCurrency } from '@/lib/utils'
 import { SimulationParams } from '@/lib/types'
 
 export function CashflowChart({ params, mode }: { params: SimulationParams, mode: string }) {
@@ -15,9 +15,7 @@ export function CashflowChart({ params, mode }: { params: SimulationParams, mode
   const baseAnnual = params.cashflowFrequency === 'monthly' ? params.cashflowAmount * 12 : params.cashflowAmount
   const steps = Math.min(params.duration, 30) // Cap at 30 bars for readability
   
-  // Dynamically extract the currency symbol (e.g., "$", "€", "¥")
-  // We format a zero value and remove all digits, punctuation, and whitespace.
-  const currencySymbol = formatCurrency(0).replace(/[\d,.\s]/g, '') || '$'
+  const currencySymbol = getAppCurrency().symbol
 
   const data = Array.from({ length: steps + 1 }, (_, i) => {
     // If inflation is excluded in simulation, nominal = real (flat)

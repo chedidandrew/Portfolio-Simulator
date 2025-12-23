@@ -28,7 +28,7 @@ import {
 import { SensitivityTable } from '@/components/monte-carlo/sensitivity-table'
 import { CashflowChart } from '@/components/monte-carlo/cashflow-chart'
 import { TaxImpactChart } from '@/components/monte-carlo/tax-impact-chart'
-import { formatCurrency, getLargeNumberName } from '@/lib/utils'
+import { formatCurrency, getLargeNumberName, getAppCurrency } from '@/lib/utils'
 import { SimulationParams } from '@/lib/types'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -189,7 +189,7 @@ export function MonteCarloResults({
                   onCheckedChange={setIsRealDollars}
                 />
                 <Label htmlFor="real-nominal-toggle" className="font-normal cursor-pointer">
-                  {isRealDollars ? "Real (Today's $)" : "Nominal (Future $)"}
+                  {isRealDollars ? `Real (Today's ${getAppCurrency().symbol})` : `Nominal (Future ${getAppCurrency().symbol})`}
                 </Label>
               </div>
 
