@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { calculateWithdrawalProjection } from '@/lib/simulation/withdrawal-engine'
 import { WithdrawalState } from '@/lib/types'
 
@@ -9,5 +9,13 @@ export function useWithdrawalCalculation(state: WithdrawalState) {
     return calculateWithdrawalProjection(state)
   }, [state])
 
-  return result
+  const [isCalculated, setIsCalculated] = useState(false)
+
+  useEffect(() => {
+    setIsCalculated(true)
+    const timer = setTimeout(() => setIsCalculated(false), 500)
+    return () => clearTimeout(timer)
+  }, [result])
+
+  return { ...result, isCalculated }
 }

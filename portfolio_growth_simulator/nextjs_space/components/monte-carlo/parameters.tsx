@@ -38,7 +38,12 @@ export function MonteCarloParameters({
 
   const getCashflowLabel = () => {
     if (mode === 'growth') return 'Monthly Contribution'
-    if (params.taxEnabled) return 'Monthly Spending (Net/After-Tax)'
+    if (params.taxEnabled) {
+       // For Taxable Account (Capital Gains), we target Net Spending.
+       if (params.taxType === 'capital_gains') return 'Monthly Spending (Target Net)'
+       // For 401k/IRA, we specify Gross Withdrawal.
+       if (params.taxType === 'tax_deferred') return 'Monthly Withdrawal (Gross)'
+    }
     return 'Monthly Withdrawal'
   }
 
@@ -125,7 +130,7 @@ export function MonteCarloParameters({
 
             {/* Expected Return */}
             <div className="space-y-2">
-              <Label htmlFor="mc-return">Expected Annual Growth Rate (%)</Label>
+              <Label htmlFor="mc-return">Expected Annual Growth Rate (Geometric/CAGR) (%)</Label>
               <NumericInput
                 id="mc-return"
                 step={0.1}
@@ -286,21 +291,28 @@ export function MonteCarloParameters({
                       max={99}
                       maxErrorMessage="At 100% you are officially working for free :)"
                     />
+                    
                     {/* DYNAMIC TAX MESSAGE */}
-                    {mode === 'withdrawal' && params.taxType !== 'income' && (
+                    {mode === 'withdrawal' && params.taxType === 'tax_deferred' && (
                        <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                        You should withdraw{' '}
+                        Withdrawing <span className="font-semibold text-primary">{formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}</span> per {params.cashflowFrequency === 'monthly' ? 'month' : 'year'}, you will net{' '}
                         <span className="font-semibold text-primary">
                           {formatCurrency(
-                            (params.cashflowAmount ?? 0) /
-                            (1 - Math.min(params.taxRate ?? 0, 99) / 100),
+                            (params.cashflowAmount ?? 0) * (1 - Math.min(params.taxRate ?? 0, 99) / 100),
                             true, 2, false
                           )}
                         </span>{' '}
-                        per {params.cashflowFrequency === 'monthly' ? 'month' : 'year'} to have an effective net withdrawal of{' '}
-                        {formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}.
+                        after taxes.
                       </p>
                     )}
+
+                    {mode === 'withdrawal' && params.taxType === 'capital_gains' && (
+                       <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                          The simulator will automatically increase your withdrawal to cover capital gains tax, ensuring you net exactly <span className="font-semibold">{formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}</span>.
+                          <span className="opacity-80 ml-1">This gross-up amount varies each year based on your portfolio&apos;s profit margin.</span>
+                       </p>
+                    )}
+
                     {mode === 'withdrawal' && params.taxType === 'income' && (
                        <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
                         Like a High-Yield Savings account. Taxes are paid annually on interest, which <span className="font-semibold text-orange-600/90 dark:text-orange-400/90">slows down your growth</span>. 
@@ -320,20 +332,21 @@ export function MonteCarloParameters({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="capital_gains">
-                          {mode === 'growth' ? 'Deferred (Cap Gains)' : 'Transaction (Gross Up)'}
+                          {mode === 'growth' ? 'Deferred (Cap Gains)' : 'Taxable Account'}
                         </SelectItem>
+                        <SelectItem value="tax_deferred">Tax-Deferred (401k/IRA)</SelectItem>
                         <SelectItem value="income">Annual (Tax Drag)</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="hidden print:block text-xs text-muted-foreground pt-1">
                       Selected: {params.taxType === 'income' 
                         ? 'Annual (Tax Drag)' 
-                        : (mode === 'growth' ? 'Deferred (Cap Gains)' : 'Transaction (Gross Up)')}
+                        : (params.taxType === 'tax_deferred' ? 'Tax-Deferred (401k/IRA)' : (mode === 'growth' ? 'Deferred (Cap Gains)' : 'Taxable Account'))}
                     </p>
                     <p className="text-[10px] text-muted-foreground pt-1 print:hidden">
                       {params.taxType === 'income'
                         ? 'Reduces annual return rate.'
-                        : (mode === 'growth' ? 'Deducts tax from final profit.' : 'Increases withdrawal amount to cover tax.')}
+                        : (params.taxType === 'tax_deferred' ? 'Full balance/withdrawal taxed.' : (mode === 'growth' ? 'Deducts tax from final profit.' : 'Increases withdrawal amount to cover tax.'))}
                     </p>
                   </div>
                  </div>

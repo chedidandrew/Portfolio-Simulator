@@ -76,7 +76,7 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
 
           {/* Annual Return */}
           <div className="space-y-2">
-            <Label htmlFor="annual-return-w">Annual Return (%)</Label>
+            <Label htmlFor="annual-return-w">Annual Return (Geometric/CAGR) (%)</Label>
             <NumericInput
               id="annual-return-w"
               step={0.1}
@@ -118,7 +118,7 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
           {/* Withdrawal Amount */}
           <div className="space-y-2">
             <Label htmlFor="periodic-withdrawal">
-               {state.taxEnabled ? `Target Withdrawal (Net/After-Tax) (${currencySymbol})` : `Withdrawal Amount (${currencySymbol})`}
+               Withdrawal Amount ({currencySymbol})
             </Label>
             <NumericInput
               id="periodic-withdrawal"
@@ -135,24 +135,36 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               max={1e18}
               maxErrorMessage="Speedrunning bankruptcy? :)"
             />
-            {state.taxEnabled && state.taxType !== 'income' && (
+            
+            {/* --- TAX MESSAGE LOGIC START --- */}
+            {state.taxEnabled && state.taxType === 'tax_deferred' && (
               <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                You should withdraw{' '}
+                Withdrawing <span className="font-semibold text-primary">{formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}</span> per {state.frequency?.replace('ly', '') || 'month'}, you will net{' '}
                 <span className="font-semibold text-primary">
                   {formatCurrencyFullUnder100m(
-                    (state.periodicWithdrawal ?? 0) /
-                    (1 - Math.min(state.taxRate ?? 0, 99) / 100)
+                    (state.periodicWithdrawal ?? 0) * (1 - Math.min(state.taxRate ?? 0, 99) / 100)
                   )}
                 </span>{' '}
-                per {state.frequency?.replace('ly', '') || 'month'} to have an effective net withdrawal of{' '}
-                {formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}.
+                after taxes.
               </p>
             )}
+
+            {state.taxEnabled && state.taxType === 'capital_gains' && (
+              <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                 The simulator will automatically increase your withdrawal to cover capital gains tax, ensuring you net exactly <span className="font-semibold">{formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}</span>.
+                 <br/>
+                 <span className="opacity-80">This gross-up amount varies each year based on your profit margin.</span>
+              </p>
+            )}
+
             {state.taxEnabled && state.taxType === 'income' && (
               <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                With Annual Tax Drag, the portfolio return is reduced by the tax rate. You withdraw exactly {formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}.
+                Like a High-Yield Savings account. Taxes are paid annually on interest, which <span className="font-semibold text-orange-600/90 dark:text-orange-400/90">slows down your growth</span>. 
+                Your withdrawal remains exactly {formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}.
               </p>
             )}
+            {/* --- TAX MESSAGE LOGIC END --- */}
+
           </div>
           
           {/* Inflation Adjustment - With Toggle */}
@@ -243,12 +255,13 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="capital_gains">Transaction (Gross Up)</SelectItem>
+                        <SelectItem value="capital_gains">Taxable Account</SelectItem>
+                        <SelectItem value="tax_deferred">Tax-Deferred (401k/IRA)</SelectItem>
                         <SelectItem value="income">Annual (Tax Drag)</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="hidden print:block text-xs text-muted-foreground pt-1">
-                      Selected: {state.taxType === 'income' ? 'Annual (Tax Drag)' : 'Transaction (Gross Up)'}
+                      Selected: {state.taxType === 'income' ? 'Annual (Tax Drag)' : (state.taxType === 'tax_deferred' ? 'Tax-Deferred (401k/IRA)' : 'Taxable Account')}
                     </p>
                  </div>
                </div>

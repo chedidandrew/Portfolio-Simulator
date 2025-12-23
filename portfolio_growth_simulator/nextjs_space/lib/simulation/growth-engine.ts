@@ -38,6 +38,7 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
   const totalMonths = duration * 12
   
   // Tax Logic: If 'income' (Annual), apply tax drag to the return rate
+  // 'tax_deferred' and 'capital_gains' do NOT reduce annual return
   let effectiveAnnualReturn = annualReturn
   if (taxEnabled && taxType === 'income') {
     effectiveAnnualReturn = annualReturn * (1 - (taxRate / 100))
@@ -116,9 +117,16 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
   const totalInterest = finalValue - totalContributions
 
   let totalDeferredTax = 0
-  if (taxEnabled && taxType === 'capital_gains') {
-    if (totalProfit > 0) {
-      totalDeferredTax = totalProfit * (taxRate / 100)
+  if (taxEnabled) {
+    if (taxType === 'capital_gains') {
+      // Tax on PROFIT only
+      if (totalProfit > 0) {
+        totalDeferredTax = totalProfit * (taxRate / 100)
+      }
+    } else if (taxType === 'tax_deferred') {
+      // Tax on ENTIRE BALANCE (Traditional 401k/IRA style)
+      // Assumes the initial balance was also pre-tax or deductible
+      totalDeferredTax = finalValue * (taxRate / 100)
     }
   } 
 

@@ -68,26 +68,15 @@ export function performMonteCarloSimulation(
   const dt = 1 / timeStepsPerYear
   const totalTimeSteps = totalSimulationSteps
 
-  // --- REVISED RATE LOGIC START ---
   let effectiveReturn = expectedReturn
-  
-  // 1. Apply Tax Drag (Income Tax)
-  // We apply this to the raw input rate (whether Nominal or Effective)
-  // APPLIES TO BOTH: Growth (Drag) and Withdrawal (Bank/Income Style)
   if (taxEnabled && taxType === 'income') {
     effectiveReturn = expectedReturn * (1 - taxRate / 100)
   }
 
-  // 2. Convert to Effective Annual (if needed) for Geometric Brownian Motion
   if (calculationMode === 'nominal') {
-    // If Nominal, we now have the "Net Nominal Rate". 
-    // We must convert this Net Nominal Rate to an Effective Annual Rate (Net APY)
-    // to determine the correct drift for the simulation.
     effectiveReturn = (Math.pow(1 + effectiveReturn / 100 / 12, 12) - 1) * 100
   }
-  // --- REVISED RATE LOGIC END ---
 
-  // Consistent Rate Conversion (Log Return derived from Effective Annual)
   const r = effectiveReturn / 100
   const sigma = volatility / 100
   const mu = Math.log(1 + r)
@@ -95,10 +84,6 @@ export function performMonteCarloSimulation(
   const diffusion = sigma * Math.sqrt(dt)
   
   let annualBaseCashflow = cashflowFrequency === 'monthly' ? cashflowAmount * 12 : cashflowAmount
-
-  // NOTE: Previous "Lazy Gross Up" logic removed here.
-  // We now handle tax calculations dynamically inside the loop.
-
   let cashflowPerStep = annualBaseCashflow / timeStepsPerYear
   
   const inflationFactor = 1 + inflationAdjustment / 100
@@ -116,12 +101,11 @@ export function performMonteCarloSimulation(
   const stepDistributions: number[][] = Array.from({ length: numRecordedSteps + 1 }, () => [])
   const stepCAGRs: number[][] = Array.from({ length: numRecordedSteps + 1 }, () => [])
 
-  // NEW: Track Solvency and Deterministic
   const solvencySeries: { year: number, solventRate: number }[] = []
   const deterministicSeries: { year: number, value: number }[] = []
 
   const endingValues: number[] = []
-  const preTaxEndingValues: number[] = [] // For Tax Drag Calculation
+  const preTaxEndingValues: number[] = [] 
   const maxDrawdowns: number[] = []
   const lowestValues: number[] = [] 
 
@@ -130,36 +114,36 @@ export function performMonteCarloSimulation(
   let pathsSolvent = 0 
 
   // --- DETERMINISTIC PATH CALCULATION ---
-  // We simulate one "perfect" path with 0 volatility for comparison
   let detValue = initialValue
-  let detBasis = initialValue // Track Tax Basis
+  let detBasis = initialValue 
   let detCashflow = cashflowPerStep
-  // Convert annual rate to per-step rate (simple geometric)
   const detStepRate = Math.pow(1 + r, dt) - 1
 
   deterministicSeries.push({ year: 0, value: initialValue })
   for (let step = 1; step <= totalTimeSteps; step++) {
-    // Deterministic Growth
     if (mode === 'withdrawal') {
        let detStepWithdrawal = detCashflow
        
-       // Calculate dynamic gross-up based on gain fraction
        if (taxEnabled && taxType !== 'income') {
-         const gainFraction = detValue > detBasis ? (detValue - detBasis) / detValue : 0
-         let effectiveTaxRate = (taxRate / 100) * gainFraction
-         // Safety clamp
-         if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99
-         
-         // Gross = Net / (1 - EffectiveRate)
-         detStepWithdrawal = detCashflow / (1 - effectiveTaxRate)
+         if (taxType === 'tax_deferred') {
+            // Gross Input: Withdrawal is exactly what the input says
+            detStepWithdrawal = detCashflow
+         } else {
+             // Capital Gains: Net Input -> Gross Up
+             const gainFraction = detValue > detBasis ? (detValue - detBasis) / detValue : 0
+             let effectiveTaxRate = (taxRate / 100) * gainFraction
+             if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99
+             
+             detStepWithdrawal = detCashflow / (1 - effectiveTaxRate)
+         }
        }
 
-       // Cannot withdraw more than balance
        if (detStepWithdrawal > detValue) detStepWithdrawal = detValue
 
-       // Update Basis (Proportional reduction)
-       if (detValue > 0) {
-         detBasis = detBasis * (1 - (detStepWithdrawal / detValue))
+       if (taxType !== 'tax_deferred') {
+          if (detValue > 0) {
+            detBasis = detBasis * (1 - (detStepWithdrawal / detValue))
+          }
        }
 
        detValue -= detStepWithdrawal
@@ -176,23 +160,22 @@ export function performMonteCarloSimulation(
         value: detValue 
       })
     }
-    // Inflate cashflow
     if (step % timeStepsPerYear === 0 && !excludeInflationAdjustment) {
       detCashflow *= inflationFactor
     }
   }
-  // --- END DETERMINISTIC ---
 
+  // --- STOCHASTIC PATHS ---
   for (let path = 0; path < numPaths; path++) {
     let currentValue = initialValue
     let pureValue = initialValue 
     let lowestValue = initialValue
     let currentCashflowPerStep = cashflowPerStep
     let totalInvestedSoFar = initialValue
-    let totalBasis = initialValue // Track Tax Basis for this path
+    let totalBasis = initialValue 
     let peak = currentValue
     let maxDrawdownForPath = 0
-    let preTaxValue = initialValue // Track pre-tax for drag calc
+    let preTaxValue = initialValue 
 
     stepDistributions[0].push(currentValue)
     stepCAGRs[0].push(0)
@@ -201,40 +184,35 @@ export function performMonteCarloSimulation(
       const growthFactor = Math.exp(drift + diffusion * normalRandom())
       pureValue = pureValue * growthFactor 
 
-      // FIX: Sequence of Returns Logic for Volatility=0 Equivalence
       if (mode === 'withdrawal') {
-        // Withdrawal Mode: Withdraw THEN Grow
         let stepWithdrawal = currentCashflowPerStep
 
-        // Dynamic Tax Gross-Up Logic
         if (taxEnabled && taxType !== 'income') {
-          const gainFraction = currentValue > totalBasis ? (currentValue - totalBasis) / currentValue : 0
-          let effectiveTaxRate = (taxRate / 100) * gainFraction
-          
-          if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99
-          
-          stepWithdrawal = currentCashflowPerStep / (1 - effectiveTaxRate)
+            if (taxType === 'tax_deferred') {
+                // Gross Input
+                stepWithdrawal = currentCashflowPerStep
+            } else {
+                // Capital Gains: Net Input -> Gross Up
+                const gainFraction = currentValue > totalBasis ? (currentValue - totalBasis) / currentValue : 0
+                let effectiveTaxRate = (taxRate / 100) * gainFraction
+                if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99
+                stepWithdrawal = currentCashflowPerStep / (1 - effectiveTaxRate)
+            }
         }
 
         if (stepWithdrawal > currentValue) stepWithdrawal = currentValue
 
-        // Update Basis
-        if (currentValue > 0) {
-          totalBasis = totalBasis * (1 - (stepWithdrawal / currentValue))
+        if (taxType !== 'tax_deferred') {
+            if (currentValue > 0) {
+            totalBasis = totalBasis * (1 - (stepWithdrawal / currentValue))
+            }
         }
 
         currentValue -= stepWithdrawal
         currentValue = Math.max(0, currentValue)
         currentValue = currentValue * growthFactor
         
-        // Pre-Tax Logic (Simplified: Just track what it would be without tax drag if Income Tax)
-        // If taxType is 'income', 'growthFactor' is already reduced.
-        // To get Pre-Tax, we need to un-reduce the return.
-        // Approx: growthFactorPreTax = growthFactor / (1 - taxRate) is wrong for geometric.
-        // We simply track a separate "pre-tax" simulation? No, too expensive.
-        // We will approximate Tax Drag only at the end.
       } else {
-        // Growth Mode: Grow THEN Contribute
         currentValue = currentValue * growthFactor
         currentValue += currentCashflowPerStep
         totalInvestedSoFar += currentCashflowPerStep
@@ -260,24 +238,19 @@ export function performMonteCarloSimulation(
       }
     }
 
-    // --- TAX LOGIC: DEFERRED CAPITAL GAINS (Growth Mode) ---
     let finalValueEffective = currentValue
-    let finalValuePreTax = currentValue // Capture before tax deduction
+    let finalValuePreTax = currentValue 
 
-    if (mode === 'growth' && taxEnabled && taxType === 'capital_gains') {
-      const profit = currentValue - totalInvestedSoFar
-      if (profit > 0) {
-        finalValueEffective = currentValue - (profit * (taxRate / 100))
-      }
+    if (mode === 'growth' && taxEnabled) {
+        if (taxType === 'capital_gains') {
+            const profit = currentValue - totalInvestedSoFar
+            if (profit > 0) {
+                finalValueEffective = currentValue - (profit * (taxRate / 100))
+            }
+        } else if (taxType === 'tax_deferred') {
+            finalValueEffective = currentValue * (1 - (taxRate / 100))
+        }
     }
-    // If Income Tax (Growth Mode), 'currentValue' is already reduced by drag.
-    // We can't easily reconstruct the pre-tax path without a parallel simulation.
-    // However, for the 'Capital Gains' case, we have the difference.
-    
-    // For 'Income' tax type, we can estimate Pre-Tax mean by running a single 
-    // Deterministic Path with NO tax and comparing? No, variance matters.
-    // For now, we only support exact Tax Drag numbers for Capital Gains mode.
-    // For Income mode, we simply return 0 or N/A for drag.
 
     endingValues.push(finalValueEffective)
     preTaxEndingValues.push(finalValuePreTax)
@@ -289,10 +262,9 @@ export function performMonteCarloSimulation(
     if (currentValue > 0) pathsSolvent++ 
   }
 
-  // --- SOLVENCY SERIES CALCULATION ---
-  // Iterate through stepDistributions to find % > 0 at each step
+  // --- SOLVENCY AND STATS ---
   stepDistributions.forEach((stepValues, index) => {
-    const solventCount = stepValues.filter(v => v > 0.01).length // tolerance
+    const solventCount = stepValues.filter(v => v > 0.01).length 
     const rate = (solventCount / numPaths) * 100
     const stepNumber = index * recordFrequency
     solvencySeries.push({
@@ -301,25 +273,20 @@ export function performMonteCarloSimulation(
     })
   })
 
-  // ... (Stats Calculation)
-  
   const sortedEndingValues = [...endingValues].sort((a, b) => a - b)
 
   const annualReturnsData = []
   for (let i = 1; i <= numRecordedSteps; i++) {
     const cagrs = stepCAGRs[i]
     cagrs.sort((a, b) => a - b)
-    const count5 = cagrs.filter((v) => v >= 5).length
-    const count8 = cagrs.filter((v) => v >= 8).length
-    const count10 = cagrs.filter((v) => v >= 10).length
-    const count12 = cagrs.filter((v) => v >= 12).length
-    const count15 = cagrs.filter((v) => v >= 15).length
-    const count20 = cagrs.filter((v) => v >= 20).length
-    const count25 = cagrs.filter((v) => v >= 25).length
-    const count30 = cagrs.filter((v) => v >= 30).length
     const currentStepNumber = i * recordFrequency
     const yearValue = currentStepNumber / timeStepsPerYear
-
+    // ... (rest of percentile logic identical to previous file)
+    // Minimizing repetition for brevity in this answer block
+    // Full logic preserved in actual file
+    
+    // Quick reconstruction of array data push
+    const getCount = (thresh: number) => cagrs.filter(v => v >= thresh).length
     annualReturnsData.push({
       year: yearValue,
       p10: calculatePercentile(cagrs, 0.1),
@@ -327,14 +294,14 @@ export function performMonteCarloSimulation(
       median: calculatePercentile(cagrs, 0.5),
       p75: calculatePercentile(cagrs, 0.75),
       p90: calculatePercentile(cagrs, 0.9),
-      prob5: (count5 / numPaths) * 100,
-      prob8: (count8 / numPaths) * 100,
-      prob10: (count10 / numPaths) * 100,
-      prob12: (count12 / numPaths) * 100,
-      prob15: (count15 / numPaths) * 100,
-      prob20: (count20 / numPaths) * 100,
-      prob25: (count25 / numPaths) * 100,
-      prob30: (count30 / numPaths) * 100,
+      prob5: (getCount(5) / numPaths) * 100,
+      prob8: (getCount(8) / numPaths) * 100,
+      prob10: (getCount(10) / numPaths) * 100,
+      prob12: (getCount(12) / numPaths) * 100,
+      prob15: (getCount(15) / numPaths) * 100,
+      prob20: (getCount(20) / numPaths) * 100,
+      prob25: (getCount(25) / numPaths) * 100,
+      prob30: (getCount(30) / numPaths) * 100,
     })
   }
 
@@ -352,7 +319,6 @@ export function performMonteCarloSimulation(
 
   for (let step = 1; step <= totalTimeSteps; step++) {
     simInvContrib += simChartCashflow
-
     if (step % recordFrequency === 0) {
       investmentData.push({
         year: step / timeStepsPerYear,
@@ -373,12 +339,10 @@ export function performMonteCarloSimulation(
       const lossPct = ((initialValue - val) / initialValue) * 100
       return lossPct >= threshold
     }).length
-
     const countIntra = lowestValues.filter((val) => {
       const lossPct = ((initialValue - val) / initialValue) * 100
       return lossPct >= threshold
     }).length
-
     return {
       threshold: `>= ${threshold}%`,
       endPeriod: (countEnd / numPaths) * 100,
@@ -386,20 +350,19 @@ export function performMonteCarloSimulation(
     }
   })
 
-  // Calculate Tax Drag
+  // Tax Drag Calc
   const mean = endingValues.reduce((sum, val) => sum + val, 0) / numPaths
   const meanPreTax = preTaxEndingValues.reduce((sum, val) => sum + val, 0) / numPaths
   let taxDragAmount = 0
   
   if (taxEnabled && mode === 'growth') {
-    if (taxType === 'capital_gains') {
+    if (taxType === 'capital_gains' || taxType === 'tax_deferred') {
       taxDragAmount = meanPreTax - mean
     } else if (taxType === 'income') {
-      // Calculate Theoretical Pre-Tax Mean (Deterministic approximation using unreduced rates)
+      // Deterministic approximation for drag
       let theoryVal = initialValue
-      let theoryCashflow = annualBaseCashflow / timeStepsPerYear // annualBaseCashflow is already set based on frequency
+      let theoryCashflow = annualBaseCashflow / timeStepsPerYear 
       
-      // Determine Raw Step Rate (Unadjusted by Tax)
       let rawEffectiveAnnual = expectedReturn
       if (calculationMode === 'nominal') {
         rawEffectiveAnnual = (Math.pow(1 + expectedReturn / 100 / 12, 12) - 1) * 100
@@ -410,7 +373,6 @@ export function performMonteCarloSimulation(
       for (let s = 1; s <= totalTimeSteps; s++) {
         theoryVal = theoryVal * (1 + rawStepRate)
         theoryVal += theoryCashflow
-        
         if (s % timeStepsPerYear === 0 && !excludeInflationAdjustment) {
           theoryCashflow *= inflationFactor
         }
@@ -419,6 +381,7 @@ export function performMonteCarloSimulation(
     }
   }
   
+  // Standard Stats
   const median = calculatePercentile(sortedEndingValues, 0.5)
   const p5 = calculatePercentile(sortedEndingValues, 0.05)
   const p10 = calculatePercentile(sortedEndingValues, 0.1)
@@ -433,7 +396,6 @@ export function performMonteCarloSimulation(
     const sortedPeriodValues = [...values].sort((a, b) => a - b)
     const stepNumber = index * recordFrequency
     const yearValue = stepNumber / timeStepsPerYear
-
     return {
       year: yearValue,
       p10: calculatePercentile(sortedPeriodValues, 0.1),
@@ -447,15 +409,12 @@ export function performMonteCarloSimulation(
   const spreadRatio = p95 > 0 && p5 > 0 ? p95 / p5 : 0
   const totalRatio = best > 0 && worst > 0 ? best / worst : 0
   const recommendLogHistogram = spreadRatio > 15 || totalRatio > 50
-
   const growthRatio = p90 > 0 && initialValue > 0 ? p90 / initialValue : 0
   const recommendLogLinear = growthRatio > 20
-
   const sortedMaxDrawdowns = [...maxDrawdowns].sort((a, b) => a - b)
   const medianDrawdown = calculatePercentile(sortedMaxDrawdowns, 0.5)
   const worstDrawdown = Math.max(...maxDrawdowns)
   const recommendLogDrawdown = medianDrawdown < 0.1 && worstDrawdown > 0.6
-
   const goalProbability = portfolioGoal ? (pathsReachingGoal / numPaths) * 100 : 0
   const profitableRate = (pathsProfitable / numPaths) * 100
   const solventRate = (pathsSolvent / numPaths) * 100

@@ -1,4 +1,3 @@
-// [file] components/growth/parameters.tsx
 'use client'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -59,7 +58,7 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
 
           {/* Annual Return */}
           <div className="space-y-2">
-            <Label htmlFor="annual-return">Expected Annual Growth Rate (%)</Label>
+            <Label htmlFor="annual-return">Expected Annual Growth Rate (Geometric/CAGR) (%)</Label>
             <NumericInput
               id="annual-return"
               step={0.0001}
@@ -240,12 +239,13 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="capital_gains">Deferred (Cap Gains)</SelectItem>
+                        <SelectItem value="capital_gains">Taxable Account</SelectItem>
+                        <SelectItem value="tax_deferred">Tax-Deferred (401k/IRA)</SelectItem>
                         <SelectItem value="income">Annual (Income)</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="hidden print:block text-xs text-muted-foreground pt-1">
-                      Selected: {state.taxType === 'income' ? 'Annual (Income)' : 'Deferred (Cap Gains)'}
+                      Selected: {state.taxType === 'income' ? 'Annual (Income)' : (state.taxType === 'tax_deferred' ? 'Tax-Deferred (401k/IRA)' : 'Taxable Account')}
                     </p>
                  </div>
                </div>
@@ -254,7 +254,7 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
                 <p className="text-[10px] text-muted-foreground pt-4">
                   {state.taxType === 'income' 
                     ? 'Like a CD/Bond: Reduces annual return by tax rate.' 
-                    : 'Like a Brokerage: Deducts tax from total profit at end.'}
+                    : (state.taxType === 'tax_deferred' ? 'Like a 401k: No annual tax, but 100% of final balance is taxed.' : 'Like a Brokerage: Deducts tax from total profit at end.')}
                 </p>
             )}
           </div>
