@@ -31,4 +31,4 @@ const out = Array.from(byCode.entries())
 await fs.mkdir('data', { recursive: true })
 await fs.writeFile('data/iso4217.json', JSON.stringify(out, null, 2) + '\n', 'utf8')
 
-console.log(`Wrote ${out.length} currencies to src/data/iso4217.json`)
+console.log(`Wrote ${out.length} currencies to data/iso4217.json`)
