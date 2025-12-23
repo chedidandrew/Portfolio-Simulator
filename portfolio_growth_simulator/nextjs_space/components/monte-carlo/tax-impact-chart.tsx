@@ -93,7 +93,13 @@ export function TaxImpactChart({ data, investmentData, params, isRealDollars }: 
         
         if (preTaxValue < postTaxValue) preTaxValue = postTaxValue
 
+      } else if (params.taxType === 'tax_deferred') {
+        // Tax the entire balance
+        preTaxValue = rawMedian
+        postTaxValue = rawMedian * (1 - (params.taxRate || 0) / 100)
+
       } else {
+        // Capital Gains (Default)
         const gain = Math.max(0, rawMedian - totalInvested)
         const taxBill = gain * ((params.taxRate || 0) / 100)
         
