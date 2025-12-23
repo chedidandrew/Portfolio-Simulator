@@ -128,6 +128,7 @@ export function MonteCarloSimulator({
       lossProbData,
       numPathsUsed,
       investmentData,
+      taxDragAmount,
     } = simResults
 
     const totalInvested =
@@ -157,6 +158,16 @@ export function MonteCarloSimulator({
       { Key: 'Number Of Scenarios', Value: numPathsUsed },
       { Key: 'Mean Ending Value', Value: roundToCents(mean) },
       { Key: 'Median Ending Value', Value: roundToCents(median) },
+    ]
+
+    if (params.taxEnabled) {
+      summaryRows.push({ Key: 'Tax Type', Value: params.taxType === 'income' ? 'Annual (Income)' : 'Deferred (Capital Gains)' })
+      if (mode === 'growth' && params.taxType === 'capital_gains' && taxDragAmount) {
+        summaryRows.push({ Key: 'Est. Tax Cost (Tax Drag)', Value: roundToCents(taxDragAmount) })
+      }
+    }
+
+    summaryRows.push(
       { Key: 'P5 Ending Value', Value: roundToCents(p5) },
       { Key: 'P10 Ending Value', Value: roundToCents(p10) },
       { Key: 'P25 Ending Value', Value: roundToCents(p25) },
@@ -165,8 +176,10 @@ export function MonteCarloSimulator({
       { Key: 'P95 Ending Value', Value: roundToCents(p95) },
       { Key: 'Best Ending Value', Value: roundToCents(best) },
       { Key: 'Worst Ending Value', Value: roundToCents(worst) },
-      { Key: 'Random Seed', Value: rngSeed ?? '' },
-    ]
+      { Key: 'Random Seed', Value: rngSeed ?? '' }
+    )
+
+    wsSummary.addRows(summaryRows)
     wsSummary.addRows(summaryRows)
 
     // 2. Percentiles

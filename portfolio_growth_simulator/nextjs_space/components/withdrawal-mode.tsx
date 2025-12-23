@@ -170,7 +170,8 @@ export function WithdrawalMode() {
     if (state.taxEnabled) {
       summaryRows.push(
         { Key: 'Tax Enabled', Value: 'Yes' },
-        { Key: 'Income Tax Rate', Value: `${state.taxRate}%` },
+        { Key: 'Tax Rate', Value: `${state.taxRate}%` },
+        { Key: 'Tax Type', Value: state.taxType === 'income' ? 'Annual (Income)' : 'Capital Gains (Proportional)' },
         { Key: 'Total Tax Paid', Value: roundToCents(calculation.totalTaxPaid) },
         { Key: 'Total Withdrawn (Net)', Value: roundToCents(calculation.totalWithdrawnNet) }
       )

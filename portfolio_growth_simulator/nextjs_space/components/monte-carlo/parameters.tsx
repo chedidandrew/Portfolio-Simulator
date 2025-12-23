@@ -119,7 +119,7 @@ export function MonteCarloParameters({
                   setParams({ ...params, initialValue: limited })
                 }}
                 min={1}
-                max={1_000_000_000_000_000_000}
+                max={1e18}
                 maxErrorMessage="This number violates several economic laws :)"
               />
             </div>
@@ -211,7 +211,7 @@ export function MonteCarloParameters({
                   setParams({ ...params, cashflowAmount: limited })
                 }}
                 min={0}
-                max={1_000_000_000_000_000_000}
+                max={1e18}
                 maxErrorMessage="I admire your confidence, but no :)"
               />
             </div>
@@ -363,7 +363,7 @@ export function MonteCarloParameters({
                     setParams({ ...params, portfolioGoal: limited })
                   }}
                   min={0}
-                  max={1_000_000_000_000_000_000}
+                  max={1e18}
                   maxErrorMessage="Sir, this is a Wendy's :)"
                 />
               </div>
