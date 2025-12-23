@@ -335,12 +335,12 @@ export function MonteCarloParameters({
                           {mode === 'growth' ? 'Deferred (Cap Gains)' : 'Taxable Account'}
                         </SelectItem>
                         <SelectItem value="tax_deferred">Tax-Deferred (401k/IRA)</SelectItem>
-                        <SelectItem value="income">Annual (Tax Drag)</SelectItem>
+                        <SelectItem value="income">Annual (Income)</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="hidden print:block text-xs text-muted-foreground pt-1">
                       Selected: {params.taxType === 'income' 
-                        ? 'Annual (Tax Drag)' 
+                        ? 'Annual (Income)' 
                         : (params.taxType === 'tax_deferred' ? 'Tax-Deferred (401k/IRA)' : (mode === 'growth' ? 'Deferred (Cap Gains)' : 'Taxable Account'))}
                     </p>
                     <p className="text-[10px] text-muted-foreground pt-1 print:hidden">

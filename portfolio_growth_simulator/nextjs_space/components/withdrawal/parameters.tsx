@@ -257,11 +257,11 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
                       <SelectContent>
                         <SelectItem value="capital_gains">Taxable Account</SelectItem>
                         <SelectItem value="tax_deferred">Tax-Deferred (401k/IRA)</SelectItem>
-                        <SelectItem value="income">Annual (Tax Drag)</SelectItem>
+                        <SelectItem value="income">Annual (Income)</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="hidden print:block text-xs text-muted-foreground pt-1">
-                      Selected: {state.taxType === 'income' ? 'Annual (Tax Drag)' : (state.taxType === 'tax_deferred' ? 'Tax-Deferred (401k/IRA)' : 'Taxable Account')}
+                      Selected: {state.taxType === 'income' ? 'Annual (Income)' : (state.taxType === 'tax_deferred' ? 'Tax-Deferred (401k/IRA)' : 'Taxable Account')}
                     </p>
                  </div>
                </div>
