@@ -17,7 +17,7 @@ interface GrowthResultsProps {
   targetValue?: number
   // NEW: Tax props for header label
   taxEnabled?: boolean
-  taxType?: 'capital_gains' | 'income'
+  taxType?: 'capital_gains' | 'income' | 'tax_deferred'
   showFullPrecision: boolean
   setShowFullPrecision: (v: boolean) => void
   onShare: () => void
