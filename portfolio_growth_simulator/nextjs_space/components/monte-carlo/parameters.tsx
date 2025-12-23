@@ -1,4 +1,3 @@
-// [file] components/monte-carlo/parameters.tsx
 'use client'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -304,43 +303,42 @@ export function MonteCarloParameters({
                     )}
                     {mode === 'withdrawal' && params.taxType === 'income' && (
                        <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                        With Annual Tax Drag, the portfolio return is reduced by the tax rate. You withdraw exactly {formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}.
+                        Like a High-Yield Savings account. Taxes are paid annually on interest, which <span className="font-semibold text-orange-600/90 dark:text-orange-400/90">slows down your growth</span>. 
+                        Your withdrawal remains exactly {formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}.
                       </p>
                     )}
                   </div>
 
-                  {mode === 'growth' && (
-                    <div className="space-y-1">
-                      <Label htmlFor="mc-tax-type" className="text-xs">Tax Type</Label>
-                      <Select
-                        value={params.taxType ?? 'capital_gains'}
-                        onValueChange={(value: any) => setParams({ ...params, taxType: value })}
-                      >
-                        <SelectTrigger id="mc-tax-type" className="h-10 print:hidden">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="capital_gains">
-                            {mode === 'growth' ? 'Deferred (Cap Gains)' : 'Transaction (Gross Up)'}
-                          </SelectItem>
-                          <SelectItem value="income">Annual (Tax Drag)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="hidden print:block text-xs text-muted-foreground pt-1">
-                        Selected: {params.taxType === 'income' 
-                          ? 'Annual (Tax Drag)' 
-                          : (mode === 'growth' ? 'Deferred (Cap Gains)' : 'Transaction (Gross Up)')}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground pt-1 print:hidden">
-                        {params.taxType === 'income'
-                          ? 'Reduces annual return rate.'
-                          : (mode === 'growth' ? 'Deducts tax from final profit.' : 'Increases withdrawal amount to cover tax.')}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="mc-tax-type" className="text-xs">Tax Type</Label>
+                    <Select
+                      value={params.taxType ?? 'capital_gains'}
+                      onValueChange={(value: any) => setParams({ ...params, taxType: value })}
+                    >
+                      <SelectTrigger id="mc-tax-type" className="h-10 print:hidden">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="capital_gains">
+                          {mode === 'growth' ? 'Deferred (Cap Gains)' : 'Transaction (Gross Up)'}
+                        </SelectItem>
+                        <SelectItem value="income">Annual (Tax Drag)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="hidden print:block text-xs text-muted-foreground pt-1">
+                      Selected: {params.taxType === 'income' 
+                        ? 'Annual (Tax Drag)' 
+                        : (mode === 'growth' ? 'Deferred (Cap Gains)' : 'Transaction (Gross Up)')}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground pt-1 print:hidden">
+                      {params.taxType === 'income'
+                        ? 'Reduces annual return rate.'
+                        : (mode === 'growth' ? 'Deducts tax from final profit.' : 'Increases withdrawal amount to cover tax.')}
+                    </p>
+                  </div>
+                 </div>
+               )}
+             </div>
 
             {/* Portfolio Goal (Growth Mode Only) */}
             {mode === 'growth' && (

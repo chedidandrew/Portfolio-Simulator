@@ -59,7 +59,7 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
 
           {/* Annual Return */}
           <div className="space-y-2">
-            <Label htmlFor="annual-return">Annual Return (%)</Label>
+            <Label htmlFor="annual-return">Expected Annual Growth Rate (%)</Label>
             <NumericInput
               id="annual-return"
               step={0.0001}
