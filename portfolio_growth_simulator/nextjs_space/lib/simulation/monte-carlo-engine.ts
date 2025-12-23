@@ -354,8 +354,32 @@ export function performMonteCarloSimulation(
   const meanPreTax = preTaxEndingValues.reduce((sum, val) => sum + val, 0) / numPaths
   let taxDragAmount = 0
   
-  if (taxEnabled && taxType === 'capital_gains' && mode === 'growth') {
-    taxDragAmount = meanPreTax - mean
+  if (taxEnabled && mode === 'growth') {
+    if (taxType === 'capital_gains') {
+      taxDragAmount = meanPreTax - mean
+    } else if (taxType === 'income') {
+      // Calculate Theoretical Pre-Tax Mean (Deterministic approximation using unreduced rates)
+      let theoryVal = initialValue
+      let theoryCashflow = annualBaseCashflow / timeStepsPerYear // annualBaseCashflow is already set based on frequency
+      
+      // Determine Raw Step Rate (Unadjusted by Tax)
+      let rawEffectiveAnnual = expectedReturn
+      if (calculationMode === 'nominal') {
+        rawEffectiveAnnual = (Math.pow(1 + expectedReturn / 100 / 12, 12) - 1) * 100
+      }
+      const rawR = rawEffectiveAnnual / 100
+      const rawStepRate = Math.pow(1 + rawR, dt) - 1
+
+      for (let s = 1; s <= totalTimeSteps; s++) {
+        theoryVal = theoryVal * (1 + rawStepRate)
+        theoryVal += theoryCashflow
+        
+        if (s % timeStepsPerYear === 0 && !excludeInflationAdjustment) {
+          theoryCashflow *= inflationFactor
+        }
+      }
+      taxDragAmount = theoryVal - mean
+    }
   }
   
   const median = calculatePercentile(sortedEndingValues, 0.5)

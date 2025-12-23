@@ -37,7 +37,7 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
   // --- 1. Engine Configuration ---
   const totalMonths = duration * 12
   
-// Effective vs Nominal Rate Calculation
+  // Effective vs Nominal Rate Calculation
   let effectiveAnnualReturn = annualReturn
   if (taxEnabled && taxType === 'income') {
     effectiveAnnualReturn = annualReturn * (1 - (taxRate / 100))
@@ -54,6 +54,7 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
 
   // --- 2. Simulation State ---
   let currentBalance = startingBalance
+  let totalBasis = startingBalance // Track Tax Basis (Assumes initial balance is contribution)
   let currentPeriodicWithdrawal = periodicWithdrawal // This is TARGET NET
   
   let yearsUntilZero: number | null = null
@@ -79,36 +80,56 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
 
     // Execute Withdrawal
     if (targetNetThisMonth > 0) {
-      // GROSS UP Logic: Gross = Net / (1 - Rate)
+      // GROSS UP Logic: Gross = Net / (1 - EffectiveRate)
       // Only apply Gross Up if NOT 'income' type (Income type uses Tax Drag instead)
       let requiredGross = targetNetThisMonth
       
+      // Calculate Gain Fraction for Capital Gains tax
+      // Proportional Withdrawal: We withdraw a mix of Principal and Gain
+      let gainFraction = 0
+      if (currentBalance > totalBasis) {
+        // Prevent division by zero if balance is extremely low, though likely covered by >0 check
+        gainFraction = (currentBalance - totalBasis) / currentBalance
+      }
+      // Clamp negative gain (loss) to 0 for tax purposes
+      if (gainFraction < 0) gainFraction = 0
+
+      let effectiveTaxRate = 0
+
       if (taxEnabled && taxType !== 'income') {
-         // EDGE CASE SAFETY: Clamp tax rate to 99% max to prevent divide-by-zero or infinity.
-         // This ensures we never divide by less than 0.01.
-         let t = taxRate / 100
-         if (t >= 0.99) t = 0.99 
+         // Adjust effective tax rate based on how much of the withdrawal is actually gain
+         // Tax = Gross * GainFraction * Rate
+         // Net = Gross - Tax = Gross * (1 - GainFraction * Rate)
+         // Gross = Net / (1 - GainFraction * Rate)
+
+         effectiveTaxRate = (taxRate / 100) * gainFraction
          
-         requiredGross = targetNetThisMonth / (1 - t)
+         // EDGE CASE SAFETY: Clamp tax rate to 99% max
+         if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99 
+         
+         requiredGross = targetNetThisMonth / (1 - effectiveTaxRate)
       }
 
       // The portfolio pays the Gross amount (or whatever is left)
       const actualGrossWithdrawal = Math.min(currentBalance, requiredGross)
       
       // Calculate actual Tax paid on this gross amount
-      // (If partial withdrawal, tax is proportional)
       let taxPaid = 0
       if (taxEnabled && taxType !== 'income') {
-        // We use the original rate for calculation, effectively clamped by the logic above 
-        // if it was extreme, but here we just apply the rate to the gross.
-        // Consistency: If t was clamped to 99% for gross-up, we should nominally 
-        // apply that same effective tax logic here to match 'Net'.
-        let t = taxRate / 100
-        if (t >= 0.99) t = 0.99
-        taxPaid = actualGrossWithdrawal * t
+        // We use the calculated effective rate derived from the gain fraction
+        taxPaid = actualGrossWithdrawal * effectiveTaxRate
       }
       
       const actualNetReceived = actualGrossWithdrawal - taxPaid
+
+      // Update Basis: Reduce basis proportionally to the withdrawal size relative to balance
+      // If we withdraw 10% of the account, we reduce the basis by 10%
+      if (currentBalance > 0) {
+        const withdrawalRatio = actualGrossWithdrawal / currentBalance
+        totalBasis = totalBasis * (1 - withdrawalRatio)
+      } else {
+        totalBasis = 0
+      }
 
       currentBalance -= actualGrossWithdrawal
       
@@ -131,10 +152,6 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
       
       if (taxEnabled && taxType === 'income') {
         // Track the tax drag amount for reporting
-        // Rate was already reduced, so we calculate what the tax portion *would* have been
-        // implied_growth = balance * raw_rate
-        // actual_growth = balance * reduced_rate
-        // diff approx tax
         const growth = currentBalance - balanceBefore
         // Re-derive tax paid from the net growth: Tax = Growth * (Rate / (1 - Rate))
         let t = taxRate / 100
