@@ -14,7 +14,7 @@ interface GrowthTableProps {
     endingValue: number
   }>
   taxEnabled?: boolean
-  taxType?: 'capital_gains' | 'income'
+  taxType?: 'capital_gains' | 'income' | 'tax_deferred'
   taxRate?: number
 }
 
