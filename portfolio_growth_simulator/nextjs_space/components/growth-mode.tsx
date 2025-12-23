@@ -170,8 +170,6 @@ export function GrowthMode() {
       { Key: 'Inflation Adjustment %', Value: state.inflationAdjustment },
       { Key: 'Target Value', Value: roundToCents(state.targetValue) || 'N/A' },
       { Key: 'Total Contributions', Value: roundToCents(calculation.totalContributions) },
-      { Key: 'Total Profit (Gross)', Value: roundToCents(calculation.totalProfit) },
-      { Key: 'Final Value (Gross)', Value: roundToCents(calculation.finalValue) },
     ]
 
     // Add Tax info if enabled
@@ -185,13 +183,20 @@ export function GrowthMode() {
       
       if (isIncome) {
          // Income Tax Mode: Taxes paid annually, final value is net
+         summaryRows.push({ Key: 'Total Profit', Value: roundToCents(calculation.totalProfit) })
+         summaryRows.push({ Key: 'Final Value', Value: roundToCents(calculation.finalValue) })
          summaryRows.push({ Key: 'Total Tax Paid', Value: roundToCents(calculation.totalTaxPaid) })
-         summaryRows.push({ Key: 'Final Value (Net)', Value: roundToCents(calculation.finalValue) })
       } else {
          // Capital Gains Mode: Taxes deferred until end
+         summaryRows.push({ Key: 'Total Profit (Gross)', Value: roundToCents(calculation.totalProfit) })
+         summaryRows.push({ Key: 'Final Value (Gross)', Value: roundToCents(calculation.finalValue) })
          summaryRows.push({ Key: 'Est. Tax Liability', Value: roundToCents(calculation.totalDeferredTax) })
          summaryRows.push({ Key: 'Final Value (Net)', Value: roundToCents(calculation.finalValueNet) })
       }
+    } else {
+      // No Tax Enabled
+      summaryRows.push({ Key: 'Total Profit', Value: roundToCents(calculation.totalProfit) })
+      summaryRows.push({ Key: 'Final Value', Value: roundToCents(calculation.finalValue) })
     }
 
     wsSummary.addRows(summaryRows)

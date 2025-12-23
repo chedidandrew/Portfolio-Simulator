@@ -159,7 +159,7 @@ export function WithdrawalMode() {
       { Key: 'Starting Balance', Value: roundToCents(state.startingBalance) },
       { Key: 'Annual Return %', Value: state.annualReturn },
       { Key: 'Duration Years', Value: state.duration },
-      { Key: 'Withdrawal Amount', Value: roundToCents(state.periodicWithdrawal) },
+      { Key: 'Target Net Withdrawal', Value: roundToCents(state.periodicWithdrawal) },
       { Key: 'Inflation Adj %', Value: state.inflationAdjustment },
       { Key: 'Frequency', Value: state.frequency },
       { Key: 'Ending Balance', Value: roundToCents(calculation.endingBalance) },
