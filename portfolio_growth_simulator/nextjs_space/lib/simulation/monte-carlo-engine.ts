@@ -47,7 +47,7 @@ export function performMonteCarloSimulation(
   } = params
 
   // ... (MAX_PHYSICS_ITERATIONS and timing logic) ...
-  const MAX_PHYSICS_ITERATIONS = 100_000_000 
+  const MAX_PHYSICS_ITERATIONS = 150_000_000 
   const opsWeekly = numPaths * duration * 52
   const opsMonthly = numPaths * duration * 12
 

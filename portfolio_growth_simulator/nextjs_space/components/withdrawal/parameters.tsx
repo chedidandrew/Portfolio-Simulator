@@ -132,7 +132,7 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
                 setState({ ...state, periodicWithdrawal: limited })
               }}
               min={0}
-              max={1_000_000_000_000_000_000}
+              max={1e18}
               maxErrorMessage="Speedrunning bankruptcy? :)"
             />
             {state.taxEnabled && state.taxType !== 'income' && (
@@ -144,10 +144,8 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
                     (1 - Math.min(state.taxRate ?? 0, 99) / 100)
                   )}
                 </span>{' '}
-                per {state.frequency?.replace('ly', '') || 'month'} to have an effective net
-                withdrawal of{' '}
-                {formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}
-                .
+                per {state.frequency?.replace('ly', '') || 'month'} to have an effective net withdrawal of{' '}
+                {formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}.
               </p>
             )}
             {state.taxEnabled && state.taxType === 'income' && (

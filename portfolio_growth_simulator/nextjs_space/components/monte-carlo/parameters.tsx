@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Coins, Zap, Scale, Settings2 } from 'lucide-react'
 import { SimulationParams } from '@/lib/types'
-import { getAppCurrency } from '@/lib/utils'
+import { getAppCurrency, formatCurrency } from '@/lib/utils'
 import { useState } from 'react'
 
 interface MonteCarloParametersProps {
@@ -287,9 +287,24 @@ export function MonteCarloParameters({
                       max={99}
                       maxErrorMessage="At 100% you are officially working for free :)"
                     />
+                    {/* DYNAMIC TAX MESSAGE */}
                     {mode === 'withdrawal' && params.taxType !== 'income' && (
-                      <p className="text-xs text-muted-foreground pt-3">
-                        We gross up the withdrawal to give you this Net amount.
+                       <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                        You should withdraw{' '}
+                        <span className="font-semibold text-primary">
+                          {formatCurrency(
+                            (params.cashflowAmount ?? 0) /
+                            (1 - Math.min(params.taxRate ?? 0, 99) / 100),
+                            true, 2, false
+                          )}
+                        </span>{' '}
+                        per {params.cashflowFrequency === 'monthly' ? 'month' : 'year'} to have an effective net withdrawal of{' '}
+                        {formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}.
+                      </p>
+                    )}
+                    {mode === 'withdrawal' && params.taxType === 'income' && (
+                       <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                        With Annual Tax Drag, the portfolio return is reduced by the tax rate. You withdraw exactly {formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}.
                       </p>
                     )}
                   </div>
