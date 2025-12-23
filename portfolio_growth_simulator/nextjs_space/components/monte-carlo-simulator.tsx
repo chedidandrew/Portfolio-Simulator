@@ -161,7 +161,7 @@ export function MonteCarloSimulator({
     ]
 
     if (params.taxEnabled) {
-      summaryRows.push({ Key: 'Tax Type', Value: params.taxType === 'income' ? 'Annual (Income)' : 'Deferred (Capital Gains)' })
+      summaryRows.push({ Key: 'Tax Type', Value: params.taxType === 'income' ? 'Annual income tax drag' : 'Taxable Account (capital gains on liquidation)' })
       if (mode === 'growth' && params.taxType === 'capital_gains' && taxDragAmount) {
         summaryRows.push({ Key: 'Est. Tax Cost (Tax Drag)', Value: roundToCents(taxDragAmount) })
       }

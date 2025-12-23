@@ -166,7 +166,7 @@ export function MonteCarloResults({
   if (taxEnabled) {
     if (mode === 'growth') {
       taxInfo = params.taxType === 'income' 
-        ? '(After Annual Tax Drag)' 
+        ? '(After annual income tax drag)' 
         : '(Net of Deferred Tax)'
     }
   }

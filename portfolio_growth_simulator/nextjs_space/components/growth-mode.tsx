@@ -178,7 +178,7 @@ export function GrowthMode() {
       summaryRows.push(
         { Key: 'Tax Enabled', Value: 'Yes' },
         { Key: 'Tax Rate', Value: `${state.taxRate}%` },
-        { Key: 'Tax Type', Value: isIncome ? 'Annual (Income)' : 'Deferred (Capital Gains)' }
+        { Key: 'Tax Type', Value: isIncome ? 'Annual income tax drag' : 'Taxable Account (capital gains on liquidation)' }
       )
       
       if (isIncome) {

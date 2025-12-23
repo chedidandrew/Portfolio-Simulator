@@ -81,7 +81,7 @@ export function GrowthResults({
   let headerLabel = ''
   if (taxEnabled) {
     headerLabel = taxType === 'income' 
-      ? '(After Annual Tax Drag)' 
+      ? '(After annual income tax drag)' 
       : '(Net of Deferred Tax)'
   }
 

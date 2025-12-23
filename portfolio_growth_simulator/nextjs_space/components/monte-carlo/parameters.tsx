@@ -59,9 +59,7 @@ export function MonteCarloParameters({
   const getCashflowLabel = () => {
     if (mode === 'growth') return 'Monthly Contribution'
     if (params.taxEnabled) {
-       // For Taxable Account (Capital Gains), we target Net Spending.
-       if (params.taxType === 'capital_gains') return 'Monthly Spending (Target Net)'
-       // For 401k/IRA, we specify Gross Withdrawal.
+       if (params.taxType === 'capital_gains') return 'Monthly Withdrawal (Gross)'
        if (params.taxType === 'tax_deferred') return 'Monthly Withdrawal (Gross)'
     }
     return 'Monthly Withdrawal'
@@ -353,21 +351,21 @@ export function MonteCarloParameters({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="capital_gains">
-                          {mode === 'growth' ? 'Deferred (Cap Gains)' : 'Taxable Account'}
+                          {mode === 'growth' ? 'Taxable Account (capital gains on liquidation)' : 'Taxable Account (capital gains on liquidation)'}
                         </SelectItem>
-                        <SelectItem value="tax_deferred">Tax-Deferred (401k/IRA)</SelectItem>
-                        <SelectItem value="income">Annual (Income)</SelectItem>
+                        <SelectItem value="tax_deferred">Tax deferred (401k/IRA), taxed on withdrawal</SelectItem>
+                        <SelectItem value="income">Annual income tax drag</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="hidden print:block text-xs text-muted-foreground pt-1">
                       Selected: {params.taxType === 'income' 
-                        ? 'Annual (Income)' 
-                        : (params.taxType === 'tax_deferred' ? 'Tax-Deferred (401k/IRA)' : (mode === 'growth' ? 'Deferred (Cap Gains)' : 'Taxable Account'))}
+                        ? 'Annual income tax drag' 
+                        : (params.taxType === 'tax_deferred' ? 'Tax deferred (401k/IRA), taxed on withdrawal' : (mode === 'growth' ? 'Taxable Account (capital gains on liquidation)' : 'Taxable Account (capital gains on liquidation)'))}
                     </p>
                     <p className="text-[10px] text-muted-foreground pt-1 print:hidden">
                       {params.taxType === 'income'
                         ? 'Reduces annual return rate.'
-                        : (params.taxType === 'tax_deferred' ? 'Full balance/withdrawal taxed.' : (mode === 'growth' ? 'Deducts tax from final profit.' : 'Increases withdrawal amount to cover tax.'))}
+                        : (params.taxType === 'tax_deferred' ? 'Full balance/withdrawal taxed.' : (mode === 'growth' ? 'Deducts tax from final profit.' : 'Capital gains tax is deducted from this withdrawal amount.'))}
                     </p>
                   </div>
                  </div>

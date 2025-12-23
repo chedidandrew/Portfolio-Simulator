@@ -171,7 +171,7 @@ export function WithdrawalMode() {
       summaryRows.push(
         { Key: 'Tax Enabled', Value: 'Yes' },
         { Key: 'Tax Rate', Value: `${state.taxRate}%` },
-        { Key: 'Tax Type', Value: state.taxType === 'income' ? 'Annual (Income)' : 'Capital Gains (Proportional)' },
+        { Key: 'Tax Type', Value: state.taxType === 'income' ? 'Annual income tax drag' : 'Taxable Account (capital gains on liquidation)' },
         { Key: 'Total Tax Paid', Value: roundToCents(calculation.totalTaxPaid) },
         { Key: 'Total Withdrawn (Net)', Value: roundToCents(calculation.totalWithdrawnNet) }
       )

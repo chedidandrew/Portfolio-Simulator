@@ -255,13 +255,13 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="capital_gains">Taxable Account</SelectItem>
-                        <SelectItem value="tax_deferred">Tax-Deferred (401k/IRA)</SelectItem>
-                        <SelectItem value="income">Annual (Income)</SelectItem>
+                        <SelectItem value="capital_gains">Taxable Account (capital gains on liquidation)</SelectItem>
+                        <SelectItem value="tax_deferred">Tax deferred (401k/IRA), taxed on withdrawal</SelectItem>
+                        <SelectItem value="income">Annual income tax drag</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="hidden print:block text-xs text-muted-foreground pt-1">
-                      Selected: {state.taxType === 'income' ? 'Annual (Income)' : (state.taxType === 'tax_deferred' ? 'Tax-Deferred (401k/IRA)' : 'Taxable Account')}
+                      Selected: {state.taxType === 'income' ? 'Annual income tax drag' : (state.taxType === 'tax_deferred' ? 'Tax deferred (401k/IRA), taxed on withdrawal' : 'Taxable Account (capital gains on liquidation)')}
                     </p>
                  </div>
                </div>
