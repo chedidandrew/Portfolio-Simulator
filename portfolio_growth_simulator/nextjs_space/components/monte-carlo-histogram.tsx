@@ -6,7 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } fro
 import { BarChart3 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
-import { formatCurrency, formatCompactNumber } from '@/lib/utils'
+import { formatCurrency, getAppCurrency, formatCompactNumber } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { triggerHaptic } from '@/hooks/use-haptics'
@@ -50,6 +50,28 @@ const CustomTooltip = ({ active, payload }: any) => {
     </div>
   )
 }
+
+  const currencySymbol = getAppCurrency().symbol
+
+  const formatCurrencyFullUnder100m = (amount: number) => {
+    const n = Number(amount)
+    if (!isFinite(n)) return formatCurrency(0)
+    if (Math.abs(n) >= 100_000_000) return formatCurrency(n)
+    const appCurrency: any = getAppCurrency()
+    const code = appCurrency?.code || appCurrency?.currency || 'USD'
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: code,
+        currencyDisplay: 'symbol',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(n)
+    } catch {
+      const symbol = appCurrency?.symbol ?? ''
+      return `${symbol}${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    }
+  }
 
 export function MonteCarloHistogram({ data, logScale, onLogScaleChange, enableAnimation = true }: MonteCarloHistogramProps) {
   const { theme } = useTheme()
@@ -199,7 +221,7 @@ export function MonteCarloHistogram({ data, logScale, onLogScaleChange, enableAn
             <div className="h-80 flex flex-col items-center justify-center gap-2 text-center">
               <p className="text-sm text-muted-foreground">All scenarios ended at</p>
               <p className="text-2xl font-bold text-emerald-400">
-                {formatCurrency(singleValue)}
+                {formatCurrencyFullUnder100m(singleValue)}
               </p>
               <p className="text-xs text-muted-foreground">
                 {data.length.toLocaleString()} scenarios landed here

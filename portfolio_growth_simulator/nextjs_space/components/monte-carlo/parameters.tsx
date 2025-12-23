@@ -36,6 +36,26 @@ export function MonteCarloParameters({
   const currencySymbol = getAppCurrency().symbol
   const [showAdvanced, setShowAdvanced] = useState(false)
 
+  const formatCurrencyFullUnder100m = (amount: number) => {
+    const n = Number(amount)
+    if (!isFinite(n)) return formatCurrency(0)
+    if (Math.abs(n) >= 100_000_000) return formatCurrency(n)
+    const appCurrency: any = getAppCurrency()
+    const code = appCurrency?.code || appCurrency?.currency || 'USD'
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: code,
+        currencyDisplay: 'symbol',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(n)
+    } catch {
+      const symbol = appCurrency?.symbol ?? ''
+      return `${symbol}${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    }
+  }
+
   const getCashflowLabel = () => {
     if (mode === 'growth') return 'Monthly Contribution'
     if (params.taxEnabled) {
@@ -307,10 +327,11 @@ export function MonteCarloParameters({
                     )}
 
                     {mode === 'withdrawal' && params.taxType === 'capital_gains' && (
-                       <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                          The simulator will automatically increase your withdrawal to cover capital gains tax, ensuring you net exactly <span className="font-semibold">{formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}</span>.
-                          <span className="opacity-80 ml-1">This gross-up amount varies each year based on your portfolio&apos;s profit margin.</span>
-                       </p>
+                      <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                        Withdrawing <span className="font-semibold">{formatCurrencyFullUnder100m(params.cashflowAmount ?? 0)}</span> (Gross), capital gains tax will be deducted from this amount.
+                        <br/>
+                        <span className="opacity-80">Your net pocket money will vary each year as your cost basis changes.</span>
+                      </p>
                     )}
 
                     {mode === 'withdrawal' && params.taxType === 'income' && (
