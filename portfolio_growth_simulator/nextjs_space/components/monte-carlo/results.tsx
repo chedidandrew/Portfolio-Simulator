@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { 
   Dices, Share, FileText, FileSpreadsheet, 
-  AlertCircle, Target, Lightbulb, Loader2 
+  AlertCircle, Target, Lightbulb, Loader2, Coins 
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
@@ -25,6 +25,9 @@ import {
   LossProbabilitiesChart, 
   InvestmentBreakdownChart 
 } from '@/components/monte-carlo-analytics'
+import { SensitivityTable } from '@/components/monte-carlo/sensitivity-table'
+import { CashflowChart } from '@/components/monte-carlo/cashflow-chart'
+import { TaxImpactChart } from '@/components/monte-carlo/tax-impact-chart'
 import { formatCurrency, getLargeNumberName } from '@/lib/utils'
 import { SimulationParams } from '@/lib/types'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -62,12 +65,69 @@ export function MonteCarloResults({
   const isDark = theme === 'dark'
   const isExporting = exportState !== 'idle'
 
-  const renderFormattedResult = (val: number | undefined) => {
-    if (val === undefined) return formatCurrency(0)
+  // --- 1. Real vs Nominal Logic ---
+  const [isRealDollars, setIsRealDollars] = useState(false)
+  const inflationAdjustment = params.inflationAdjustment ?? 0
+  const duration = params.duration
 
-    const shouldUseCompact = val >= 1e100 || !showFullPrecision
-    const formatted = formatCurrency(val, true, 2, shouldUseCompact)
-    const fullName = getLargeNumberName(val)
+  const deflate = (val: number, years: number) => {
+    if (!isRealDollars) return val
+    if (inflationAdjustment === 0) return val
+    return val / Math.pow(1 + inflationAdjustment / 100, years)
+  }
+
+  const getAdjustedScalar = (val: number | undefined) => {
+    if (val === undefined) return 0
+    return deflate(val, duration)
+  }
+
+  const adjustedEndingValues = useMemo(() => {
+    if (!results?.endingValues) return []
+    if (!isRealDollars) return results.endingValues
+    return results.endingValues.map((v: number) => deflate(v, duration))
+  }, [results?.endingValues, isRealDollars, duration, inflationAdjustment])
+
+  const adjustedInvestmentData = useMemo(() => {
+    if (!results?.investmentData) return []
+    if (!isRealDollars) return results.investmentData
+    return results.investmentData.map((pt: any) => ({
+      ...pt,
+      initial: deflate(pt.initial, pt.year),
+      contributions: deflate(pt.contributions, pt.year),
+      total: deflate(pt.total, pt.year)
+    }))
+  }, [results?.investmentData, isRealDollars, inflationAdjustment])
+
+  const adjustedAnnualReturnsData = useMemo(() => {
+    if (!results?.annualReturnsData) return []
+    if (!isRealDollars) return results.annualReturnsData
+    
+    return results.annualReturnsData.map((pt: any) => {
+      const adjustCAGR = (val: number) => {
+        const nominal = val / 100
+        const inflation = inflationAdjustment / 100
+        const real = ((1 + nominal) / (1 + inflation)) - 1
+        return real * 100
+      }
+      return {
+        ...pt,
+        p10: adjustCAGR(pt.p10),
+        p25: adjustCAGR(pt.p25),
+        median: adjustCAGR(pt.median),
+        p75: adjustCAGR(pt.p75),
+        p90: adjustCAGR(pt.p90),
+      }
+    })
+  }, [results?.annualReturnsData, isRealDollars, inflationAdjustment])
+
+
+  const renderFormattedResult = (val: number | undefined) => {
+    const adjusted = getAdjustedScalar(val)
+    if (adjusted === undefined) return formatCurrency(0)
+
+    const shouldUseCompact = adjusted >= 1e100 || !showFullPrecision
+    const formatted = formatCurrency(adjusted, true, 2, shouldUseCompact)
+    const fullName = getLargeNumberName(adjusted)
 
     if (shouldUseCompact && fullName) {
       return <CompactValue formatted={formatted} fullName={fullName} />
@@ -102,19 +162,12 @@ export function MonteCarloResults({
   if (!results) return null
   
   const taxEnabled = params.taxEnabled
-  
-  // Adjusted Tax Info Label Logic
   let taxInfo = ''
   if (taxEnabled) {
     if (mode === 'growth') {
       taxInfo = params.taxType === 'income' 
         ? '(After Annual Tax Drag)' 
         : '(Net of Deferred Tax)'
-    } else {
-       // Withdrawal mode: Tax is accounted for via gross-up.
-       // We hide the label here because the input is explicitly "Net Spending",
-       // so the results (Probability of Success, etc.) are already intuitively "Net" capabilities.
-       taxInfo = '' 
     }
   }
 
@@ -129,6 +182,17 @@ export function MonteCarloResults({
             </CardTitle>
 
             <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-3 text-xs sm:text-sm print:hidden">
+              <div className="flex items-center gap-2 mr-2 border-r border-border pr-3">
+                 <Switch
+                  id="real-nominal-toggle"
+                  checked={isRealDollars}
+                  onCheckedChange={setIsRealDollars}
+                />
+                <Label htmlFor="real-nominal-toggle" className="font-normal cursor-pointer">
+                  {isRealDollars ? "Real (Today's $)" : "Nominal (Future $)"}
+                </Label>
+              </div>
+
               <div className="flex items-center gap-2 mr-2 border-r border-border pr-3">
                 <Switch
                   id="precision-toggle-mc"
@@ -181,8 +245,27 @@ export function MonteCarloResults({
             />
           </div>
 
+          {taxEnabled && params.taxType === 'capital_gains' && mode === 'growth' && (
+             <motion.div 
+               initial={{ opacity: 0 }} 
+               animate={{ opacity: 1 }}
+               className="flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm"
+             >
+                <Coins className="h-5 w-5 text-red-500" />
+                <div>
+                   <span className="font-semibold text-red-600 dark:text-red-400">Estimated Tax Cost: </span>
+                   <span className="font-bold">
+                      {formatCurrency(getAdjustedScalar(results.taxDragAmount))}
+                   </span>
+                   <span className="text-muted-foreground ml-1">
+                      (Avg diff between pre-tax and post-tax outcome)
+                   </span>
+                </div>
+             </motion.div>
+          )}
+
           <div className="space-y-2">
-            <Label>Outcome Distribution</Label>
+            <Label>Outcome Distribution {isRealDollars && <span className="text-xs text-muted-foreground font-normal">(Adjusted for Inflation)</span>}</Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
               <DistributionItem label="10th percentile" value={renderFormattedResult(results.p10)} />
               <DistributionItem label="25th percentile" value={renderFormattedResult(results.p25)} />
@@ -202,7 +285,7 @@ export function MonteCarloResults({
               <Target className="h-6 w-6 text-primary" />
               <div className="flex-1">
                 <p className="font-semibold">
-                  {results.goalProbability?.toFixed(1) ?? '0'}% chance of reaching {formatCurrency(results.portfolioGoalSnapshot ?? params.portfolioGoal)}
+                  {results.goalProbability?.toFixed(1) ?? '0'}% chance of reaching {formatCurrency(getAdjustedScalar(results.portfolioGoalSnapshot ?? params.portfolioGoal))}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   In {results.pathsReachingGoal ?? 0} out of {results.numPathsUsed ?? params.numPaths} scenarios, you reached your goal
@@ -283,10 +366,26 @@ export function MonteCarloResults({
           logScale={logScales.chart}
           onLogScaleChange={(val) => setLogScales({ ...logScales, chart: val })}
           enableAnimation={!isExporting}
+          isRealDollars={isRealDollars}
+          inflationAdjustment={inflationAdjustment}
+          deterministicData={results.deterministicSeries}
         />
 
+        <CashflowChart params={params} mode={mode} />
+             
+        {taxEnabled && (
+           <TaxImpactChart 
+              data={results.chartData} 
+              investmentData={results.investmentData} 
+              params={params} 
+              isRealDollars={isRealDollars} 
+           />
+        )}
+
+        <SensitivityTable params={params} mode={mode} />
+
         <MonteCarloHistogram 
-          data={results.endingValues ?? []} 
+          data={adjustedEndingValues} 
           logScale={logScales.histogram}
           onLogScaleChange={(val) => setLogScales({ ...logScales, histogram: val })}
           enableAnimation={!isExporting}
@@ -300,13 +399,13 @@ export function MonteCarloResults({
         />
 
         <InvestmentBreakdownChart 
-          data={results.investmentData ?? []} 
+          data={adjustedInvestmentData} 
           isDark={isDark} 
           enableAnimation={!isExporting}
         />
 
         <AnnualReturnsChart 
-          data={results.annualReturnsData ?? []} 
+          data={adjustedAnnualReturnsData} 
           isDark={isDark} 
           enableAnimation={!isExporting}
         />

@@ -17,6 +17,10 @@ interface MonteCarloChartProps {
   logScale: boolean
   onLogScaleChange: (val: boolean) => void
   enableAnimation?: boolean
+  // NEW PROPS
+  isRealDollars?: boolean
+  inflationAdjustment?: number
+  deterministicData?: any[]
 }
 
 const PERCENTILE_LABELS: Record<string, string> = {
@@ -25,6 +29,7 @@ const PERCENTILE_LABELS: Record<string, string> = {
   p50: '50th percentile (median)',
   p25: '25th percentile',
   p10: '10th percentile',
+  deterministic: 'Deterministic (0% Volatility)'
 }
 
 const PERCENTILE_COLORS: Record<string, string> = {
@@ -33,6 +38,7 @@ const PERCENTILE_COLORS: Record<string, string> = {
   p50: 'hsl(165, 65%, 48%)',
   p25: 'hsl(180, 70%, 55%)',
   p10: 'hsl(30, 85%, 60%)',
+  deterministic: 'hsl(0, 0%, 50%)'
 }
 
 interface TooltipProps {
@@ -98,6 +104,7 @@ const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
   const rows = [
     { key: 'p90', value: point.p90 },
     { key: 'p75', value: point.p75 },
+    { key: 'deterministic', value: point.deterministic },
     { key: 'p50', value: point.p50 },
     { key: 'p25', value: point.p25 },
     { key: 'p10', value: point.p10 },
@@ -110,15 +117,18 @@ const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
         {mode === 'growth' ? 'Projected portfolio value' : 'Projected remaining balance'}
       </div>
       <div className="mt-1 space-y-1">
-        {rows.map(({ key, value }) => (
-          <div key={key} className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: PERCENTILE_COLORS[key] }} />
-              <span>{PERCENTILE_LABELS[key]}</span>
-            </div>
-            <span className="font-semibold">{formatCurrency(value)}</span>
-          </div>
-        ))}
+        {rows.map(({ key, value }) => {
+            if (value === undefined) return null;
+            return (
+              <div key={key} className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: PERCENTILE_COLORS[key] }} />
+                  <span>{PERCENTILE_LABELS[key]}</span>
+                </div>
+                <span className="font-semibold">{formatCurrency(value)}</span>
+              </div>
+            )
+        })}
       </div>
     </div>
   )
@@ -130,7 +140,16 @@ function logSafe(value: number): number {
   return value > LOG_FLOOR ? value : LOG_FLOOR
 }
 
-export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enableAnimation = true }: MonteCarloChartProps) {
+export function MonteCarloChart({ 
+    data, 
+    mode, 
+    logScale, 
+    onLogScaleChange, 
+    enableAnimation = true,
+    isRealDollars = false,
+    inflationAdjustment = 0,
+    deterministicData = []
+}: MonteCarloChartProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
@@ -205,20 +224,41 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
     return `Year ${value}`
   }
 
-  const chartData = useMemo(
-    () =>
-      logScale
-        ? data.map(point => ({
-            ...point,
-            p90: logSafe(point.p90),
-            p75: logSafe(point.p75),
-            p50: logSafe(point.p50),
-            p25: logSafe(point.p25),
-            p10: logSafe(point.p10),
-          }))
-        : data,
-    [data, logScale],
-  )
+  // Merge Deterministic Data and Apply Real/Nominal Adjustment
+  const chartData = useMemo(() => {
+    return data.map((point, index) => {
+       const year = point.year;
+       const detPoint = deterministicData[index]; // Assume synced indices for simplicity or find by year
+       const detValue = detPoint ? detPoint.value : undefined;
+
+       // Adjustment Factor
+       const factor = isRealDollars 
+         ? Math.pow(1 + inflationAdjustment / 100, year) 
+         : 1
+
+       const raw = {
+         year: point.year,
+         p90: point.p90 / factor,
+         p75: point.p75 / factor,
+         p50: point.p50 / factor,
+         p25: point.p25 / factor,
+         p10: point.p10 / factor,
+         deterministic: detValue ? detValue / factor : undefined
+       }
+
+       return logScale
+        ? {
+            ...raw,
+            p90: logSafe(raw.p90),
+            p75: logSafe(raw.p75),
+            p50: logSafe(raw.p50),
+            p25: logSafe(raw.p25),
+            p10: logSafe(raw.p10),
+            deterministic: raw.deterministic ? logSafe(raw.deterministic) : undefined
+          }
+        : raw
+    })
+  }, [data, logScale, isRealDollars, inflationAdjustment, deterministicData])
 
   const handleLogScaleChange = (checked: boolean) => { 
     triggerHaptic('light'); 
@@ -305,6 +345,7 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
 
                 <Line type="monotone" dataKey="p90" stroke={PERCENTILE_COLORS.p90} strokeWidth={2} dot={false} name="p90" animationDuration={enableAnimation ? 500 : 0} />
                 <Line type="monotone" dataKey="p75" stroke={PERCENTILE_COLORS.p75} strokeWidth={2} dot={false} name="p75" animationDuration={enableAnimation ? 400 : 0} />
+                <Line type="monotone" dataKey="deterministic" stroke={PERCENTILE_COLORS.deterministic} strokeWidth={2} strokeDasharray="5 5" dot={false} name="deterministic" animationDuration={enableAnimation ? 500 : 0} />
                 <Line type="monotone" dataKey="p50" stroke={PERCENTILE_COLORS.p50} strokeWidth={3} dot={false} name="p50" animationDuration={enableAnimation ? 300 : 0} />
                 <Line type="monotone" dataKey="p25" stroke={PERCENTILE_COLORS.p25} strokeWidth={2} dot={false} name="p25" animationDuration={enableAnimation ? 200 : 0} />
                 <Line type="monotone" dataKey="p10" stroke={PERCENTILE_COLORS.p10} strokeWidth={2} dot={false} name="p10" animationDuration={enableAnimation ? 100 : 0} />
@@ -312,7 +353,8 @@ export function MonteCarloChart({ data, mode, logScale, onLogScaleChange, enable
             </ResponsiveContainer>
           </div>
           <p className="text-xs text-muted-foreground mt-3 text-center">
-            Shows the range of possible portfolio values using up to 100,000 simulated market outcomes, from optimistic to pessimistic scenarios.
+             Shows the range of possible portfolio values using up to 100,000 simulated market outcomes, from optimistic to pessimistic scenarios. 
+             The <span className="text-muted-foreground/70 border-b border-dashed border-muted-foreground">dashed gray line</span> represents the deterministic outcome (0% volatility).
           </p>
         </CardContent>
       </Card>
