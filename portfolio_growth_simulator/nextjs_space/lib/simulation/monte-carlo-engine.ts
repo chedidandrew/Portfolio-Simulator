@@ -96,13 +96,8 @@ export function performMonteCarloSimulation(
   
   let annualBaseCashflow = cashflowFrequency === 'monthly' ? cashflowAmount * 12 : cashflowAmount
 
-  // FIX: Tax Rate Edge Case Safety (Consistent with Withdrawal Engine)
-  // Only Gross Up if NOT 'income' type (Income type uses Tax Drag instead)
-  if (mode === 'withdrawal' && taxEnabled && taxType !== 'income') {
-     let t = taxRate / 100
-     if (t >= 0.99) t = 0.99 // Hard clamp to 99% for safety
-     annualBaseCashflow = annualBaseCashflow / (1 - t)
-  }
+  // NOTE: Previous "Lazy Gross Up" logic removed here.
+  // We now handle tax calculations dynamically inside the loop.
 
   let cashflowPerStep = annualBaseCashflow / timeStepsPerYear
   
@@ -137,6 +132,7 @@ export function performMonteCarloSimulation(
   // --- DETERMINISTIC PATH CALCULATION ---
   // We simulate one "perfect" path with 0 volatility for comparison
   let detValue = initialValue
+  let detBasis = initialValue // Track Tax Basis
   let detCashflow = cashflowPerStep
   // Convert annual rate to per-step rate (simple geometric)
   const detStepRate = Math.pow(1 + r, dt) - 1
@@ -145,7 +141,28 @@ export function performMonteCarloSimulation(
   for (let step = 1; step <= totalTimeSteps; step++) {
     // Deterministic Growth
     if (mode === 'withdrawal') {
-       detValue -= detCashflow
+       let detStepWithdrawal = detCashflow
+       
+       // Calculate dynamic gross-up based on gain fraction
+       if (taxEnabled && taxType !== 'income') {
+         const gainFraction = detValue > detBasis ? (detValue - detBasis) / detValue : 0
+         let effectiveTaxRate = (taxRate / 100) * gainFraction
+         // Safety clamp
+         if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99
+         
+         // Gross = Net / (1 - EffectiveRate)
+         detStepWithdrawal = detCashflow / (1 - effectiveTaxRate)
+       }
+
+       // Cannot withdraw more than balance
+       if (detStepWithdrawal > detValue) detStepWithdrawal = detValue
+
+       // Update Basis (Proportional reduction)
+       if (detValue > 0) {
+         detBasis = detBasis * (1 - (detStepWithdrawal / detValue))
+       }
+
+       detValue -= detStepWithdrawal
        detValue = Math.max(0, detValue)
        detValue = detValue * (1 + detStepRate)
     } else {
@@ -172,6 +189,7 @@ export function performMonteCarloSimulation(
     let lowestValue = initialValue
     let currentCashflowPerStep = cashflowPerStep
     let totalInvestedSoFar = initialValue
+    let totalBasis = initialValue // Track Tax Basis for this path
     let peak = currentValue
     let maxDrawdownForPath = 0
     let preTaxValue = initialValue // Track pre-tax for drag calc
@@ -186,7 +204,26 @@ export function performMonteCarloSimulation(
       // FIX: Sequence of Returns Logic for Volatility=0 Equivalence
       if (mode === 'withdrawal') {
         // Withdrawal Mode: Withdraw THEN Grow
-        currentValue -= currentCashflowPerStep
+        let stepWithdrawal = currentCashflowPerStep
+
+        // Dynamic Tax Gross-Up Logic
+        if (taxEnabled && taxType !== 'income') {
+          const gainFraction = currentValue > totalBasis ? (currentValue - totalBasis) / currentValue : 0
+          let effectiveTaxRate = (taxRate / 100) * gainFraction
+          
+          if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99
+          
+          stepWithdrawal = currentCashflowPerStep / (1 - effectiveTaxRate)
+        }
+
+        if (stepWithdrawal > currentValue) stepWithdrawal = currentValue
+
+        // Update Basis
+        if (currentValue > 0) {
+          totalBasis = totalBasis * (1 - (stepWithdrawal / currentValue))
+        }
+
+        currentValue -= stepWithdrawal
         currentValue = Math.max(0, currentValue)
         currentValue = currentValue * growthFactor
         
