@@ -1,5 +1,6 @@
 export interface GrowthState {
   startingBalance: number
+  startingCostBasis?: number
   annualReturn: number
   duration: number
   periodicAddition: number
@@ -17,6 +18,7 @@ export interface GrowthState {
 
 export interface WithdrawalState {
   startingBalance: number
+  startingCostBasis?: number
   annualReturn: number
   duration: number
   periodicWithdrawal: number
@@ -33,6 +35,7 @@ export interface WithdrawalState {
 
 export interface SimulationParams {
   initialValue: number
+  startingCostBasis?: number
   expectedReturn: number
   volatility: number
   duration: number

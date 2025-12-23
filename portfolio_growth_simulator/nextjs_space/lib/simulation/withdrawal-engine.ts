@@ -23,6 +23,7 @@ export interface WithdrawalProjectionResult {
 export function calculateWithdrawalProjection(state: WithdrawalState): WithdrawalProjectionResult {
   const {
     startingBalance,
+    startingCostBasis,
     annualReturn,
     duration,
     periodicWithdrawal,
@@ -53,9 +54,11 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
 
   const inflationFactor = 1 + inflationAdjustment / 100
 
+  const clampedStartingCostBasis = Math.max(0, startingCostBasis ?? startingBalance)
+
   // --- 2. Simulation State ---
   let currentBalance = startingBalance
-  let totalBasis = startingBalance
+  let totalBasis = clampedStartingCostBasis
   let currentPeriodicWithdrawal = periodicWithdrawal 
   
   let yearsUntilZero: number | null = null

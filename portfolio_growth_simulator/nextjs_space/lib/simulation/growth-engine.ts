@@ -22,6 +22,7 @@ export interface GrowthProjectionResult {
 export function calculateGrowthProjection(state: GrowthState): GrowthProjectionResult {
   const { 
     startingBalance, 
+    startingCostBasis,
     annualReturn, 
     duration, 
     periodicAddition, 
@@ -54,8 +55,11 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
 
   const inflationFactor = 1 + (inflationAdjustment / 100)
 
+  const clampedStartingCostBasis = Math.max(0, startingCostBasis ?? startingBalance)
+
   let currentBalance = startingBalance
   let totalContributions = startingBalance
+  let totalBasis = clampedStartingCostBasis
   let currentPeriodicAddition = periodicAddition
   let totalTaxPaid = 0
 
@@ -90,6 +94,7 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     if (contributionThisMonth > 0) {
       currentBalance += contributionThisMonth
       totalContributions += contributionThisMonth
+      totalBasis += contributionThisMonth
       yearContributions += contributionThisMonth
     }
 
@@ -120,8 +125,9 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
   if (taxEnabled) {
     if (taxType === 'capital_gains') {
       // Tax on PROFIT only
-      if (totalProfit > 0) {
-        totalDeferredTax = totalProfit * (taxRate / 100)
+      const profitForTax = finalValue - totalBasis
+      if (profitForTax > 0) {
+        totalDeferredTax = profitForTax * (taxRate / 100)
       }
     } else if (taxType === 'tax_deferred') {
       // Tax on ENTIRE BALANCE (Traditional 401k/IRA style)
