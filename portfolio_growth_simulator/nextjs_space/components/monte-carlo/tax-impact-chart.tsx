@@ -110,6 +110,73 @@ export function TaxImpactChart({ data, investmentData, params, isRealDollars }: 
     })
   }, [data, investmentData, params, isRealDollars])
 
+  /* ------------------------------------------------------------------ */
+  /* Smart Ticks Logic (Matched with MonteCarloChart)                   */
+  /* ------------------------------------------------------------------ */
+  const maxYear = useMemo(() => {
+    if (!chartData || chartData.length === 0) return 0
+    return chartData[chartData.length - 1].year
+  }, [chartData])
+
+  const customTicks = useMemo(() => {
+    if (!maxYear) return [0]
+    
+    // Case 1: Very Short (<= 0.5 years / 6 months) -> Weekly ticks
+    if (maxYear <= 0.5) {
+      const totalWeeks = Math.ceil(maxYear * 52)
+      return Array.from({ length: totalWeeks + 1 }, (_, i) => i / 52)
+    }
+
+    // Case 2: Short Duration (<= 3 years) -> Monthly ticks
+    if (maxYear <= 3) {
+      const totalMonths = Math.ceil(maxYear * 12)
+      return Array.from({ length: totalMonths + 1 }, (_, i) => i / 12)
+    }
+
+    // Case 3: Smart Interval
+    const targetTickCount = 15
+    const rawInterval = maxYear / targetTickCount
+    
+    // Snap to "nice" intervals (1, 2, 4, 5, 10, 20, 25, 50, 100)
+    const niceIntervals = [1, 2, 4, 5, 10, 20, 25, 50, 100]
+    const interval = niceIntervals.find(i => i >= rawInterval) || niceIntervals[niceIntervals.length - 1]
+
+    const ticks = []
+    for (let i = 0; i <= maxYear; i += interval) {
+      ticks.push(i)
+    }
+    if (maxYear - ticks[ticks.length - 1] > interval * 0.5) {
+      ticks.push(maxYear)
+    }
+    
+    return ticks
+  }, [maxYear])
+
+  const formatXAxis = (value: number) => {
+    if (value === 0) return 'Month 1'
+    const isInteger = Math.abs(value % 1) < 0.001
+
+    if (maxYear <= 0.5) {
+      const weeks = Math.round(value * 52)
+      return `Week ${weeks}`
+    }
+
+    if (maxYear <= 3) {
+      if (isInteger) return `Year ${Math.round(value)}`
+      const years = Math.floor(value)
+      const months = Math.round((value - years) * 12)
+      
+      const displayMonth = months + 1
+      if (displayMonth > 12) return `Year ${years + 1}`
+
+      if (years === 0) return `Month ${displayMonth}`
+      return `Yr ${years} M ${displayMonth}`
+    }
+
+    if (!isInteger) return ''
+    return `Year ${value}`
+  }
+
   if (!params.taxEnabled) return null
 
   return (
@@ -123,7 +190,7 @@ export function TaxImpactChart({ data, investmentData, params, isRealDollars }: 
       <CardContent>
          <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 35 }}>
                 <defs>
                     <linearGradient id="colorPre" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.1}/>
@@ -134,13 +201,34 @@ export function TaxImpactChart({ data, investmentData, params, isRealDollars }: 
                         <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
                     </linearGradient>
                 </defs>
-                <XAxis 
-                  dataKey="year" 
+                <XAxis
+                  dataKey="year"
+                  type="number"
+                  domain={[0, 'dataMax']}
+                  ticks={customTicks}
                   tickLine={false}
-                  tick={{ fontSize: 10, fill: isDark ? '#a1a1aa' : '#71717a' }}
-                  interval="preserveStartEnd"
-                  minTickGap={30}
-                  tickFormatter={(val) => Math.round(val).toString()}
+                  axisLine={{ stroke: isDark ? 'hsl(240, 3.7%, 15.9%)' : 'hsl(214, 32%, 91%)' }}
+                  tick={{
+                    fontSize: 11,
+                    angle: -45,
+                    textAnchor: 'end',
+                    dy: 10,
+                    fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)',
+                  } as any}
+                  height={60} 
+                  tickFormatter={formatXAxis}
+                  interval={0}
+                  minTickGap={1}
+                  label={{
+                    value: 'Time',
+                    position: 'insideBottom',
+                    offset: -5,
+                    style: {
+                      textAnchor: 'middle',
+                      fontSize: 11,
+                      fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)',
+                    },
+                  }}
                 />
                 <YAxis 
                   tickLine={false}
