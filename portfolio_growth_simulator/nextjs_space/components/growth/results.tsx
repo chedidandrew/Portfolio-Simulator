@@ -51,7 +51,7 @@ export function GrowthResults({
   const isProfitNegative = totalProfit < 0
   
   const roi = totalContributions > 0 
-    ? ((totalProfit - totalDeferredTax) / totalContributions) * 100 
+    ? (totalProfit / totalContributions) * 100 
     : 0
 
   const formatResult = (val: number) => {
@@ -127,7 +127,7 @@ export function GrowthResults({
             />
             <MetricCard
               label={showDeferredTax ? "Total Profit (After Tax)" : "Total Profit"}
-              value={formatResult(showDeferredTax ? totalProfit - totalDeferredTax : totalProfit)}
+              value={formatResult(totalProfit)}
               colorClass={isProfitNegative ? 'text-destructive' : 'text-emerald-500'}
               bgClass={isProfitNegative 
                 ? 'bg-gradient-to-br from-destructive/10 to-destructive/5' 
@@ -200,7 +200,7 @@ export function GrowthResults({
             </motion.div>
           ) : null}
 
-          <GrowthMilestones finalValue={finalValue} />
+          <GrowthMilestones finalValue={displayValue} />
         </CardContent>
       </Card>
 

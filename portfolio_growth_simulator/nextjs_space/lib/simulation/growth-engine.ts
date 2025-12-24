@@ -40,7 +40,15 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     calculationMode = 'effective'
   } = state
 
-  const totalMonths = duration * 12
+  const getStepsPerYear = (f: GrowthState['frequency']) => {
+    if (f === 'weekly') return 52
+    if (f === 'monthly') return 12
+    if (f === 'quarterly') return 4
+    return 1
+  }
+
+  const stepsPerYear = getStepsPerYear(frequency)
+  const totalSteps = duration * stepsPerYear
   
   // Tax Logic: If 'income' (Annual), apply tax drag to the return rate
   // 'tax_deferred' and 'capital_gains' do NOT reduce annual return
@@ -49,12 +57,12 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     effectiveAnnualReturn = annualReturn * (1 - (taxRate / 100))
   }
 
-  // Consistent: Use Effective Monthly Rate or Nominal Monthly Rate
-  let monthlyRate
+  // Consistent: Use Effective Step Rate or Nominal Step Rate
+  let stepRate
   if (calculationMode === 'nominal') {
-    monthlyRate = effectiveAnnualReturn / 100 / 12
+    stepRate = effectiveAnnualReturn / 100 / stepsPerYear
   } else {
-    monthlyRate = Math.pow(1 + effectiveAnnualReturn / 100, 1 / 12) - 1
+    stepRate = Math.pow(1 + effectiveAnnualReturn / 100, 1 / stepsPerYear) - 1
   }
 
   const inflationFactor = 1 + (inflationAdjustment / 100)
@@ -66,6 +74,7 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
   let totalBasis = clampedStartingCostBasis
   let currentPeriodicAddition = periodicAddition
   let totalTaxPaid = 0
+  let totalInterest = 0
 
   const yearData = []
   const getNetLiquidationValue = (balance: number, basis: number) => {
@@ -87,38 +96,38 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
   let yearInterest = 0
   let yearTaxPaid = 0
 
-  for (let month = 1; month <= totalMonths; month++) {
+  for (let step = 1; step <= totalSteps; step++) {
     const balanceBeforeInterest = currentBalance
-    
-    // A. Apply Growth
-    currentBalance = currentBalance * (1 + monthlyRate)
-    const monthlyInterest = currentBalance - balanceBeforeInterest
-    yearInterest += monthlyInterest
 
+    // A. Apply Growth
+    currentBalance = currentBalance * (1 + stepRate)
+    const stepInterestNet = currentBalance - balanceBeforeInterest
+
+    let stepInterestGross = stepInterestNet
     if (taxEnabled && taxType === 'income') {
       // EDGE CASE SAFETY: Clamp tax rate to 99% max for the 'implied tax' division
       let t = taxRate / 100
       if (t >= 0.99) t = 0.99
-      const impliedTax = monthlyInterest * (t / (1 - t))
+      stepInterestGross = stepInterestNet / (1 - t)
+      const impliedTax = stepInterestGross - stepInterestNet
       totalTaxPaid += impliedTax
       yearTaxPaid += impliedTax
     }
 
-    // B. Apply Contributions
-    let contributionThisMonth = 0
-    if (frequency === 'monthly') contributionThisMonth = currentPeriodicAddition
-    else if (frequency === 'quarterly' && month % 3 === 0) contributionThisMonth = currentPeriodicAddition
-    else if (frequency === 'yearly' && month % 12 === 0) contributionThisMonth = currentPeriodicAddition
-    else if (frequency === 'weekly') contributionThisMonth = (currentPeriodicAddition * 52) / 12
+    totalInterest += stepInterestGross
+    yearInterest += stepInterestGross
 
-    if (contributionThisMonth > 0) {
-      currentBalance += contributionThisMonth
-      totalContributions += contributionThisMonth
-      totalBasis += contributionThisMonth
-      yearContributions += contributionThisMonth
+
+
+    // B. Apply Contributions (Discrete at selected frequency)
+    if (currentPeriodicAddition > 0) {
+      currentBalance += currentPeriodicAddition
+      totalContributions += currentPeriodicAddition
+      totalBasis += currentPeriodicAddition
+      yearContributions += currentPeriodicAddition
     }
 
-    if (month % 12 === 0) {
+    if (step % stepsPerYear === 0) {
       let endingValue = currentBalance
       if (taxEnabled) {
         if (taxType === 'capital_gains') {
@@ -132,7 +141,7 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
       }
 
       yearData.push({
-        year: month / 12,
+        year: step / stepsPerYear,
         startingValue: yearStartBalanceNet,
         grossStartingValue: yearStartBalanceGross,
         contributions: yearContributions,
@@ -155,8 +164,6 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
   }
 
   const finalValue = currentBalance
-  const totalProfit = finalValue - totalContributions
-  const totalInterest = finalValue - totalContributions
 
   const taxableGain = (taxEnabled && taxType === 'capital_gains') ? Math.max(0, finalValue - totalBasis) : 0
 
@@ -176,6 +183,7 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
   } 
 
   const finalValueNet = finalValue - totalDeferredTax
+  const totalProfit = finalValueNet - totalContributions
   const finalValueInTodaysDollars = finalValueNet / Math.pow(1 + inflationAdjustment / 100, duration)
 
   let yearsToTarget: number | null = null
@@ -185,18 +193,12 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     let tBasis = clampedStartingCostBasis
     let tContribution = periodicAddition
     
-    for (let m = 1; m <= 1000 * 12; m++) {
-      tBalance = tBalance * (1 + monthlyRate)
+    for (let m = 1; m <= 1000 * stepsPerYear; m++) {
+      tBalance = tBalance * (1 + stepRate)
       
-      let tAdd = 0
-      if (frequency === 'monthly') tAdd = tContribution
-      else if (frequency === 'quarterly' && m % 3 === 0) tAdd = tContribution
-      else if (frequency === 'yearly' && m % 12 === 0) tAdd = tContribution
-      else if (frequency === 'weekly') tAdd = (tContribution * 52) / 12
-      
-      tBalance += tAdd
-      if (tAdd > 0) {
-        tBasis += tAdd
+      if (tContribution > 0) {
+        tBalance += tContribution
+        tBasis += tContribution
       }
 
       let tNet = tBalance
@@ -212,11 +214,11 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
       }
 
       if (tNet >= targetValue) {
-        yearsToTarget = parseFloat((m / 12).toFixed(1))
+        yearsToTarget = parseFloat((m / stepsPerYear).toFixed(1))
         break
       }
 
-      if (m % 12 === 0 && !excludeInflationAdjustment) {
+      if (m % stepsPerYear === 0 && !excludeInflationAdjustment) {
         tContribution *= inflationFactor
       }
     }

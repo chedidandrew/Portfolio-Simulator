@@ -12,7 +12,14 @@ export function CashflowChart({ params, mode }: { params: SimulationParams, mode
   const isDark = theme === 'dark'
   
   const inflation = params.inflationAdjustment ?? 0
-  const baseAnnual = params.cashflowFrequency === 'monthly' ? params.cashflowAmount * 12 : params.cashflowAmount
+  const baseAnnual =
+    params.cashflowFrequency === 'weekly'
+      ? params.cashflowAmount * 52
+      : params.cashflowFrequency === 'monthly'
+        ? params.cashflowAmount * 12
+        : params.cashflowFrequency === 'quarterly'
+          ? params.cashflowAmount * 4
+          : params.cashflowAmount
   const steps = Math.min(params.duration, 30) // Cap at 30 bars for readability
   
   const currencySymbol = getAppCurrency().symbol

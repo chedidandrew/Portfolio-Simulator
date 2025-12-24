@@ -40,7 +40,7 @@ export interface SimulationParams {
   volatility: number
   duration: number
   cashflowAmount: number
-  cashflowFrequency: 'yearly' | 'monthly'
+  cashflowFrequency: 'yearly' | 'quarterly' | 'monthly' | 'weekly'
   inflationAdjustment?: number
   excludeInflationAdjustment?: boolean
   numPaths: number

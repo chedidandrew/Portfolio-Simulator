@@ -56,13 +56,28 @@ export function MonteCarloParameters({
     }
   }
 
+  const getCashflowPeriodTitle = () => {
+    if (params.cashflowFrequency === 'weekly') return 'Weekly'
+    if (params.cashflowFrequency === 'monthly') return 'Monthly'
+    if (params.cashflowFrequency === 'quarterly') return 'Quarterly'
+    return 'Yearly'
+  }
+
+  const getCashflowPeriodNoun = () => {
+    if (params.cashflowFrequency === 'weekly') return 'week'
+    if (params.cashflowFrequency === 'monthly') return 'month'
+    if (params.cashflowFrequency === 'quarterly') return 'quarter'
+    return 'year'
+  }
+
   const getCashflowLabel = () => {
-    if (mode === 'growth') return 'Monthly Contribution'
+    const period = getCashflowPeriodTitle()
+    if (mode === 'growth') return `${period} Contribution`
     if (params.taxEnabled) {
-       if (params.taxType === 'capital_gains') return 'Monthly Withdrawal (Gross)'
-       if (params.taxType === 'tax_deferred') return 'Monthly Withdrawal (Gross)'
+       if (params.taxType === 'capital_gains') return `${period} Withdrawal (Gross)`
+       if (params.taxType === 'tax_deferred') return `${period} Withdrawal (Gross)`
     }
-    return 'Monthly Withdrawal'
+    return `${period} Withdrawal`
   }
 
   return (
@@ -237,6 +252,25 @@ export function MonteCarloParameters({
                 maxErrorMessage="I admire your confidence, but no :)"
               />
             </div>
+
+            {/* Cashflow Frequency */}
+            <div className="space-y-2">
+              <Label htmlFor="mc-frequency">Cashflow Frequency</Label>
+              <Select
+                value={params.cashflowFrequency}
+                onValueChange={(value: any) => setParams({ ...params, cashflowFrequency: value })}
+              >
+                <SelectTrigger id="mc-frequency" className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="quarterly">Quarterly</SelectItem>
+                  <SelectItem value="yearly">Yearly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             
             {/* Inflation */}
             <div className="space-y-2">
@@ -313,7 +347,7 @@ export function MonteCarloParameters({
                     {/* DYNAMIC TAX MESSAGE */}
                     {mode === 'withdrawal' && params.taxType === 'tax_deferred' && (
                        <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                        Withdrawing <span className="font-semibold text-primary">{formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}</span> per {params.cashflowFrequency === 'monthly' ? 'month' : 'year'}, you will net{' '}
+                        Withdrawing <span className="font-semibold text-primary">{formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}</span> per {getCashflowPeriodNoun()}, you will net{' '}
                         <span className="font-semibold text-primary">
                           {formatCurrency(
                             (params.cashflowAmount ?? 0) * (1 - Math.min(params.taxRate ?? 0, 99) / 100),

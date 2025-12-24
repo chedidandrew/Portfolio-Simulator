@@ -61,7 +61,7 @@ export function useMonteCarlo(
         mode === 'growth'
           ? initialValues?.periodicAddition ?? 500
           : initialValues?.periodicWithdrawal ?? 3000,
-      cashflowFrequency: 'monthly',
+      cashflowFrequency: initialValues?.frequency ?? 'monthly',
       inflationAdjustment: initialValues?.inflationAdjustment ?? 0,
       numPaths: 500,
       portfolioGoal: mode === 'growth' ? 1000000 : undefined,

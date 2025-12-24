@@ -194,7 +194,7 @@ export function GrowthMode() {
          summaryRows.push({ Key: 'Total Tax Paid', Value: roundToCents(calculation.totalTaxPaid) })
       } else {
          // Capital Gains Mode: Taxes deferred until end
-         summaryRows.push({ Key: 'Total Profit (Gross)', Value: roundToCents(calculation.totalProfit) })
+         summaryRows.push({ Key: 'Total Profit (Gross)', Value: roundToCents(calculation.finalValue - calculation.totalContributions) })
          summaryRows.push({ Key: 'Final Value (Gross)', Value: roundToCents(calculation.finalValue) })
          summaryRows.push({ Key: 'Est. Tax Liability', Value: roundToCents(calculation.totalDeferredTax) })
          summaryRows.push({ Key: 'Final Value (Net)', Value: roundToCents(calculation.finalValueNet) })

@@ -47,15 +47,14 @@ export function performMonteCarloSimulation(
     calculationMode = 'effective'
   } = params
 
-  const MAX_PHYSICS_ITERATIONS = 150_000_000 
-  const opsWeekly = numPaths * duration * 52
-  const opsMonthly = numPaths * duration * 12
-
-  let timeStepsPerYear = 52 
-  if (opsWeekly > MAX_PHYSICS_ITERATIONS) {
-    if (opsMonthly > MAX_PHYSICS_ITERATIONS) timeStepsPerYear = 1
-    else timeStepsPerYear = 12
+  const getStepsPerYear = (f: SimulationParams['cashflowFrequency']) => {
+    if (f === 'weekly') return 52
+    if (f === 'monthly') return 12
+    if (f === 'quarterly') return 4
+    return 1
   }
+
+  const timeStepsPerYear = getStepsPerYear(cashflowFrequency)
 
   const MAX_TOTAL_DATA_POINTS = 10_000_000
   const MAX_CHART_STEPS = 500
@@ -78,8 +77,8 @@ export function performMonteCarloSimulation(
   }
 
   if (calculationMode === 'nominal') {
-    preTaxReturn = (Math.pow(1 + preTaxReturn / 100 / 12, 12) - 1) * 100
-    postTaxReturn = (Math.pow(1 + postTaxReturn / 100 / 12, 12) - 1) * 100
+    preTaxReturn = (Math.pow(1 + preTaxReturn / 100 / timeStepsPerYear, timeStepsPerYear) - 1) * 100
+    postTaxReturn = (Math.pow(1 + postTaxReturn / 100 / timeStepsPerYear, timeStepsPerYear) - 1) * 100
   }
 
   const r = postTaxReturn / 100
@@ -91,9 +90,7 @@ export function performMonteCarloSimulation(
   const driftPreTax = muPreTax * dt
   const diffusion = sigma * Math.sqrt(dt)
   
-  let annualBaseCashflow = cashflowFrequency === 'monthly' ? cashflowAmount * 12 : cashflowAmount
-
-  let cashflowPerStep = annualBaseCashflow / timeStepsPerYear
+  let cashflowPerStep = cashflowAmount
   
   const inflationFactor = 1 + inflationAdjustment / 100
   const rng = seedrandom(seed ?? `monte-carlo-${Date.now()}-${Math.random()}`)

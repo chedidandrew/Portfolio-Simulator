@@ -48,7 +48,15 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
   } = state
 
   // --- 1. Engine Configuration ---
-  const totalMonths = duration * 12
+  const getStepsPerYear = (f: WithdrawalState['frequency']) => {
+    if (f === 'weekly') return 52
+    if (f === 'monthly') return 12
+    if (f === 'quarterly') return 4
+    return 1
+  }
+
+  const stepsPerYear = getStepsPerYear(frequency)
+  const totalSteps = duration * stepsPerYear
   
   // Effective vs Nominal Rate Calculation
   let effectiveAnnualReturn = annualReturn
@@ -56,11 +64,11 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
     effectiveAnnualReturn = annualReturn * (1 - (taxRate / 100))
   }
 
-  let monthlyRate
+  let stepRate
   if (calculationMode === 'nominal') {
-    monthlyRate = effectiveAnnualReturn / 100 / 12
+    stepRate = effectiveAnnualReturn / 100 / stepsPerYear
   } else {
-    monthlyRate = Math.pow(1 + effectiveAnnualReturn / 100, 1 / 12) - 1
+    stepRate = Math.pow(1 + effectiveAnnualReturn / 100, 1 / stepsPerYear) - 1
   }
 
   const inflationFactor = 1 + inflationAdjustment / 100
@@ -90,25 +98,21 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
   let yearTaxDrag = 0
 
   // --- 3. Run Simulation ---
-  for (let month = 1; month <= totalMonths; month++) {
+  for (let step = 1; step <= totalSteps; step++) {
     
     // --- STEP 1: Determine Withdrawal ---
-    let inputAmountThisMonth = 0
-    if (frequency === 'monthly') inputAmountThisMonth = currentPeriodicWithdrawal
-    else if (frequency === 'quarterly' && month % 3 === 0) inputAmountThisMonth = currentPeriodicWithdrawal
-    else if (frequency === 'yearly' && month % 12 === 0) inputAmountThisMonth = currentPeriodicWithdrawal
-    else if (frequency === 'weekly') inputAmountThisMonth = (currentPeriodicWithdrawal * 52) / 12
+    const inputAmountThisStep = currentPeriodicWithdrawal
 
     // Execute Withdrawal
-    if (inputAmountThisMonth > 0) {
-      let requiredGross = inputAmountThisMonth
+    if (inputAmountThisStep > 0) {
+      let requiredGross = inputAmountThisStep
       let calculatedTax = 0
 
       // TAX LOGIC BRANCH
       if (taxEnabled && taxType !== 'income') {
          if (taxType === 'tax_deferred') {
            const effectiveRate = taxRate / 100
-           requiredGross = inputAmountThisMonth
+           requiredGross = inputAmountThisStep
            calculatedTax = requiredGross * effectiveRate
            
          } else {
@@ -122,7 +126,7 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
            let effectiveTaxRate = (taxRate / 100) * gainFraction
            if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99 
            
-           requiredGross = inputAmountThisMonth
+           requiredGross = inputAmountThisStep
            calculatedTax = requiredGross * effectiveTaxRate
          }
       }
@@ -157,14 +161,14 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
       yearTaxPaid += actualTaxPaid // Accumulate withdrawal tax
       yearTaxWithheld += actualTaxPaid
 
-      const discountFactor = Math.pow(inflationFactor, month / 12)
+      const discountFactor = Math.pow(inflationFactor, step / stepsPerYear)
       totalWithdrawnInTodaysDollars += (actualNetReceived / discountFactor)
     }
 
     // --- STEP 2: Apply Growth ---
     if (currentBalance > 0) {
       const balanceBefore = currentBalance
-      currentBalance = currentBalance * (1 + monthlyRate)
+      currentBalance = currentBalance * (1 + stepRate)
       
       if (taxEnabled && taxType === 'income') {
         const growth = currentBalance - balanceBefore
@@ -176,20 +180,18 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
         // Tax = Growth_PostTax * (Rate / (1 - Rate))
         const dragAmount = growth * (t / (1 - t))
         
-        totalTaxPaid += dragAmount
         totalTaxDrag += dragAmount
-        yearTaxPaid += dragAmount // Accumulate drag tax
         yearTaxDrag += dragAmount
       }
     }
 
     if (currentBalance <= 0.01 && yearsUntilZero === null) {
       currentBalance = 0
-      yearsUntilZero = parseFloat((month / 12).toFixed(1))
+      yearsUntilZero = parseFloat((step / stepsPerYear).toFixed(1))
     }
 
     // D. End of Year Processing
-    if (month % 12 === 0) {
+    if (step % stepsPerYear === 0) {
       const endingGross = Math.max(0, currentBalance)
       const startingGross = Math.max(0, yearStartBalance)
 
@@ -215,7 +217,7 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
       }
 
       yearData.push({
-        year: month / 12,
+        year: step / stepsPerYear,
         startingBalance: startingNet,
         startingBalanceNet: startingNet,
         grossStartingBalance: startingGross,
