@@ -6,6 +6,7 @@ export interface GrowthProjectionResult {
   finalValueInTodaysDollars: number
   totalContributions: number
   totalInterest: number
+  totalProfit: number
   taxableGain: number
   totalDeferredTax: number
   totalTaxPaid: number
@@ -154,6 +155,7 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
   }
 
   const finalValue = currentBalance
+  const totalProfit = finalValue - totalContributions
   const totalInterest = finalValue - totalContributions
 
   const taxableGain = (taxEnabled && taxType === 'capital_gains') ? Math.max(0, finalValue - totalBasis) : 0
@@ -226,6 +228,7 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     finalValueInTodaysDollars,
     totalContributions, 
     totalInterest, 
+    totalProfit, 
     taxableGain,
     totalDeferredTax,
     totalTaxPaid,
