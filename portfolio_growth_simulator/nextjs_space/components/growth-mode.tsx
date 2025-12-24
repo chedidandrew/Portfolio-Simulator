@@ -211,6 +211,9 @@ export function GrowthMode() {
     const wsData = workbook.addWorksheet('Value By Year')
 
     const showIncomeTaxColumn = !!state.taxEnabled && state.taxType === 'income'
+    // FIXED: Defined this variable which was missing in your code
+    const hasGrossColumns = !!state.taxEnabled && state.taxType !== 'income'
+    
     let t = (state.taxRate || 0) / 100
     if (t >= 0.99) t = 0.99
     const taxMultiplier = showIncomeTaxColumn ? (t / (1 - t)) : 0
@@ -218,10 +221,12 @@ export function GrowthMode() {
     wsData.columns = [
       { header: 'Year', key: 'Year', width: 10 },
       { header: 'Starting Value', key: 'Starting Value', width: 20 },
+      ...(hasGrossColumns ? [{ header: 'Starting Value (Gross)', key: 'Starting Value (Gross)', width: 20 }] : []),
       { header: 'Contributions', key: 'Contributions', width: 20 },
       { header: 'Interest Earned', key: 'Interest Earned', width: 20 },
       ...(showIncomeTaxColumn ? [{ header: 'Tax Paid', key: 'Tax Paid', width: 20 }] : []),
       { header: 'Ending Value', key: 'Ending Value', width: 20 },
+      ...(hasGrossColumns ? [{ header: 'Ending Value (Gross)', key: 'Ending Value (Gross)', width: 20 }] : []),
     ]
 
     const excelData = calculation.yearData.map((row: any) => ({
