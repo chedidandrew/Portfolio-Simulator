@@ -178,7 +178,9 @@ export function WithdrawalMode() {
         { Key: 'Tax Enabled', Value: 'Yes' },
         { Key: 'Tax Rate', Value: `${state.taxRate}%` },
         { Key: 'Tax Type', Value: taxTypeLabel },
-        { Key: 'Total Tax Paid', Value: roundToCents(calculation.totalTaxPaid) },
+        { Key: 'Total Tax Withheld', Value: roundToCents(calculation.totalTaxWithheld) },
+        { Key: 'Total Tax Drag', Value: roundToCents(calculation.totalTaxDrag) },
+        { Key: 'Total Tax (Combined)', Value: roundToCents(calculation.totalTaxPaid) },
         { Key: 'Total Withdrawn (Net)', Value: roundToCents(calculation.totalWithdrawnNet) }
       )
     }
@@ -212,26 +214,38 @@ export function WithdrawalMode() {
       (acc, row) => {
         acc.withdrawals += row.withdrawals
         acc.netIncome += row.netIncome
-        acc.taxPaid += (row.withdrawals - row.netIncome)
+        acc.taxPaid += (row as any).taxPaid ?? 0
+        acc.taxWithheld += (row as any).taxWithheld ?? (row.withdrawals - row.netIncome)
+        acc.taxDrag += (row as any).taxDrag ?? 0
         acc.growth += (row.endingBalance - row.startingBalance + row.withdrawals)
         return acc
       },
-      { withdrawals: 0, netIncome: 0, taxPaid: 0, growth: 0 }
+      { withdrawals: 0, netIncome: 0, taxPaid: 0, taxWithheld: 0, taxDrag: 0, growth: 0 }
     )
 
     const excelData = calculation.yearData.map((row) => {
       const dataRow: any = {
         Year: row.year,
-        'Starting Balance': roundToCents(row.startingBalance),
-        'Withdrawals': roundToCents(row.withdrawals),
-        'Growth Earned': roundToCents(row.endingBalance - row.startingBalance + row.withdrawals),
-        'Ending Balance': roundToCents(row.endingBalance),
+        'Starting Balance (Spendable)': roundToCents(row.startingBalanceNet ?? row.startingBalance),
+        'Withdrawals (Gross)': roundToCents(row.withdrawals),
+        'Net Income Received': roundToCents(row.netIncome),
+        'Ending Balance (Spendable)': roundToCents(row.endingBalanceNet ?? row.endingBalance),
         Sustainable: row.isSustainable ? 'Yes' : 'No',
       }
-      if (state.taxEnabled) {
-        dataRow['Net Income'] = roundToCents(row.netIncome)
-        dataRow['Tax Paid'] = roundToCents(row.withdrawals - row.netIncome)
+
+      if (typeof (row as any).grossStartingBalance === 'number') {
+        dataRow['Starting Balance (Gross)'] = roundToCents((row as any).grossStartingBalance)
       }
+      if (typeof (row as any).grossEndingBalance === 'number') {
+        dataRow['Ending Balance (Gross)'] = roundToCents((row as any).grossEndingBalance)
+      }
+
+      if (state.taxEnabled) {
+        dataRow['Tax Withheld'] = roundToCents((row as any).taxWithheld ?? (row.withdrawals - row.netIncome))
+        dataRow['Tax Drag'] = roundToCents((row as any).taxDrag ?? 0)
+        dataRow['Tax (Total)'] = roundToCents((row as any).taxPaid ?? 0)
+      }
+
       return dataRow
     })
 
@@ -244,8 +258,10 @@ export function WithdrawalMode() {
       Sustainable: '',
     }
     if (state.taxEnabled) {
-      totalsRow['Net Income'] = roundToCents(totals.netIncome)
-      totalsRow['Tax Paid'] = roundToCents(totals.taxPaid)
+      totalsRow['Net Income Received'] = roundToCents(totals.netIncome)
+      totalsRow['Tax Withheld'] = roundToCents(totals.taxWithheld)
+      totalsRow['Tax Drag'] = roundToCents(totals.taxDrag)
+      totalsRow['Tax (Total)'] = roundToCents(totals.taxPaid)
     }
     excelData.push(totalsRow)
 

@@ -184,8 +184,8 @@ export function MonteCarloChart({
     enableAnimation = true,
     isRealDollars = false,
     inflationAdjustment = 0,
-    deterministicData = []
-  deterministicGrossData = []
+    deterministicData = [],
+    deterministicGrossData = []
 }: MonteCarloChartProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'

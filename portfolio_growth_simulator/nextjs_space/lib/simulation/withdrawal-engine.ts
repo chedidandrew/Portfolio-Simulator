@@ -2,23 +2,34 @@ import { WithdrawalState } from '@/lib/types'
 
 export interface WithdrawalProjectionResult {
   endingBalance: number
+  endingBalanceGross: number
+  endingBalanceNet: number
   endingBalanceInTodaysDollars: number
   totalWithdrawn: number
   totalWithdrawnNet: number // After tax
   totalTaxPaid: number
+  totalTaxWithheld: number
+  totalTaxDrag: number
   totalWithdrawnInTodaysDollars: number
   isSustainable: boolean
   yearsUntilZero: number | null
   yearData: Array<{
     year: number
     startingBalance: number
+    startingBalanceNet: number
+    grossStartingBalance: number
     withdrawals: number
     netIncome: number // what user actually got
-    taxPaid: number   // New: explicit tax tracking
+    taxPaid: number   // New: explicit tax tracking (withheld + drag)
+    taxWithheld: number
+    taxDrag: number
     endingBalance: number
+    endingBalanceNet: number
+    grossEndingBalance: number
     isSustainable: boolean
   }>
 }
+
 
 export function calculateWithdrawalProjection(state: WithdrawalState): WithdrawalProjectionResult {
   const {
@@ -65,13 +76,18 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
   let totalWithdrawn = 0
   let totalWithdrawnNet = 0
   let totalTaxPaid = 0
+  let totalTaxWithheld = 0
+  let totalTaxDrag = 0
   let totalWithdrawnInTodaysDollars = 0
 
   const yearData = []
   let yearStartBalance = startingBalance
+  let yearStartBasis = totalBasis
   let yearWithdrawals = 0
   let yearNetIncome = 0
   let yearTaxPaid = 0 // New accumulator
+  let yearTaxWithheld = 0
+  let yearTaxDrag = 0
 
   // --- 3. Run Simulation ---
   for (let month = 1; month <= totalMonths; month++) {
@@ -134,10 +150,12 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
       totalWithdrawn += actualGrossWithdrawal
       totalWithdrawnNet += actualNetReceived
       totalTaxPaid += actualTaxPaid
+      totalTaxWithheld += actualTaxPaid
       
       yearWithdrawals += actualGrossWithdrawal
       yearNetIncome += actualNetReceived
       yearTaxPaid += actualTaxPaid // Accumulate withdrawal tax
+      yearTaxWithheld += actualTaxPaid
 
       const discountFactor = Math.pow(inflationFactor, month / 12)
       totalWithdrawnInTodaysDollars += (actualNetReceived / discountFactor)
@@ -159,7 +177,9 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
         const dragAmount = growth * (t / (1 - t))
         
         totalTaxPaid += dragAmount
+        totalTaxDrag += dragAmount
         yearTaxPaid += dragAmount // Accumulate drag tax
+        yearTaxDrag += dragAmount
       }
     }
 
@@ -170,20 +190,53 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
 
     // D. End of Year Processing
     if (month % 12 === 0) {
+      const endingGross = Math.max(0, currentBalance)
+      const startingGross = Math.max(0, yearStartBalance)
+
+      let startingNet = startingGross
+      let endingNet = endingGross
+
+      if (taxEnabled) {
+        if (taxType === 'capital_gains') {
+          const profitStart = startingGross - yearStartBasis
+          if (profitStart > 0) {
+            startingNet = startingGross - (profitStart * (taxRate / 100))
+          }
+
+          const profitEnd = endingGross - totalBasis
+          if (profitEnd > 0) {
+            endingNet = endingGross - (profitEnd * (taxRate / 100))
+          }
+        } else if (taxType === 'tax_deferred') {
+          const effectiveRate = taxRate / 100
+          startingNet = startingGross * (1 - effectiveRate)
+          endingNet = endingGross * (1 - effectiveRate)
+        }
+      }
+
       yearData.push({
         year: month / 12,
-        startingBalance: yearStartBalance,
+        startingBalance: startingNet,
+        startingBalanceNet: startingNet,
+        grossStartingBalance: startingGross,
         withdrawals: yearWithdrawals,
         netIncome: yearNetIncome,
-        taxPaid: yearTaxPaid, // Pass the tracked total
-        endingBalance: Math.max(0, currentBalance),
+        taxPaid: yearTaxPaid, // Pass the tracked total (withheld + drag)
+        taxWithheld: yearTaxWithheld,
+        taxDrag: yearTaxDrag,
+        endingBalance: endingNet,
+        endingBalanceNet: endingNet,
+        grossEndingBalance: endingGross,
         isSustainable: currentBalance > 0,
       })
 
       yearStartBalance = currentBalance
+      yearStartBasis = totalBasis
       yearWithdrawals = 0
       yearNetIncome = 0
       yearTaxPaid = 0
+      yearTaxWithheld = 0
+      yearTaxDrag = 0
 
       if (!excludeInflationAdjustment) {
         currentPeriodicWithdrawal *= inflationFactor
@@ -191,16 +244,35 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
     }
   }
 
-  const endingBalance = Math.max(0, currentBalance)
-  const isSustainable = endingBalance > 0
+  const endingBalanceGross = Math.max(0, currentBalance)
+  let endingBalanceNet = endingBalanceGross
+
+  if (taxEnabled) {
+    if (taxType === 'capital_gains') {
+      const profitForTax = endingBalanceGross - totalBasis
+      if (profitForTax > 0) {
+        endingBalanceNet = endingBalanceGross - (profitForTax * (taxRate / 100))
+      }
+    } else if (taxType === 'tax_deferred') {
+      const effectiveRate = taxRate / 100
+      endingBalanceNet = endingBalanceGross * (1 - effectiveRate)
+    }
+  }
+
+  const endingBalance = endingBalanceNet
+  const isSustainable = endingBalanceGross > 0
   const endingBalanceInTodaysDollars = endingBalance / Math.pow(inflationFactor, duration)
 
   return {
     endingBalance,
+    endingBalanceGross,
+    endingBalanceNet,
     endingBalanceInTodaysDollars,
     totalWithdrawn,
     totalWithdrawnNet,
     totalTaxPaid,
+    totalTaxWithheld,
+    totalTaxDrag,
     totalWithdrawnInTodaysDollars,
     isSustainable,
     yearsUntilZero,

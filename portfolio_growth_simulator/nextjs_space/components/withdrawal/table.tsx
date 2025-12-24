@@ -12,6 +12,12 @@ interface WithdrawalTableProps {
     withdrawals: number
     netIncome: number
     taxPaid: number
+    taxWithheld?: number
+    taxDrag?: number
+    grossStartingBalance?: number
+    grossEndingBalance?: number
+    startingBalanceNet?: number
+    endingBalanceNet?: number
     endingBalance: number
     isSustainable: boolean
   }>
@@ -21,25 +27,27 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
   if (!data || data.length === 0) return null
 
   // Show tax if any tax was paid (explicit field)
-  const hasTax = data.some(row => row.taxPaid > 0.01)
+  const hasTax = data.some(row => (row.taxWithheld ?? 0) > 0.01 || (row.taxDrag ?? 0) > 0.01 || row.taxPaid > 0.01)
   
   // Detect if this is "Income" mode (Net == Gross but Tax > 0)
-  const isIncomeMode = data.some(row => row.taxPaid > 0.01 && Math.abs(row.withdrawals - row.netIncome) < 0.01)
+  const isIncomeMode = data.some(row => (row.taxDrag ?? 0) > 0.01)
 
   const totals = data.reduce(
     (acc, row) => {
       acc.withdrawals += row.withdrawals
       acc.netIncome += row.netIncome
       acc.taxPaid += row.taxPaid
+      acc.taxWithheld += (row.taxWithheld ?? 0)
+      acc.taxDrag += (row.taxDrag ?? 0)
       // Net Growth = End - Start + GrossWithdrawal. (This is net of drag)
       acc.growth += (row.endingBalance - row.startingBalance + row.withdrawals)
       if (isIncomeMode) {
-          // If we want to show Gross Growth for income mode, add back the tax
-          acc.growth += row.taxPaid
+        // If we want to show Gross Growth for income mode, add back the tax
+        acc.growth += (row.taxDrag ?? row.taxPaid)
       }
       return acc
     },
-    { withdrawals: 0, netIncome: 0, taxPaid: 0, growth: 0 }
+    { withdrawals: 0, netIncome: 0, taxPaid: 0, taxWithheld: 0, taxDrag: 0, growth: 0 }
   )
 
   return (
@@ -88,11 +96,12 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
               </thead>
               <tbody>
                 {data.map((row, idx) => {
-                  const effectiveRate = row.withdrawals > 0 ? (row.taxPaid / row.withdrawals) * 100 : 0
+                  const taxWithheldValue = row.taxWithheld ?? (row.withdrawals - row.netIncome)
+                  const effectiveRate = !isIncomeMode && row.withdrawals > 0 ? (taxWithheldValue / row.withdrawals) * 100 : 0
                   
                   // Calculate Growth for display
                   let growthDisplay = row.endingBalance - row.startingBalance + row.withdrawals
-                  if (isIncomeMode) growthDisplay += row.taxPaid
+                  if (isIncomeMode) growthDisplay += (row.taxDrag ?? row.taxPaid)
 
                   return (
                     <motion.tr
@@ -133,7 +142,7 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
 
                       {hasTax && (
                         <td className="p-3 text-sm text-right text-red-500/80">
-                           {formatCurrency(row.taxPaid, true, 2, false)}
+                           {formatCurrency(isIncomeMode ? (row.taxDrag ?? row.taxPaid) : (row.taxWithheld ?? (row.withdrawals - row.netIncome)), true, 2, false)}
                         </td>
                       )}
                       
@@ -165,7 +174,7 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
                   
                   {hasTax && (
                     <td className="p-3 text-sm text-right text-red-500/80">
-                      {formatCurrency(totals.taxPaid, true, 2, false)}
+                      {formatCurrency(isIncomeMode ? totals.taxDrag : totals.taxWithheld, true, 2, false)}
                     </td>
                   )}
                   <td className="p-3 text-sm text-right">

@@ -40,6 +40,8 @@ export function WithdrawalResults({
     totalWithdrawn, 
     totalWithdrawnNet,
     totalTaxPaid,
+    totalTaxWithheld,
+    totalTaxDrag,
     totalWithdrawnInTodaysDollars,
     isSustainable, 
     yearsUntilZero, 
@@ -62,7 +64,10 @@ export function WithdrawalResults({
     return formatted
   }
   
-  const showTax = totalTaxPaid > 0
+  const showTaxWithheld = totalTaxWithheld > 0.01
+  const showTaxDrag = totalTaxDrag > 0.01
+  const showTax = showTaxWithheld || showTaxDrag
+  const showGrossBalance = Math.abs((endingBalanceGross ?? 0) - (endingBalance ?? 0)) > 0.01
 
   return (
     <>
@@ -158,9 +163,9 @@ export function WithdrawalResults({
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Primary Metrics */}
-            <div className={`grid grid-cols-1 gap-4 ${showTax ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
+            <div className={`grid grid-cols-1 gap-4 ${(showGrossBalance || showTax) ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
               <MetricCard
-                label="Ending Balance"
+                label="Ending Balance (Spendable)"
                 value={renderFormattedResult(endingBalance)}
                 colorClass={sustainabilityColor}
                 bgClass={isSustainable 
@@ -169,6 +174,15 @@ export function WithdrawalResults({
                 }
               />
 
+              {showGrossBalance && (
+                <MetricCard
+                  label="Gross Account Value"
+                  value={renderFormattedResult(endingBalanceGross)}
+                  colorClass="text-muted-foreground"
+                  bgClass="bg-gradient-to-br from-muted/60 to-muted/20"
+                />
+              )}
+
               <MetricCard
                 label={showTax ? "Total Withdrawn (Before Tax)" : "Total Withdrawn"}
                 value={renderFormattedResult(totalWithdrawn)}
@@ -176,10 +190,19 @@ export function WithdrawalResults({
                 bgClass="bg-gradient-to-br from-blue-500/10 to-blue-500/5"
               />
 
-              {showTax && (
-                 <MetricCard
-                  label="Total Tax Paid"
-                  value={renderFormattedResult(-totalTaxPaid)}
+              {showTaxWithheld && (
+                <MetricCard
+                  label="Total Tax Withheld"
+                  value={renderFormattedResult(-totalTaxWithheld)}
+                  colorClass="text-red-500"
+                  bgClass="bg-gradient-to-br from-red-500/10 to-red-500/5"
+                />
+              )}
+
+              {showTaxDrag && (
+                <MetricCard
+                  label="Total Tax Drag"
+                  value={renderFormattedResult(-totalTaxDrag)}
                   colorClass="text-red-500"
                   bgClass="bg-gradient-to-br from-red-500/10 to-red-500/5"
                 />
