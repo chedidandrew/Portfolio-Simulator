@@ -30,7 +30,7 @@ export function WithdrawalMode() {
     frequency: 'monthly',
     excludeInflationAdjustment: false,
     taxEnabled: false,
-    taxRate: 0
+    taxRate: 15
   })
 
   const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('withdrawal-show-monte-carlo', false)

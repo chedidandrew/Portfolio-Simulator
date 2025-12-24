@@ -31,7 +31,7 @@ export function GrowthMode() {
     inflationAdjustment: 2.5,
     excludeInflationAdjustment: true,
     taxEnabled: false,
-    taxRate: 0,
+    taxRate: 15,
     taxType: 'capital_gains'
   })
 

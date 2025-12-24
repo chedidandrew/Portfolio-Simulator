@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { ChartSpline } from 'lucide-react'
@@ -30,8 +30,7 @@ const PERCENTILE_LABELS: Record<string, string> = {
   p75: '75th percentile',
   p50: '50th percentile (median)',
   p25: '25th percentile',
-  p10: '10th percentile',
-  deterministic: 'Deterministic (0% Volatility)'
+  p10: '10th percentile'
 }
 
 const PERCENTILE_COLORS: Record<string, string> = {
@@ -39,10 +38,7 @@ const PERCENTILE_COLORS: Record<string, string> = {
   p75: 'hsl(200, 75%, 55%)',
   p50: 'hsl(165, 65%, 48%)',
   p25: 'hsl(180, 70%, 55%)',
-  p10: 'hsl(30, 85%, 60%)',
-  deterministic: 'hsl(0, 0%, 50%)',
-  p50Gross: 'hsl(0, 0%, 65%)',
-  deterministicGross: 'hsl(0, 0%, 35%)'
+  p10: 'hsl(30, 85%, 60%)'
 }
 
 interface TooltipProps {
@@ -108,19 +104,10 @@ const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
   const netRows = [
     { key: 'p90', value: point.p90 },
     { key: 'p75', value: point.p75 },
-    { key: 'deterministic', value: point.deterministic },
     { key: 'p50', value: point.p50 },
     { key: 'p25', value: point.p25 },
     { key: 'p10', value: point.p10 },
   ]
-
-  const grossRows = [
-    { key: 'p50Gross', value: point.p50Gross },
-    { key: 'deterministicGross', value: point.deterministicGross },
-  ]
-
-  const hasGross = grossRows.some((r) => r.value !== undefined)
-
   return (
     <div className="rounded-lg border bg-background p-3 text-xs shadow-lg">
       <div className="font-semibold">{timeLabel}</div>
@@ -145,25 +132,6 @@ const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
             })}
           </div>
         </div>
-        {hasGross && (
-          <div>
-            <div className="text-[11px] font-medium text-muted-foreground">Gross</div>
-            <div className="mt-1 space-y-1">
-              {grossRows.map(({ key, value }) => {
-                if (value === undefined) return null
-                return (
-                  <div key={key} className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: PERCENTILE_COLORS[key] }} />
-                      <span>{PERCENTILE_LABELS[key]}</span>
-                    </div>
-                    <span className="font-semibold">{formatCurrency(value)}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
@@ -194,9 +162,6 @@ export function MonteCarloChart({
     if (!data || data.length === 0) return 0
     return data[data.length - 1].year
   }, [data])
-
-  const [showGross, setShowGross] = useState(false)
-
   /* ------------------------------------------------------------------ */
   /* Smart Ticks Logic                                                  */
   /* ------------------------------------------------------------------ */
@@ -323,7 +288,7 @@ export function MonteCarloChart({
           <div className="flex items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
               <ChartSpline className="h-5 w-5" style={{ color: 'hsl(165, 65%, 48%)' }} />
-              Scenario Paths with Percentile Bands
+              Scenario Paths
             </CardTitle>
 
             <div className="flex items-center gap-2">
@@ -335,22 +300,7 @@ export function MonteCarloChart({
               />
               <Label htmlFor="log-scale-montecarlo" className="text-sm cursor-pointer print:hidden">
                 Log scale
-              </Label>
-              <div className="flex items-center gap-2 ml-4">
-                <Switch
-                  id="show-gross-montecarlo"
-                  checked={showGross}
-                  onCheckedChange={(checked) => {
-                    triggerHaptic('light');
-                    setShowGross(checked);
-                  }}
-                  className="print:hidden"
-                />
-                <Label htmlFor="show-gross-montecarlo" className="text-sm cursor-pointer print:hidden">
-                  Show gross
-                </Label>
-              </div>
-              {logScale && (
+              </Label>              {logScale && (
                 <span className="hidden print:inline text-xs text-muted-foreground font-medium">
                   (Log scale enabled)
                 </span>
@@ -404,40 +354,14 @@ export function MonteCarloChart({
                 <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} formatter={(value: string) => PERCENTILE_LABELS[value] ?? value} />
 
                 <Line type="monotone" dataKey="p90" stroke={PERCENTILE_COLORS.p90} strokeWidth={2} dot={false} name="p90" animationDuration={enableAnimation ? 500 : 0} />
-                <Line type="monotone" dataKey="p75" stroke={PERCENTILE_COLORS.p75} strokeWidth={2} dot={false} name="p75" animationDuration={enableAnimation ? 400 : 0} />
-                <Line type="monotone" dataKey="deterministic" stroke={PERCENTILE_COLORS.deterministic} strokeWidth={2} strokeDasharray="5 5" dot={false} name="deterministic" animationDuration={enableAnimation ? 500 : 0} />
-                {showGross && (
-                  <>
-                    <Line
-                      type="monotone"
-                      dataKey="p50Gross"
-                      stroke={PERCENTILE_COLORS.p50Gross}
-                      strokeDasharray="6 4"
-                      dot={false}
-                      name="p50Gross"
-                      animationDuration={enableAnimation ? 250 : 0}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="deterministicGross"
-                      stroke={PERCENTILE_COLORS.deterministicGross}
-                      strokeDasharray="2 6"
-                      dot={false}
-                      name="deterministicGross"
-                      animationDuration={enableAnimation ? 250 : 0}
-                    />
-                  </>
-                )}
-                <Line type="monotone" dataKey="p50" stroke={PERCENTILE_COLORS.p50} strokeWidth={3} dot={false} name="p50" animationDuration={enableAnimation ? 300 : 0} />
+                <Line type="monotone" dataKey="p75" stroke={PERCENTILE_COLORS.p75} strokeWidth={2} dot={false} name="p75" animationDuration={enableAnimation ? 400 : 0} /><Line type="monotone" dataKey="p50" stroke={PERCENTILE_COLORS.p50} strokeWidth={3} dot={false} name="p50" animationDuration={enableAnimation ? 300 : 0} />
                 <Line type="monotone" dataKey="p25" stroke={PERCENTILE_COLORS.p25} strokeWidth={2} dot={false} name="p25" animationDuration={enableAnimation ? 200 : 0} />
                 <Line type="monotone" dataKey="p10" stroke={PERCENTILE_COLORS.p10} strokeWidth={2} dot={false} name="p10" animationDuration={enableAnimation ? 100 : 0} />
               </LineChart>
             </ResponsiveContainer>
           </div>
           <p className="text-xs text-muted-foreground mt-3 text-center">
-             Shows the range of possible portfolio values using up to 100,000 simulated market outcomes, from optimistic to pessimistic scenarios. 
-             The <span className="text-muted-foreground/70 border-b border-dashed border-muted-foreground">dashed gray line</span> represents the deterministic outcome (0% volatility).
-          </p>
+             Shows the range of possible portfolio values using up to 100,000 simulated market outcomes, from optimistic to pessimistic scenarios. </p>
         </CardContent>
       </Card>
     </motion.div>
