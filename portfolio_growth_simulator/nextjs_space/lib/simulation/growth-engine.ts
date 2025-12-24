@@ -7,14 +7,18 @@ export interface GrowthProjectionResult {
   totalContributions: number
   totalInterest: number
   totalProfit: number
+  taxableGain: number
   totalDeferredTax: number
   totalTaxPaid: number
   yearData: Array<{
     year: number
     startingValue: number
+    grossStartingValue: number
     contributions: number
     interest: number
+    taxPaid: number
     endingValue: number
+    grossEndingValue: number
   }>
   yearsToTarget: number | null
 }
@@ -64,9 +68,24 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
   let totalTaxPaid = 0
 
   const yearData = []
-  let yearStartBalance = startingBalance
+  const getNetLiquidationValue = (balance: number, basis: number) => {
+    if (!taxEnabled) return balance
+    if (taxType === 'capital_gains') {
+      const profitForTax = balance - basis
+      if (profitForTax > 0) return balance - (profitForTax * (taxRate / 100))
+      return balance
+    }
+    if (taxType === 'tax_deferred') {
+      return balance * (1 - (taxRate / 100))
+    }
+    return balance
+  }
+
+  let yearStartBalanceGross = startingBalance
+  let yearStartBalanceNet = getNetLiquidationValue(startingBalance, totalBasis)
   let yearContributions = 0
   let yearInterest = 0
+  let yearTaxPaid = 0
 
   for (let month = 1; month <= totalMonths; month++) {
     const balanceBeforeInterest = currentBalance
@@ -82,6 +101,7 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
       if (t >= 0.99) t = 0.99
       const impliedTax = monthlyInterest * (t / (1 - t))
       totalTaxPaid += impliedTax
+      yearTaxPaid += impliedTax
     }
 
     // B. Apply Contributions
@@ -99,17 +119,34 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     }
 
     if (month % 12 === 0) {
+      let endingValue = currentBalance
+      if (taxEnabled) {
+        if (taxType === 'capital_gains') {
+          const profitForTax = currentBalance - totalBasis
+          if (profitForTax > 0) {
+            endingValue = currentBalance - (profitForTax * (taxRate / 100))
+          }
+        } else if (taxType === 'tax_deferred') {
+          endingValue = currentBalance * (1 - (taxRate / 100))
+        }
+      }
+
       yearData.push({
         year: month / 12,
-        startingValue: yearStartBalance,
+        startingValue: yearStartBalanceNet,
+        grossStartingValue: yearStartBalanceGross,
         contributions: yearContributions,
         interest: yearInterest,
-        endingValue: currentBalance,
+        taxPaid: yearTaxPaid,
+        endingValue,
+        grossEndingValue: currentBalance,
       })
 
-      yearStartBalance = currentBalance
+      yearStartBalanceGross = currentBalance
+      yearStartBalanceNet = endingValue
       yearContributions = 0
       yearInterest = 0
+      yearTaxPaid = 0
 
       if (!excludeInflationAdjustment) {
         currentPeriodicAddition *= inflationFactor
@@ -120,6 +157,8 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
   const finalValue = currentBalance
   const totalProfit = finalValue - totalContributions
   const totalInterest = finalValue - totalContributions
+
+  const taxableGain = (taxEnabled && taxType === 'capital_gains') ? Math.max(0, finalValue - totalBasis) : 0
 
   let totalDeferredTax = 0
   if (taxEnabled) {
@@ -143,6 +182,7 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
 
   if (targetValue && targetValue > startingBalance) {
     let tBalance = startingBalance
+    let tBasis = clampedStartingCostBasis
     let tContribution = periodicAddition
     
     for (let m = 1; m <= 1000 * 12; m++) {
@@ -155,8 +195,23 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
       else if (frequency === 'weekly') tAdd = (tContribution * 52) / 12
       
       tBalance += tAdd
+      if (tAdd > 0) {
+        tBasis += tAdd
+      }
 
-      if (tBalance >= targetValue) {
+      let tNet = tBalance
+      if (taxEnabled) {
+        if (taxType === 'capital_gains') {
+          const profitForTax = tBalance - tBasis
+          if (profitForTax > 0) {
+            tNet = tBalance - (profitForTax * (taxRate / 100))
+          }
+        } else if (taxType === 'tax_deferred') {
+          tNet = tBalance * (1 - (taxRate / 100))
+        }
+      }
+
+      if (tNet >= targetValue) {
         yearsToTarget = parseFloat((m / 12).toFixed(1))
         break
       }
@@ -174,6 +229,7 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     totalContributions, 
     totalInterest, 
     totalProfit, 
+    taxableGain,
     totalDeferredTax,
     totalTaxPaid,
     yearData, 
