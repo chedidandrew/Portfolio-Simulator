@@ -97,6 +97,11 @@ export async function performMonteCarloSimulationWebGPU(
     throw new Error('WebGPU not available')
   }
 
+  const adapter = await (navigator as any).gpu.requestAdapter()
+  if (!adapter) throw new Error('WebGPU adapter not available')
+
+  const device = await adapter.requestDevice()
+
   const {
     initialValue,
     startingCostBasis,
@@ -124,13 +129,34 @@ export async function performMonteCarloSimulationWebGPU(
 
   const timeStepsPerYear = getStepsPerYear(cashflowFrequency)
 
-  const MAX_TOTAL_DATA_POINTS = 10_000_000
+  const maxStorageBindingBytes = Number((device as any)?.limits?.maxStorageBufferBindingSize ?? 0)
+  const maxBufferBytes = Number((device as any)?.limits?.maxBufferSize ?? 0)
+  const maxRecordsBufferBytes = Math.min(
+    maxStorageBindingBytes > 0 ? maxStorageBindingBytes : Number.POSITIVE_INFINITY,
+    maxBufferBytes > 0 ? maxBufferBytes : Number.POSITIVE_INFINITY
+  )
+
+  const maxPointsPerRecordsBuffer = maxRecordsBufferBytes === Number.POSITIVE_INFINITY
+    ? 10_000_000
+    : Math.max(0, Math.floor(maxRecordsBufferBytes / 4))
+
+  const MAX_TOTAL_DATA_POINTS = Math.max(
+    0,
+    Math.min(
+      10_000_000,
+      Math.max(0, maxPointsPerRecordsBuffer - Math.max(0, numPaths))
+    )
+  )
   const MAX_CHART_STEPS = 500
   const totalSimulationSteps = Math.floor(duration * timeStepsPerYear)
   const memoryAllowedSteps = Math.floor(MAX_TOTAL_DATA_POINTS / numPaths)
-  const targetSteps = Math.max(2, Math.min(memoryAllowedSteps, MAX_CHART_STEPS))
-  let recordFrequency = Math.ceil(totalSimulationSteps / targetSteps)
-  if (recordFrequency < 1) recordFrequency = 1
+  const deviceAllowedSteps = Math.max(0, Math.floor(maxPointsPerRecordsBuffer / numPaths) - 1)
+  const targetSteps = Math.min(memoryAllowedSteps, MAX_CHART_STEPS, deviceAllowedSteps)
+  let recordFrequency = totalSimulationSteps + 1
+  if (targetSteps >= 1) {
+    recordFrequency = Math.ceil(totalSimulationSteps / Math.max(1, targetSteps))
+    if (recordFrequency < 1) recordFrequency = 1
+  }
 
   const dt = 1 / timeStepsPerYear
   const totalTimeSteps = totalSimulationSteps
@@ -300,10 +326,6 @@ export async function performMonteCarloSimulationWebGPU(
   // --- END DETERMINISTIC ---
 
   // --- WEBGPU STOCHASTIC SIMULATION ---
-  const adapter = await (navigator as any).gpu.requestAdapter()
-  if (!adapter) throw new Error('WebGPU adapter not available')
-
-  const device = await adapter.requestDevice()
 
   const taxTypeCode =
     taxType === 'income' ? 1 : (taxType === 'tax_deferred' ? 2 : 0)
