@@ -3,13 +3,20 @@ import { GrowthState } from '@/lib/types'
 export interface GrowthProjectionResult {
   finalValue: number
   finalValueNet: number
+  endingBalanceGross: number
+  endingBalanceNet: number
   finalValueInTodaysDollars: number
   totalContributions: number
   totalInterest: number
   totalProfit: number
+  profitGross: number
+  profitNet: number
   taxableGain: number
   totalDeferredTax: number
   totalTaxPaid: number
+  totalTaxWithheld: number
+  totalTaxDrag: number
+  totalTaxCost: number
   yearData: Array<{
     year: number
     startingValue: number
@@ -184,6 +191,13 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
 
   const finalValueNet = finalValue - totalDeferredTax
   const totalProfit = finalValueNet - totalContributions
+  const profitGross = finalValue - totalContributions
+  const profitNet = totalProfit
+  const endingBalanceGross = finalValue
+  const endingBalanceNet = finalValueNet
+  const totalTaxWithheld = 0
+  const totalTaxDrag = totalTaxPaid
+  const totalTaxCost = totalTaxWithheld + totalTaxDrag + totalDeferredTax
   const finalValueInTodaysDollars = finalValueNet / Math.pow(1 + inflationAdjustment / 100, duration)
 
   let yearsToTarget: number | null = null
@@ -224,16 +238,23 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     }
   }
   
-  return { 
-    finalValue, 
+  return {
+    finalValue,
     finalValueNet,
+    endingBalanceGross,
+    endingBalanceNet,
     finalValueInTodaysDollars,
     totalContributions, 
     totalInterest, 
-    totalProfit, 
+    totalProfit,
+    profitGross,
+    profitNet,
     taxableGain,
     totalDeferredTax,
     totalTaxPaid,
+    totalTaxWithheld,
+    totalTaxDrag,
+    totalTaxCost,
     yearData, 
     yearsToTarget 
   }

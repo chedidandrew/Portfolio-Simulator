@@ -39,19 +39,33 @@ export function GrowthResults({
   const {
     finalValue,
     finalValueNet,
+    endingBalanceGross,
+    endingBalanceNet,
     finalValueInTodaysDollars,
     totalContributions,
     totalProfit,
+    profitGross,
+    profitNet,
     totalDeferredTax,
     totalTaxPaid,
+    totalTaxWithheld,
+    totalTaxDrag,
+    totalTaxCost,
     yearsToTarget,
     yearData,
   } = data
 
-  const isProfitNegative = totalProfit < 0
+  const balanceNet = endingBalanceNet ?? finalValueNet
+  const balanceGross = endingBalanceGross ?? finalValue
+  const netProfit = profitNet ?? totalProfit
+  const grossProfit = profitGross ?? (finalValue - totalContributions)
+  const taxDrag = totalTaxDrag ?? totalTaxPaid
+  const taxWithheld = totalTaxWithheld ?? 0
+
+  const isProfitNegative = netProfit < 0
   
   const roi = totalContributions > 0 
-    ? (totalProfit / totalContributions) * 100 
+    ? (netProfit / totalContributions) * 100 
     : 0
 
   const formatResult = (val: number) => {
@@ -69,20 +83,24 @@ export function GrowthResults({
   }
 
   // Logic to determine which tax to show
-  const showDeferredTax = totalDeferredTax > 0
-  const showPaidTax = totalTaxPaid > 0
-  const showAnyTax = showDeferredTax || showPaidTax
+  const showDeferredTax = totalDeferredTax > 0.01
+  const showTaxWithheld = taxWithheld > 0.01
+  const showTaxDrag = taxDrag > 0.01
+  const showAnyTax = showDeferredTax || showTaxWithheld || showTaxDrag
+
+  const showGrossBalance = Math.abs((balanceGross ?? 0) - (balanceNet ?? 0)) > 0.01
+  const showGrossProfit = Math.abs((grossProfit ?? 0) - (netProfit ?? 0)) > 0.01
 
   // For Capital Gains: Main number is Net.
   // For Income: Main number is Net (which is same as Gross/FinalValue in this engine structure).
-  const displayValue = showDeferredTax ? finalValueNet : finalValue
+  const displayValue = balanceNet
 
   // Header Label Logic
   let headerLabel = ''
   if (taxEnabled) {
     headerLabel = taxType === 'income' 
       ? '(After annual income tax drag)' 
-      : '(Net of Deferred Tax)'
+      : '(Net of liquidation tax)'
   }
 
   return (
@@ -112,28 +130,51 @@ export function GrowthResults({
         </CardHeader>
 
         <CardContent className="space-y-6">
-          <div className={`grid grid-cols-1 gap-4 ${showAnyTax ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
+          <div className={`grid grid-cols-1 gap-4 ${(showAnyTax || showGrossBalance || showGrossProfit) ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
             <MetricCard 
-              label={showDeferredTax ? "Final Value (After Tax)" : "Final Portfolio Value"} 
+              label={showGrossBalance ? "Portfolio Balance (Net)" : "Final Portfolio Value"} 
               value={formatResult(displayValue)} 
               colorClass="text-primary" 
               bgClass="bg-gradient-to-br from-primary/10 to-primary/5"
             />
+
+            {showGrossBalance && (
+              <MetricCard 
+                label="Portfolio Balance (Gross)" 
+                value={formatResult(balanceGross)} 
+                colorClass="text-primary" 
+                bgClass="bg-gradient-to-br from-primary/10 to-primary/5"
+              />
+            )}
+
             <MetricCard 
               label="Total Contributions" 
               value={formatResult(totalContributions)} 
               colorClass="text-blue-500" 
               bgClass="bg-gradient-to-br from-blue-500/10 to-blue-500/5"
             />
+
             <MetricCard
-              label={showDeferredTax ? "Total Profit (After Tax)" : "Total Profit"}
-              value={formatResult(totalProfit)}
+              label={showGrossProfit ? "Total Profit (Net)" : "Total Profit"}
+              value={formatResult(netProfit)}
               colorClass={isProfitNegative ? 'text-destructive' : 'text-emerald-500'}
               bgClass={isProfitNegative 
                 ? 'bg-gradient-to-br from-destructive/10 to-destructive/5' 
                 : 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5'
               }
             />
+
+            {showGrossProfit && (
+              <MetricCard
+                label="Total Profit (Gross)"
+                value={formatResult(grossProfit)}
+                colorClass={grossProfit < 0 ? 'text-destructive' : 'text-emerald-500'}
+                bgClass={grossProfit < 0 
+                  ? 'bg-gradient-to-br from-destructive/10 to-destructive/5' 
+                  : 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5'
+                }
+              />
+            )}
             
             {showDeferredTax && (
                <MetricCard 
@@ -144,10 +185,10 @@ export function GrowthResults({
               />
             )}
 
-            {showPaidTax && (
+            {showTaxDrag && (
                <MetricCard 
-                label="Total Tax Paid" 
-                value={formatResult(-totalTaxPaid)} 
+                label="Tax Drag" 
+                value={formatResult(-taxDrag)} 
                 colorClass="text-red-500" 
                 bgClass="bg-gradient-to-br from-red-500/10 to-red-500/5"
               />
@@ -161,7 +202,7 @@ export function GrowthResults({
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">
-                  {showDeferredTax ? "Purchasing Power (Real Value After Tax)" : "Purchasing Power (Real Value)"}
+                  {showGrossBalance ? "Purchasing Power (Real Value After Tax)" : "Purchasing Power (Real Value)"}
                 </p>
                 <p className="text-2xl font-bold text-indigo-500 my-1">{formatResult(finalValueInTodaysDollars)}</p>
                 <p className="text-xs text-muted-foreground leading-tight">
@@ -200,7 +241,7 @@ export function GrowthResults({
             </motion.div>
           ) : null}
 
-          <GrowthMilestones finalValue={displayValue} />
+          <GrowthMilestones finalValue={balanceNet} />
         </CardContent>
       </Card>
 

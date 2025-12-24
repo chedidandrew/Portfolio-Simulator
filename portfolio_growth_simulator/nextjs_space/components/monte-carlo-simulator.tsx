@@ -112,22 +112,35 @@ export function MonteCarloSimulator({
 
     const {
       mean,
+      meanGross,
       median,
+      medianGross,
       p5,
+      p5Gross,
       p10,
+      p10Gross,
       p25,
+      p25Gross,
       p75,
+      p75Gross,
       p90,
+      p90Gross,
       p95,
+      p95Gross,
       best,
+      bestGross,
       worst,
+      worstGross,
       chartData,
+      chartDataGross,
       endingValues,
+      endingValuesGross,
       maxDrawdowns,
       annualReturnsData,
       lossProbData,
       numPathsUsed,
       investmentData,
+      totalTaxCost,
       taxDragAmount,
     } = simResults
 
@@ -137,6 +150,7 @@ export function MonteCarloSimulator({
         : params.initialValue
 
     const investedLabel = mode === 'withdrawal' ? 'Starting Balance' : 'Total Invested'
+    const showGrossSummary = !!params.taxEnabled && mode === 'growth' && (params.taxType === 'capital_gains' || params.taxType === 'tax_deferred')
 
     const workbook = new ExcelJS.Workbook()
 
@@ -156,8 +170,12 @@ export function MonteCarloSimulator({
       { Key: 'Monthly Cashflow', Value: roundToCents(params.cashflowAmount) },
       { Key: 'Inflation Adjustment %', Value: params.inflationAdjustment ?? 0 },
       { Key: 'Number Of Scenarios', Value: numPathsUsed },
-      { Key: 'Mean Ending Value', Value: roundToCents(mean) },
-      { Key: 'Median Ending Value', Value: roundToCents(median) },
+      { Key: showGrossSummary ? 'Mean Ending Value (Net)' : 'Mean Ending Value', Value: roundToCents(mean) },
+      { Key: showGrossSummary ? 'Median Ending Value (Net)' : 'Median Ending Value', Value: roundToCents(median) },
+      ...(showGrossSummary ? [
+        { Key: 'Mean Ending Value (Gross)', Value: roundToCents(meanGross) },
+        { Key: 'Median Ending Value (Gross)', Value: roundToCents(medianGross) },
+      ] : []),
     ]
 
     if (params.taxEnabled) {
@@ -168,13 +186,13 @@ export function MonteCarloSimulator({
             ? 'Tax deferred (401k/IRA), taxed on withdrawal'
             : 'Taxable Account (capital gains on liquidation)')
       summaryRows.push({ Key: 'Tax Type', Value: taxTypeLabel })
-      if (mode === 'growth' && params.taxType === 'capital_gains' && taxDragAmount) {
-        summaryRows.push({ Key: 'Est. Tax Cost (Tax Drag)', Value: roundToCents(taxDragAmount) })
+      if (mode === 'growth' && (params.taxType === 'capital_gains' || params.taxType === 'tax_deferred') && (totalTaxCost ?? taxDragAmount)) {
+        summaryRows.push({ Key: 'Est. Tax Cost', Value: roundToCents(totalTaxCost ?? taxDragAmount) })
       }
     }
 
     summaryRows.push(
-      { Key: 'P5 Ending Value', Value: roundToCents(p5) },
+      { Key: showGrossSummary ? 'P5 Ending Value (Net)' : 'P5 Ending Value', Value: roundToCents(p5) },
       { Key: 'P10 Ending Value', Value: roundToCents(p10) },
       { Key: 'P25 Ending Value', Value: roundToCents(p25) },
       { Key: 'P75 Ending Value', Value: roundToCents(p75) },
@@ -185,7 +203,19 @@ export function MonteCarloSimulator({
       { Key: 'Random Seed', Value: rngSeed ?? '' }
     )
 
-    wsSummary.addRows(summaryRows)
+    if (showGrossSummary) {
+      summaryRows.push(
+        { Key: 'P5 Ending Value (Gross)', Value: roundToCents(p5Gross) },
+        { Key: 'P10 Ending Value (Gross)', Value: roundToCents(p10Gross) },
+        { Key: 'P25 Ending Value (Gross)', Value: roundToCents(p25Gross) },
+        { Key: 'P75 Ending Value (Gross)', Value: roundToCents(p75Gross) },
+        { Key: 'P90 Ending Value (Gross)', Value: roundToCents(p90Gross) },
+        { Key: 'P95 Ending Value (Gross)', Value: roundToCents(p95Gross) },
+        { Key: 'Best Ending Value (Gross)', Value: roundToCents(bestGross) },
+        { Key: 'Worst Ending Value (Gross)', Value: roundToCents(worstGross) },
+      )
+    }
+
     wsSummary.addRows(summaryRows)
 
     // 2. Percentiles

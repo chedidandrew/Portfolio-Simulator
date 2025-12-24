@@ -65,6 +65,9 @@ export function MonteCarloResults({
   const isDark = theme === 'dark'
   const isExporting = exportState !== 'idle'
 
+  const showGrossSummary = !!params.taxEnabled && mode === 'growth' && (params.taxType === 'capital_gains' || params.taxType === 'tax_deferred')
+
+
   // --- 1. Real vs Nominal Logic ---
   const [isRealDollars, setIsRealDollars] = useState(false)
   const inflationAdjustment = params.inflationAdjustment ?? 0
@@ -217,35 +220,43 @@ export function MonteCarloResults({
         <CardContent className="space-y-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <MetricCard 
-               label="Median Outcome" 
-               value={renderFormattedResult(results.median)} 
+               label={showGrossSummary ? "Median Outcome (Net)" : "Median Outcome"} 
+               value={renderFormattedResult(results.median)}
+               subLabel={showGrossSummary ? "Gross:" : undefined}
+               subValue={showGrossSummary ? renderFormattedResult(results.medianGross) : undefined} 
                textClass="text-primary"
                bgClass="bg-gradient-to-br from-primary/10 to-primary/5"
             />
             <MetricCard 
-               label="Mean Outcome" 
-               value={renderFormattedResult(results.mean)} 
+               label={showGrossSummary ? "Mean Outcome (Net)" : "Mean Outcome"} 
+               value={renderFormattedResult(results.mean)}
+               subLabel={showGrossSummary ? "Gross:" : undefined}
+               subValue={showGrossSummary ? renderFormattedResult(results.meanGross) : undefined} 
                textClass="text-blue-500"
                bgClass="bg-gradient-to-br from-blue-500/10 to-blue-500/5"
                delay={0.05} 
             />
             <MetricCard 
-               label="Best Case (95%)" 
-               value={renderFormattedResult(results.p95)} 
+               label={showGrossSummary ? "Best Case (95%) (Net)" : "Best Case (95%)"} 
+               value={renderFormattedResult(results.p95)}
+               subLabel={showGrossSummary ? "Gross:" : undefined}
+               subValue={showGrossSummary ? renderFormattedResult(results.p95Gross) : undefined} 
                textClass="text-emerald-500"
                bgClass="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5"
                delay={0.1} 
             />
             <MetricCard 
-               label="Worst Case (5%)" 
-               value={renderFormattedResult(results.p5)} 
+               label={showGrossSummary ? "Worst Case (5%) (Net)" : "Worst Case (5%)"} 
+               value={renderFormattedResult(results.p5)}
+               subLabel={showGrossSummary ? "Gross:" : undefined}
+               subValue={showGrossSummary ? renderFormattedResult(results.p5Gross) : undefined} 
                textClass="text-orange-500"
                bgClass="bg-gradient-to-br from-orange-500/10 to-orange-500/5"
                delay={0.15} 
             />
           </div>
 
-          {taxEnabled && params.taxType === 'capital_gains' && mode === 'growth' && (
+          {taxEnabled && mode === 'growth' && (params.taxType === 'capital_gains' || params.taxType === 'tax_deferred') && (
              <motion.div 
                initial={{ opacity: 0 }} 
                animate={{ opacity: 1 }}
@@ -255,7 +266,7 @@ export function MonteCarloResults({
                 <div>
                    <span className="font-semibold text-red-600 dark:text-red-400">Estimated Tax Cost: </span>
                    <span className="font-bold">
-                      {formatCurrency(getAdjustedScalar(results.taxDragAmount))}
+                      {formatCurrency(getAdjustedScalar((results.totalTaxCost ?? results.taxDragAmount)))}
                    </span>
                    <span className="text-muted-foreground ml-1">
                       (Avg diff between pre-tax and post-tax outcome)
@@ -428,7 +439,7 @@ export function MonteCarloResults({
   )
 }
 
-function MetricCard({ label, value, textClass, bgClass, delay = 0 }: any) {
+function MetricCard({ label, value, subLabel, subValue, textClass, bgClass, delay = 0 }: any) {
   return (
     <motion.div
       initial={{ scale: 0.9, opacity: 0 }}
@@ -440,6 +451,11 @@ function MetricCard({ label, value, textClass, bgClass, delay = 0 }: any) {
       <p className={`text-lg sm:text-xl md:text-2xl font-bold break-words leading-tight ${textClass}`}>
         {value}
       </p>
+      {subValue !== undefined && subValue !== null && (
+        <p className="text-xs text-muted-foreground">
+          {subLabel ? subLabel : ''} <span className="font-medium text-foreground">{subValue}</span>
+        </p>
+      )}
     </motion.div>
   )
 }

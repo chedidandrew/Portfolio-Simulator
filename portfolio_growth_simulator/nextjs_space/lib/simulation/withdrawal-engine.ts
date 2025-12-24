@@ -10,6 +10,7 @@ export interface WithdrawalProjectionResult {
   totalTaxPaid: number
   totalTaxWithheld: number
   totalTaxDrag: number
+  totalTaxCost: number
   totalWithdrawnInTodaysDollars: number
   isSustainable: boolean
   yearsUntilZero: number | null
@@ -182,6 +183,9 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
         
         totalTaxDrag += dragAmount
         yearTaxDrag += dragAmount
+
+        totalTaxPaid += dragAmount
+        yearTaxPaid += dragAmount
       }
     }
 
@@ -275,6 +279,7 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
     totalTaxPaid,
     totalTaxWithheld,
     totalTaxDrag,
+    totalTaxCost: totalTaxPaid,
     totalWithdrawnInTodaysDollars,
     isSustainable,
     yearsUntilZero,

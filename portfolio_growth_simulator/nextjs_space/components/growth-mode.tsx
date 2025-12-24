@@ -188,16 +188,18 @@ export function GrowthMode() {
       )
       
       if (isIncome) {
-         // Income Tax Mode: Taxes paid annually, final value is net
+         // Income Tax Mode: Taxes paid annually (tax drag), final value is net
          summaryRows.push({ Key: 'Total Profit', Value: roundToCents(calculation.totalProfit) })
-         summaryRows.push({ Key: 'Final Value', Value: roundToCents(calculation.finalValue) })
-         summaryRows.push({ Key: 'Total Tax Paid', Value: roundToCents(calculation.totalTaxPaid) })
+         summaryRows.push({ Key: 'Final Value', Value: roundToCents(calculation.finalValueNet) })
+         summaryRows.push({ Key: 'Tax Drag', Value: roundToCents(calculation.totalTaxDrag ?? calculation.totalTaxPaid) })
       } else {
          // Capital Gains Mode: Taxes deferred until end
          summaryRows.push({ Key: 'Total Profit (Gross)', Value: roundToCents(calculation.finalValue - calculation.totalContributions) })
          summaryRows.push({ Key: 'Final Value (Gross)', Value: roundToCents(calculation.finalValue) })
          summaryRows.push({ Key: 'Est. Tax Liability', Value: roundToCents(calculation.totalDeferredTax) })
          summaryRows.push({ Key: 'Final Value (Net)', Value: roundToCents(calculation.finalValueNet) })
+         summaryRows.push({ Key: 'Total Profit (Net)', Value: roundToCents(calculation.totalProfit) })
+         summaryRows.push({ Key: 'Est. Tax Cost', Value: roundToCents(calculation.totalTaxCost ?? calculation.totalDeferredTax) })
       }
     } else {
       // No Tax Enabled

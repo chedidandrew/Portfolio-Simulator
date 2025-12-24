@@ -411,6 +411,7 @@ export function performMonteCarloSimulation(
 
   // ... (Stats Calculation omitted for brevity) ...
   const sortedEndingValues = [...endingValues].sort((a, b) => a - b)
+  const sortedPreTaxEndingValues = [...preTaxEndingValues].sort((a, b) => a - b)
   const annualReturnsData = []
   
   for (let i = 1; i <= numRecordedSteps; i++) {
@@ -499,14 +500,23 @@ export function performMonteCarloSimulation(
   }
   
   const median = calculatePercentile(sortedEndingValues, 0.5)
+  const medianGross = calculatePercentile(sortedPreTaxEndingValues, 0.5)
   const p5 = calculatePercentile(sortedEndingValues, 0.05)
   const p10 = calculatePercentile(sortedEndingValues, 0.1)
   const p25 = calculatePercentile(sortedEndingValues, 0.25)
   const p75 = calculatePercentile(sortedEndingValues, 0.75)
   const p90 = calculatePercentile(sortedEndingValues, 0.9)
   const p95 = calculatePercentile(sortedEndingValues, 0.95)
+  const p5Gross = calculatePercentile(sortedPreTaxEndingValues, 0.05)
+  const p10Gross = calculatePercentile(sortedPreTaxEndingValues, 0.1)
+  const p25Gross = calculatePercentile(sortedPreTaxEndingValues, 0.25)
+  const p75Gross = calculatePercentile(sortedPreTaxEndingValues, 0.75)
+  const p90Gross = calculatePercentile(sortedPreTaxEndingValues, 0.9)
+  const p95Gross = calculatePercentile(sortedPreTaxEndingValues, 0.95)
   const best = sortedEndingValues[numPaths - 1]
   const worst = sortedEndingValues[0]
+  const bestGross = sortedPreTaxEndingValues[numPaths - 1]
+  const worstGross = sortedPreTaxEndingValues[0]
 
   const chartData = stepDistributions.map((values, index) => {
     const sortedPeriodValues = [...values].sort((a, b) => a - b)
@@ -552,6 +562,7 @@ export function performMonteCarloSimulation(
 
   return {
     endingValues,
+    endingValuesGross: preTaxEndingValues,
     maxDrawdowns,
     annualReturnsData,
     lossProbData,
@@ -563,16 +574,29 @@ export function performMonteCarloSimulation(
     deterministicSeriesGross,
     deterministicYearData, 
     taxDragAmount,
+    totalTaxWithheld: 0,
+    totalTaxDrag: taxDragAmount,
+    totalTaxCost: taxDragAmount,
     mean,
+    meanGross: meanPreTax,
     median,
+    medianGross,
     p5,
+    p5Gross,
     p10,
+    p10Gross,
     p25,
+    p25Gross,
     p75,
+    p75Gross,
     p90,
+    p90Gross,
     p95,
+    p95Gross,
     best,
+    bestGross,
     worst,
+    worstGross,
     goalProbability,
     pathsReachingGoal,
     profitableRate,
