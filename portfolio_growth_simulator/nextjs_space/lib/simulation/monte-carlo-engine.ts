@@ -417,6 +417,8 @@ export function performMonteCarloSimulation(
   for (let i = 1; i <= numRecordedSteps; i++) {
      const cagrs = stepCAGRs[i]
      cagrs.sort((a, b) => a - b)
+     const probOf = (threshold: number) => (cagrs.filter(v => v >= threshold).length / numPaths) * 100
+
      const currentStepNumber = i * recordFrequency
      const yearValue = currentStepNumber / timeStepsPerYear
      annualReturnsData.push({
@@ -426,7 +428,7 @@ export function performMonteCarloSimulation(
       median: calculatePercentile(cagrs, 0.5),
       p75: calculatePercentile(cagrs, 0.75),
       p90: calculatePercentile(cagrs, 0.9),
-      prob5: 0, prob8: 0, prob10: 0, prob12: 0, prob15: 0, prob20: 0, prob25: 0, prob30: 0
+      prob5: probOf(5), prob8: probOf(8), prob10: probOf(10), prob12: probOf(12), prob15: probOf(15), prob20: probOf(20), prob25: probOf(25), prob30: probOf(30)
     })
   }
 
