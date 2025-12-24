@@ -434,7 +434,7 @@ export function ReturnProbabilitiesChart({ data, isDark, enableAnimation = true 
             </ResponsiveContainer>
           </div>
           <p className="text-xs text-muted-foreground mt-3 text-center">
-            Shows the probability each year of achieving return thresholds such as 5, 8, 10, 12, 15, or 20 percent annualized (based on pure asset performance).
+            Shows the probability each year of achieving return thresholds such as 5, 8, 10, 12, 15, or 20 percent annualized.
           </p>
         </CardContent>
       </Card>
