@@ -108,10 +108,12 @@ export function performMonteCarloSimulation(
   const numRecordedSteps = Math.floor(totalTimeSteps / recordFrequency)
   
   const stepDistributions: number[][] = Array.from({ length: numRecordedSteps + 1 }, () => [])
+  const stepDistributionsGross: number[][] = Array.from({ length: numRecordedSteps + 1 }, () => [])
   const stepCAGRs: number[][] = Array.from({ length: numRecordedSteps + 1 }, () => [])
 
   const solvencySeries: { year: number, solventRate: number }[] = []
   const deterministicSeries: { year: number, value: number }[] = []
+  const deterministicSeriesGross: { year: number, value: number }[] = []
   
   const deterministicYearData: Array<{
     year: number
@@ -130,6 +132,22 @@ export function performMonteCarloSimulation(
 
   const clampedStartingCostBasis = Math.max(0, startingCostBasis ?? initialValue)
 
+  function getNetLiquidationValue(balance: number, basis: number): number {
+    if (!taxEnabled) return balance
+    if (taxType === 'income') return balance
+    if (taxType === 'tax_deferred') {
+      return balance * (1 - (taxRate / 100))
+    }
+    if (taxType === 'capital_gains') {
+      const profitForTax = balance - basis
+      if (profitForTax > 0) {
+        return balance - (profitForTax * (taxRate / 100))
+      }
+      return balance
+    }
+    return balance
+  }
+
   let pathsReachingGoal = 0
   let pathsProfitable = 0 
   let pathsSolvent = 0 
@@ -145,7 +163,8 @@ export function performMonteCarloSimulation(
   let detYearNetIncome = 0
   let detYearTaxPaid = 0
 
-  deterministicSeries.push({ year: 0, value: initialValue })
+  deterministicSeries.push({ year: 0, value: getNetLiquidationValue(initialValue, detBasis) })
+  deterministicSeriesGross.push({ year: 0, value: initialValue })
   
   for (let step = 1; step <= totalTimeSteps; step++) {
     let stepTaxPaid = 0
@@ -211,12 +230,17 @@ export function performMonteCarloSimulation(
        // Growth Mode
        detValue = detValue * (1 + detStepRate)
        detValue += detCashflow
+       detBasis += detCashflow
     }
 
     if (step % recordFrequency === 0) {
       deterministicSeries.push({ 
         year: step / timeStepsPerYear, 
-        value: detValue 
+        value: getNetLiquidationValue(detValue, detBasis) 
+      })
+      deterministicSeriesGross.push({
+        year: step / timeStepsPerYear,
+        value: detValue
       })
     }
     
@@ -228,10 +252,10 @@ export function performMonteCarloSimulation(
                 withdrawals: detYearWithdrawals,
                 netIncome: detYearNetIncome,
                 taxPaid: detYearTaxPaid,
-                endingBalance: detValue,
+                endingBalance: getNetLiquidationValue(detValue, detBasis),
                 isSustainable: detValue > 0
             })
-            detYearStartBalance = detValue
+            detYearStartBalance = getNetLiquidationValue(detValue, detBasis)
             detYearWithdrawals = 0
             detYearNetIncome = 0
             detYearTaxPaid = 0
@@ -252,11 +276,12 @@ export function performMonteCarloSimulation(
     let currentCashflowPerStep = cashflowPerStep
     let totalInvestedSoFar = clampedStartingCostBasis
     let totalBasis = clampedStartingCostBasis 
-    let peak = currentValue
+    let peak = getNetLiquidationValue(currentValue, totalBasis)
     let maxDrawdownForPath = 0
     let preTaxValue = initialValue 
 
-    stepDistributions[0].push(currentValue)
+    stepDistributions[0].push(getNetLiquidationValue(currentValue, totalBasis))
+    stepDistributionsGross[0].push(currentValue)
     stepCAGRs[0].push(0)
 
     for (let step = 1; step <= totalTimeSteps; step++) {
@@ -310,18 +335,23 @@ export function performMonteCarloSimulation(
         }
       }
 
-      if (currentValue < lowestValue) lowestValue = currentValue
-      if (currentValue > peak) peak = currentValue
+      const basisForNet = mode === 'growth' ? totalInvestedSoFar : totalBasis
+      const netValue = getNetLiquidationValue(currentValue, basisForNet)
+
+      if (netValue < lowestValue) lowestValue = netValue
+      if (netValue > peak) peak = netValue
       if (peak > 0) {
-        const dd = (peak - currentValue) / peak
+        const dd = (peak - netValue) / peak
         if (dd > maxDrawdownForPath) maxDrawdownForPath = dd
       }
 
       if (step % recordFrequency === 0) {
         const recordIndex = step / recordFrequency
-        stepDistributions[recordIndex].push(currentValue)
+        stepDistributions[recordIndex].push(netValue)
+        stepDistributionsGross[recordIndex].push(currentValue)
         const timeInYears = step / timeStepsPerYear
-        const cagr = Math.pow(pureValue / initialValue, 1 / timeInYears) - 1
+        const initialNet = getNetLiquidationValue(initialValue, clampedStartingCostBasis)
+        const cagr = Math.pow((netValue || 1) / (initialNet || 1), 1 / timeInYears) - 1
         stepCAGRs[recordIndex].push(cagr * 100)
       }
 
@@ -351,7 +381,7 @@ export function performMonteCarloSimulation(
 
     if (portfolioGoal && finalValueEffective >= portfolioGoal) pathsReachingGoal++
     if (finalValueEffective > totalInvestedSoFar) pathsProfitable++
-    if (currentValue > 0) pathsSolvent++ 
+    if (finalValueEffective > 0) pathsSolvent++ 
   }
 
   // --- SOLVENCY SERIES ---
@@ -478,6 +508,21 @@ export function performMonteCarloSimulation(
     }
   })
 
+  const chartDataGross = stepDistributionsGross.map((values, index) => {
+    const sortedPeriodValues = [...values].sort((a, b) => a - b)
+    const stepNumber = index * recordFrequency
+    const yearValue = stepNumber / timeStepsPerYear
+    return {
+      year: yearValue,
+      p10: calculatePercentile(sortedPeriodValues, 0.1),
+      p25: calculatePercentile(sortedPeriodValues, 0.25),
+      p50: calculatePercentile(sortedPeriodValues, 0.5),
+      p75: calculatePercentile(sortedPeriodValues, 0.75),
+      p90: calculatePercentile(sortedPeriodValues, 0.9),
+    }
+  })
+
+
   const spreadRatio = p95 > 0 && p5 > 0 ? p95 / p5 : 0
   const totalRatio = best > 0 && worst > 0 ? best / worst : 0
   const recommendLogHistogram = spreadRatio > 15 || totalRatio > 50
@@ -498,8 +543,10 @@ export function performMonteCarloSimulation(
     lossProbData,
     investmentData,
     chartData,
+    chartDataGross,
     solvencySeries,
     deterministicSeries,
+    deterministicSeriesGross,
     deterministicYearData, 
     taxDragAmount,
     mean,

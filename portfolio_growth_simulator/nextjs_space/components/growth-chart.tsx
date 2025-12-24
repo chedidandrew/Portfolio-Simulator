@@ -17,6 +17,8 @@ interface YearData {
   startingValue: number
   contributions: number
   endingValue: number
+  grossStartingValue?: number
+  grossEndingValue?: number
 }
 
 interface GrowthChartProps {
@@ -35,7 +37,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           if (entry.dataKey === 'contributions') {
             displayLabel = 'Total Invested'
           } else if (entry.dataKey === 'value') {
-            displayLabel = 'Portfolio Value'
+            displayLabel = 'Spendable Value'
+          } else if (entry.dataKey === 'grossValue') {
+            displayLabel = 'Gross Value'
           }
           
           return (
@@ -83,6 +87,10 @@ export function GrowthChart({ data }: GrowthChartProps) {
       setUseLogScale(checked)
     }
 
+  const hasGrossSeries = useMemo(() => {
+    return (data ?? []).some((d) => typeof d?.grossEndingValue === 'number' && Math.abs((d.grossEndingValue ?? 0) - (d.endingValue ?? 0)) > 0.01)
+  }, [data])
+
   const chartData = useMemo(() => {
     let cumulativeContributions = 0
     return data?.map?.((item, index) => {
@@ -94,6 +102,7 @@ export function GrowthChart({ data }: GrowthChartProps) {
       return {
         year: `Year ${item?.year}`,
         value: useLogScale ? logSafe(Math.round(item?.endingValue ?? 0)) : Math.round(item?.endingValue ?? 0),
+        grossValue: useLogScale ? logSafe(Math.round(item?.grossEndingValue ?? item?.endingValue ?? 0)) : Math.round(item?.grossEndingValue ?? item?.endingValue ?? 0),
         contributions: useLogScale ? logSafe(Math.round(cumulativeContributions)) : Math.round(cumulativeContributions),
       }
 
@@ -190,9 +199,21 @@ export function GrowthChart({ data }: GrowthChartProps) {
                   stroke="hsl(142, 70%, 45%)"
                   fill="url(#colorValue)"
                   strokeWidth={3}
-                  name="Portfolio Value"
+                  name="Spendable Value"
                   animationDuration={500}
                 />
+                {hasGrossSeries && (
+                  <Area
+                    type="monotone"
+                    dataKey="grossValue"
+                    stroke="hsl(262, 83%, 58%)"
+                    fillOpacity={0}
+                    strokeWidth={2}
+                    name="Gross Value"
+                    animationDuration={500}
+                    strokeDasharray="6 4"
+                  />
+                )}
               </AreaChart>
             </ResponsiveContainer>
           </div>

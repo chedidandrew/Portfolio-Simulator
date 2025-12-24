@@ -200,7 +200,7 @@ export function GrowthResults({
             </motion.div>
           ) : null}
 
-          <GrowthMilestones finalValue={displayValue} />
+          <GrowthMilestones finalValue={finalValue} />
         </CardContent>
       </Card>
 

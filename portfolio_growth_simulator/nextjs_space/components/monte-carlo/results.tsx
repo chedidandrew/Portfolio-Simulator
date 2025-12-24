@@ -362,6 +362,8 @@ export function MonteCarloResults({
       <div className="grid grid-cols-1 gap-6">
         <MonteCarloChart 
           data={results.chartData ?? []} 
+          grossData={results.chartDataGross ?? []} 
+          deterministicGrossData={results.deterministicSeriesGross ?? []} 
           mode={mode} 
           logScale={logScales.chart}
           onLogScaleChange={(val) => setLogScales({ ...logScales, chart: val })}

@@ -224,13 +224,15 @@ export function GrowthMode() {
       { header: 'Ending Value', key: 'Ending Value', width: 20 },
     ]
 
-    const excelData = calculation.yearData.map((row) => ({
+    const excelData = calculation.yearData.map((row: any) => ({
       Year: row.year,
       'Starting Value': roundToCents(row.startingValue),
+      ...(hasGrossColumns ? { 'Starting Value (Gross)': roundToCents(row.grossStartingValue ?? row.startingValue) } : {}),
       Contributions: roundToCents(row.contributions),
       'Interest Earned': roundToCents(row.interest),
-      ...(showIncomeTaxColumn ? { 'Tax Paid': roundToCents(row.interest * taxMultiplier) } : {}),
+      ...(showIncomeTaxColumn ? { 'Tax Paid': roundToCents(row.taxPaid ?? (row.interest * taxMultiplier)) } : {}),
       'Ending Value': roundToCents(row.endingValue),
+      ...(hasGrossColumns ? { 'Ending Value (Gross)': roundToCents(row.grossEndingValue ?? row.endingValue) } : {}),
     }))
     wsData.addRows(excelData)
 

@@ -11,7 +11,10 @@ interface GrowthTableProps {
     startingValue: number
     contributions: number
     interest: number
+    taxPaid?: number
     endingValue: number
+    grossStartingValue?: number
+    grossEndingValue?: number
   }>
   taxEnabled?: boolean
   taxType?: 'capital_gains' | 'income' | 'tax_deferred'

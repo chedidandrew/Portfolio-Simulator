@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { ChartSpline } from 'lucide-react'
@@ -13,6 +13,7 @@ import { triggerHaptic } from '@/hooks/use-haptics'
 
 interface MonteCarloChartProps {
   data: any[]
+  grossData?: any[]
   mode: 'growth' | 'withdrawal'
   logScale: boolean
   onLogScaleChange: (val: boolean) => void
@@ -21,6 +22,7 @@ interface MonteCarloChartProps {
   isRealDollars?: boolean
   inflationAdjustment?: number
   deterministicData?: any[]
+  deterministicGrossData?: any[]
 }
 
 const PERCENTILE_LABELS: Record<string, string> = {
@@ -38,7 +40,9 @@ const PERCENTILE_COLORS: Record<string, string> = {
   p50: 'hsl(165, 65%, 48%)',
   p25: 'hsl(180, 70%, 55%)',
   p10: 'hsl(30, 85%, 60%)',
-  deterministic: 'hsl(0, 0%, 50%)'
+  deterministic: 'hsl(0, 0%, 50%)',
+  p50Gross: 'hsl(0, 0%, 65%)',
+  deterministicGross: 'hsl(0, 0%, 35%)'
 }
 
 interface TooltipProps {
@@ -101,7 +105,7 @@ const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
   const point = payload[0].payload
   const timeLabel = formatTooltipLabel(label ?? 0)
 
-  const rows = [
+  const netRows = [
     { key: 'p90', value: point.p90 },
     { key: 'p75', value: point.p75 },
     { key: 'deterministic', value: point.deterministic },
@@ -110,25 +114,56 @@ const CustomTooltip = ({ active, payload, label, mode }: TooltipProps) => {
     { key: 'p10', value: point.p10 },
   ]
 
+  const grossRows = [
+    { key: 'p50Gross', value: point.p50Gross },
+    { key: 'deterministicGross', value: point.deterministicGross },
+  ]
+
+  const hasGross = grossRows.some((r) => r.value !== undefined)
+
   return (
-    <div className="rounded-md border bg-popover px-3 py-2 shadow-md text-xs space-y-1">
+    <div className="rounded-lg border bg-background p-3 text-xs shadow-lg">
       <div className="font-semibold">{timeLabel}</div>
       <div className="text-muted-foreground">
         {mode === 'growth' ? 'Projected portfolio value' : 'Projected remaining balance'}
       </div>
-      <div className="mt-1 space-y-1">
-        {rows.map(({ key, value }) => {
-            if (value === undefined) return null;
-            return (
-              <div key={key} className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: PERCENTILE_COLORS[key] }} />
-                  <span>{PERCENTILE_LABELS[key]}</span>
+      <div className="mt-2 space-y-3">
+        <div>
+          <div className="text-[11px] font-medium text-muted-foreground">Spendable (After Tax)</div>
+          <div className="mt-1 space-y-1">
+            {netRows.map(({ key, value }) => {
+              if (value === undefined) return null
+              return (
+                <div key={key} className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: PERCENTILE_COLORS[key] }} />
+                    <span>{PERCENTILE_LABELS[key]}</span>
+                  </div>
+                  <span className="font-semibold">{formatCurrency(value)}</span>
                 </div>
-                <span className="font-semibold">{formatCurrency(value)}</span>
-              </div>
-            )
-        })}
+              )
+            })}
+          </div>
+        </div>
+        {hasGross && (
+          <div>
+            <div className="text-[11px] font-medium text-muted-foreground">Gross</div>
+            <div className="mt-1 space-y-1">
+              {grossRows.map(({ key, value }) => {
+                if (value === undefined) return null
+                return (
+                  <div key={key} className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: PERCENTILE_COLORS[key] }} />
+                      <span>{PERCENTILE_LABELS[key]}</span>
+                    </div>
+                    <span className="font-semibold">{formatCurrency(value)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -142,6 +177,7 @@ function logSafe(value: number): number {
 
 export function MonteCarloChart({ 
     data, 
+  grossData = [],
     mode, 
     logScale, 
     onLogScaleChange, 
@@ -149,6 +185,7 @@ export function MonteCarloChart({
     isRealDollars = false,
     inflationAdjustment = 0,
     deterministicData = []
+  deterministicGrossData = []
 }: MonteCarloChartProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -157,6 +194,8 @@ export function MonteCarloChart({
     if (!data || data.length === 0) return 0
     return data[data.length - 1].year
   }, [data])
+
+  const [showGross, setShowGross] = useState(false)
 
   /* ------------------------------------------------------------------ */
   /* Smart Ticks Logic                                                  */
@@ -230,6 +269,9 @@ export function MonteCarloChart({
        const year = point.year;
        const detPoint = deterministicData[index]; // Assume synced indices for simplicity or find by year
        const detValue = detPoint ? detPoint.value : undefined;
+       const grossPoint = grossData[index]
+       const detGrossPoint = deterministicGrossData[index]
+       const detGrossValue = detGrossPoint ? detGrossPoint.value : undefined
 
        // Adjustment Factor
        const factor = isRealDollars 
@@ -243,7 +285,9 @@ export function MonteCarloChart({
          p50: point.p50 / factor,
          p25: point.p25 / factor,
          p10: point.p10 / factor,
-         deterministic: detValue ? detValue / factor : undefined
+         deterministic: detValue ? detValue / factor : undefined,
+          p50Gross: grossPoint ? grossPoint.p50 / factor : undefined,
+          deterministicGross: detGrossValue ? detGrossValue / factor : undefined
        }
 
        return logScale
@@ -254,11 +298,13 @@ export function MonteCarloChart({
             p50: logSafe(raw.p50),
             p25: logSafe(raw.p25),
             p10: logSafe(raw.p10),
-            deterministic: raw.deterministic ? logSafe(raw.deterministic) : undefined
+            deterministic: raw.deterministic ? logSafe(raw.deterministic) : undefined,
+            p50Gross: raw.p50Gross ? logSafe(raw.p50Gross) : undefined,
+            deterministicGross: raw.deterministicGross ? logSafe(raw.deterministicGross) : undefined
           }
         : raw
     })
-  }, [data, logScale, isRealDollars, inflationAdjustment, deterministicData])
+  }, [data, grossData, logScale, isRealDollars, inflationAdjustment, deterministicData, deterministicGrossData])
 
   const handleLogScaleChange = (checked: boolean) => { 
     triggerHaptic('light'); 
@@ -290,6 +336,20 @@ export function MonteCarloChart({
               <Label htmlFor="log-scale-montecarlo" className="text-sm cursor-pointer print:hidden">
                 Log scale
               </Label>
+              <div className="flex items-center gap-2 ml-4">
+                <Switch
+                  id="show-gross-montecarlo"
+                  checked={showGross}
+                  onCheckedChange={(checked) => {
+                    triggerHaptic('light');
+                    setShowGross(checked);
+                  }}
+                  className="print:hidden"
+                />
+                <Label htmlFor="show-gross-montecarlo" className="text-sm cursor-pointer print:hidden">
+                  Show gross
+                </Label>
+              </div>
               {logScale && (
                 <span className="hidden print:inline text-xs text-muted-foreground font-medium">
                   (Log scale enabled)
@@ -346,6 +406,28 @@ export function MonteCarloChart({
                 <Line type="monotone" dataKey="p90" stroke={PERCENTILE_COLORS.p90} strokeWidth={2} dot={false} name="p90" animationDuration={enableAnimation ? 500 : 0} />
                 <Line type="monotone" dataKey="p75" stroke={PERCENTILE_COLORS.p75} strokeWidth={2} dot={false} name="p75" animationDuration={enableAnimation ? 400 : 0} />
                 <Line type="monotone" dataKey="deterministic" stroke={PERCENTILE_COLORS.deterministic} strokeWidth={2} strokeDasharray="5 5" dot={false} name="deterministic" animationDuration={enableAnimation ? 500 : 0} />
+                {showGross && (
+                  <>
+                    <Line
+                      type="monotone"
+                      dataKey="p50Gross"
+                      stroke={PERCENTILE_COLORS.p50Gross}
+                      strokeDasharray="6 4"
+                      dot={false}
+                      name="p50Gross"
+                      animationDuration={enableAnimation ? 250 : 0}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="deterministicGross"
+                      stroke={PERCENTILE_COLORS.deterministicGross}
+                      strokeDasharray="2 6"
+                      dot={false}
+                      name="deterministicGross"
+                      animationDuration={enableAnimation ? 250 : 0}
+                    />
+                  </>
+                )}
                 <Line type="monotone" dataKey="p50" stroke={PERCENTILE_COLORS.p50} strokeWidth={3} dot={false} name="p50" animationDuration={enableAnimation ? 300 : 0} />
                 <Line type="monotone" dataKey="p25" stroke={PERCENTILE_COLORS.p25} strokeWidth={2} dot={false} name="p25" animationDuration={enableAnimation ? 200 : 0} />
                 <Line type="monotone" dataKey="p10" stroke={PERCENTILE_COLORS.p10} strokeWidth={2} dot={false} name="p10" animationDuration={enableAnimation ? 100 : 0} />
