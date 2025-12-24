@@ -36,6 +36,7 @@ export function WithdrawalResults({
   
   const { 
     endingBalance, 
+    endingBalanceGross,
     endingBalanceInTodaysDollars,
     totalWithdrawn, 
     totalWithdrawnNet,
