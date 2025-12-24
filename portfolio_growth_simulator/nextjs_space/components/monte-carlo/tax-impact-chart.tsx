@@ -63,66 +63,63 @@ export function TaxImpactChart({ data, investmentData, params, isRealDollars }: 
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  // Combine and Calculate Pre/Post Tax Data
-  const chartData = useMemo(() => {
-    if (!data || data.length === 0) return []
-    
-    const len = Math.min(data.length, investmentData?.length || 0)
-    
-    return data.slice(0, len).map((point, i) => {
-      const invPoint = investmentData[i]
-      const year = point.year
-      
-      const inflation = params.inflationAdjustment ?? 0
-      const deflator = isRealDollars ? Math.pow(1 + inflation / 100, year) : 1
+// Combine and Calculate Pre/Post Tax Data
+const chartData = useMemo(() => {
+  if (!data || data.length === 0) return []
 
-      const rawMedian = point.p50
-      const totalInvested = invPoint.total
+  return data.map((point, i) => {
+    const invPoint =
+      investmentData && investmentData.length
+        ? investmentData[Math.min(i, investmentData.length - 1)]
+        : undefined
 
-      let preTaxValue = 0
-      let postTaxValue = 0
+    const year = point.year
 
-      if (params.taxType === 'income') {
-        const rGross = params.expectedReturn / 100
-        const rNet = rGross * (1 - (params.taxRate || 0) / 100)
-        
-        const growthRatio = Math.pow((1 + rGross) / (1 + rNet), year)
-        
-        postTaxValue = rawMedian
-        preTaxValue = rawMedian * growthRatio
-        
-        if (preTaxValue < postTaxValue) preTaxValue = postTaxValue
+    const inflation = params.inflationAdjustment ?? 0
+    const deflator = isRealDollars ? Math.pow(1 + inflation / 100, year) : 1
 
-      } else if (params.taxType === 'tax_deferred') {
-        // Tax the entire balance
-        preTaxValue = rawMedian
-        postTaxValue = rawMedian * (1 - (params.taxRate || 0) / 100)
+    const rawMedian = point.p50
+    const totalInvested = invPoint?.total ?? 0
 
-      } else {
-        // Capital Gains (Default)
-        const gain = Math.max(0, rawMedian - totalInvested)
-        const taxBill = gain * ((params.taxRate || 0) / 100)
-        
-        preTaxValue = rawMedian
-        postTaxValue = rawMedian - taxBill
-      }
+    let preTaxValue = 0
+    let postTaxValue = 0
 
-      return {
-        year,
-        preTax: preTaxValue / deflator,
-        postTax: postTaxValue / deflator,
-        taxLost: (preTaxValue - postTaxValue) / deflator
-      }
-    })
-  }, [data, investmentData, params, isRealDollars])
+    if (params.taxType === 'income') {
+      const rGross = params.expectedReturn / 100
+      const rNet = rGross * (1 - (params.taxRate || 0) / 100)
 
-  /* ------------------------------------------------------------------ */
-  /* Smart Ticks Logic (Matched with MonteCarloChart)                   */
-  /* ------------------------------------------------------------------ */
-  const maxYear = useMemo(() => {
-    if (!chartData || chartData.length === 0) return 0
-    return chartData[chartData.length - 1].year
-  }, [chartData])
+      const growthRatio = Math.pow((1 + rGross) / (1 + rNet), year)
+
+      postTaxValue = rawMedian
+      preTaxValue = rawMedian * growthRatio
+
+      if (preTaxValue < postTaxValue) preTaxValue = postTaxValue
+    } else if (params.taxType === 'tax_deferred') {
+      preTaxValue = rawMedian
+      postTaxValue = rawMedian * (1 - (params.taxRate || 0) / 100)
+    } else {
+      const gain = Math.max(0, rawMedian - totalInvested)
+      const taxBill = gain * ((params.taxRate || 0) / 100)
+
+      preTaxValue = rawMedian
+      postTaxValue = rawMedian - taxBill
+    }
+
+    return {
+      year,
+      preTax: preTaxValue / deflator,
+      postTax: postTaxValue / deflator,
+      taxLost: (preTaxValue - postTaxValue) / deflator
+    }
+  })
+}, [data, investmentData, params, isRealDollars])
+
+const maxYear = useMemo(() => {
+  const last = chartData && chartData.length ? chartData[chartData.length - 1].year : 0
+  if (last) return last
+  if (params.duration) return params.duration
+  return 0
+}, [chartData, params.duration])
 
   const customTicks = useMemo(() => {
     if (!maxYear) return [0]
@@ -210,7 +207,7 @@ export function TaxImpactChart({ data, investmentData, params, isRealDollars }: 
                 <XAxis
                   dataKey="year"
                   type="number"
-                  domain={[0, 'dataMax']}
+                  domain={[0, maxYear]}
                   ticks={customTicks}
                   tickLine={false}
                   axisLine={{ stroke: isDark ? 'hsl(240, 3.7%, 15.9%)' : 'hsl(214, 32%, 91%)' }}

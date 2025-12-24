@@ -20,6 +20,23 @@ export function calculatePercentile(sortedArray: number[], p: number): number {
   return lowerValue + (upperValue - lowerValue) * fraction
 }
 
+
+export async function performMonteCarloSimulationAsync(
+  params: SimulationParams,
+  mode: 'growth' | 'withdrawal',
+  seed?: string
+) {
+  try {
+    if (typeof navigator !== 'undefined' && (navigator as any).gpu) {
+      const { performMonteCarloSimulationWebGPU } = await import('./monte-carlo-webgpu')
+      return await performMonteCarloSimulationWebGPU(params, mode, seed)
+    }
+  } catch (e) {
+    // Fall back to CPU implementation
+  }
+  return performMonteCarloSimulation(params, mode, seed)
+}
+
 export function performMonteCarloSimulation(
   params: SimulationParams,
   mode: 'growth' | 'withdrawal',

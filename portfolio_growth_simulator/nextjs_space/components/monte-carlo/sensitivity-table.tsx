@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { performMonteCarloSimulation } from '@/lib/simulation/monte-carlo-engine'
+import { performMonteCarloSimulationAsync } from '@/lib/simulation/monte-carlo-engine'
 import { SimulationParams } from '@/lib/types'
 import { formatCurrency } from '@/lib/utils'
 import { Loader2, Table2 } from 'lucide-react'
@@ -21,25 +21,30 @@ export function SensitivityTable({ params, mode, rngSeed }: SensitivityTableProp
     setIsLoading(true)
     // Run in a timeout to unblock the UI
     setTimeout(() => {
+      ;(async () => {
       const baseCashflow = params.cashflowAmount
       // Variations: -20%, -10%, Current, +10%, +20%
       const variations = [0.8, 0.9, 1.0, 1.1, 1.2] 
 
-      const results = variations.map((modifier) => {
+      const results: any[] = []
+      for (const modifier of variations) {
         const testCashflow = baseCashflow * modifier
         // Use fewer paths (200) for speed, it's just an estimate
         const testParams = { ...params, cashflowAmount: testCashflow, numPaths: 200 } 
-        const sim = performMonteCarloSimulation(testParams, mode, rngSeed || undefined)
-        
-        return {
+        const sim = await performMonteCarloSimulationAsync(testParams, mode, rngSeed || undefined)
+
+        results.push({
             amount: testCashflow,
             modifier,
             successRate: mode === 'withdrawal' ? sim.solventRate : sim.profitableRate,
-            medianEnd: sim.median
-        }
-      })
-      setData(results)
+            finalMedian: sim.median,
+        })
+      }
+setData(results)
       setIsLoading(false)
+      })().catch(() => {
+        setIsLoading(false)
+      })
     }, 100)
   }
 

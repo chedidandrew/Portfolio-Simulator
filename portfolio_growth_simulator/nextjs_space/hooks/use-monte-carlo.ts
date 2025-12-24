@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 import { SimulationParams } from '@/lib/types'
-import { performMonteCarloSimulation } from '@/lib/simulation/monte-carlo-engine'
+import { performMonteCarloSimulationAsync } from '@/lib/simulation/monte-carlo-engine'
 
 interface LogScaleSettings {
   chart: boolean
@@ -135,7 +135,8 @@ export function useMonteCarlo(
     setRngSeed(seed)
 
     setTimeout(() => {
-      const simResults = performMonteCarloSimulation(simParams, mode, seed)
+      ;(async () => {
+      const simResults = await performMonteCarloSimulationAsync(simParams, mode, seed)
       const finalResults = { ...simResults, simulationParams: simParams }
 
       if (preservedLogScales) {
@@ -154,6 +155,9 @@ export function useMonteCarlo(
       if (onComplete) {
         onComplete(finalResults)
       }
+      })().catch(() => {
+        setIsSimulating(false)
+      })
     }, 100)
   }
 
