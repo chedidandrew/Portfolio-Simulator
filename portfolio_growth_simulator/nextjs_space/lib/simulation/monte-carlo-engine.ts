@@ -364,8 +364,10 @@ export function performMonteCarloSimulation(
         stepDistributions[recordIndex].push(netValue)
         stepDistributionsGross[recordIndex].push(currentValue)
         const timeInYears = step / timeStepsPerYear
-        const initialNet = getNetLiquidationValue(initialValue, clampedStartingCostBasis)
-        const cagr = Math.pow((netValue || 1) / (initialNet || 1), 1 / timeInYears) - 1
+        
+        // Use pureValue (which excludes contributions) for CAGR calculation
+        // to show pure asset performance instead of portfolio growth via deposits
+        const cagr = Math.pow(pureValue / initialValue, 1 / timeInYears) - 1
         stepCAGRs[recordIndex].push(cagr * 100)
       }
 

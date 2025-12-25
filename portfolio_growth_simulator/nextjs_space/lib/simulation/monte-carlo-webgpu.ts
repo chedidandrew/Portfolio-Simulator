@@ -70,7 +70,222 @@ function createUniformBufferData(args: {
   return buffer
 }
 
-const WGSL_SOURCE = "\nstruct Params {\n  initialValue: f32,\n  startingCostBasis: f32,\n  postTaxReturn: f32,\n  preTaxReturn: f32,\n  sigma: f32,\n  dt: f32,\n  drift: f32,\n  driftPreTax: f32,\n  diffusion: f32,\n  cashflowPerStep0: f32,\n  inflationFactor: f32,\n  taxRate: f32,\n  portfolioGoal: f32,\n\n  timeStepsPerYear: u32,\n  totalTimeSteps: u32,\n  recordFrequency: u32,\n  numRecordedSteps: u32,\n  taxEnabled: u32,\n  taxType: u32,\n  mode: u32,\n  excludeInflationAdjustment: u32,\n  seed: u32,\n  _pad: u32,\n};\n\n@group(0) @binding(0) var<uniform> params: Params;\n\n// Record buffers are laid out as [recordIndex][pathIndex], row-major.\n@group(0) @binding(1) var<storage, read_write> netRecords: array<f32>;\n@group(0) @binding(2) var<storage, read_write> grossRecords: array<f32>;\n\n@group(0) @binding(3) var<storage, read_write> endingValues: array<f32>;\n@group(0) @binding(4) var<storage, read_write> preTaxEndingValues: array<f32>;\n@group(0) @binding(5) var<storage, read_write> lowestValues: array<f32>;\n@group(0) @binding(6) var<storage, read_write> maxDrawdowns: array<f32>;\n@group(0) @binding(7) var<storage, read_write> totalInvestedOut: array<f32>;\n\nfn xorshift32(state: ptr<function, u32>) -> u32 {\n  var x = (*state);\n  x = x ^ (x << 13u);\n  x = x ^ (x >> 17u);\n  x = x ^ (x << 5u);\n  (*state) = x;\n  return x;\n}\n\nfn rng_f32(state: ptr<function, u32>) -> f32 {\n  // (0,1], avoid 0 exactly.\n  let x = xorshift32(state);\n  return (f32(x) + 1.0) * (1.0 / 4294967296.0);\n}\n\nfn normal_rand(state: ptr<function, u32>) -> f32 {\n  let u1 = max(rng_f32(state), 1e-7);\n  let u2 = rng_f32(state);\n  let r = sqrt(-2.0 * log(u1));\n  let theta = 6.283185307179586 * u2;\n  return r * cos(theta);\n}\n\nfn net_liquidation(balance: f32, basis: f32) -> f32 {\n  if (params.taxEnabled == 0u) {\n    return balance;\n  }\n  // taxType: 0=capital_gains, 1=income, 2=tax_deferred\n  if (params.taxType == 2u) {\n    return balance * (1.0 - params.taxRate);\n  }\n  if (params.taxType == 0u) {\n    let profit = balance - basis;\n    if (profit > 0.0) {\n      return balance - (profit * params.taxRate);\n    }\n    return balance;\n  }\n  return balance;\n}\n\n@compute @workgroup_size(128)\nfn main(@builtin(global_invocation_id) gid: vec3<u32>) {\n  let path = gid.x;\n  let numPaths = arrayLength(&endingValues);\n  if (path >= numPaths) {\n    return;\n  }\n\n  var rngState: u32 = params.seed ^ (path * 747796405u + 2891336453u);\n\n  var currentValue: f32 = params.initialValue;\n  var preTaxValue: f32 = params.initialValue;\n  var currentCashflow: f32 = params.cashflowPerStep0;\n  var totalInvested: f32 = params.startingCostBasis;\n  var totalBasis: f32 = params.startingCostBasis;\n\n  var peak: f32 = net_liquidation(currentValue, totalBasis);\n  var lowest: f32 = params.initialValue;\n  var maxDD: f32 = 0.0;\n\n  // record step 0\n  netRecords[path] = peak;\n  grossRecords[path] = currentValue;\n\n  for (var step: u32 = 1u; step <= params.totalTimeSteps; step = step + 1u) {\n    let z = normal_rand(&rngState);\n    let growthFactor = exp(params.drift + params.diffusion * z);\n    let isIncomeTax = (params.taxEnabled == 1u && params.taxType == 1u);\n    let growthFactorPreTax = select(0.0, exp(params.driftPreTax + params.diffusion * z), isIncomeTax);\n\n    if (params.mode == 1u) {\n      // withdrawal\n      var stepWithdrawal: f32 = currentCashflow;\n\n      if (params.taxEnabled == 1u && params.taxType != 1u) {\n        if (params.taxType == 2u) {\n          stepWithdrawal = currentCashflow;\n        } else {\n          let gainFraction = select(0.0, (currentValue - totalBasis) / currentValue, currentValue > totalBasis && currentValue > 0.0);\n          var effectiveTaxRate = params.taxRate * gainFraction;\n          effectiveTaxRate = min(effectiveTaxRate, 0.99);\n          stepWithdrawal = currentCashflow;\n        }\n      }\n\n      if (stepWithdrawal > currentValue) {\n        stepWithdrawal = currentValue;\n      }\n\n      if (params.taxType != 2u) {\n        if (currentValue > 0.0) {\n          totalBasis = totalBasis * (1.0 - (stepWithdrawal / currentValue));\n        }\n      }\n\n      currentValue = max(0.0, currentValue - stepWithdrawal);\n      currentValue = currentValue * growthFactor;\n\n      if (isIncomeTax) {\n        var preTaxWithdrawal: f32 = stepWithdrawal;\n        if (preTaxWithdrawal > preTaxValue) {\n          preTaxWithdrawal = preTaxValue;\n        }\n        preTaxValue = max(0.0, preTaxValue - preTaxWithdrawal);\n        preTaxValue = preTaxValue * growthFactorPreTax;\n      }\n    } else {\n      // growth\n      currentValue = currentValue * growthFactor;\n      currentValue = currentValue + currentCashflow;\n      totalInvested = totalInvested + currentCashflow;\n\n      if (isIncomeTax) {\n        preTaxValue = preTaxValue * growthFactorPreTax;\n        preTaxValue = preTaxValue + currentCashflow;\n      }\n    }\n\n    let basisForNet = select(totalBasis, totalInvested, params.mode == 0u);\n    let netValue = net_liquidation(currentValue, basisForNet);\n\n    if (netValue < lowest) {\n      lowest = netValue;\n    }\n    if (netValue > peak) {\n      peak = netValue;\n    }\n    if (peak > 0.0) {\n      let dd = (peak - netValue) / peak;\n      if (dd > maxDD) {\n        maxDD = dd;\n      }\n    }\n\n    if (params.recordFrequency > 0u && (step % params.recordFrequency) == 0u) {\n      let recordIndex = step / params.recordFrequency;\n      let outIndex = recordIndex * numPaths + path;\n      netRecords[outIndex] = netValue;\n      grossRecords[outIndex] = currentValue;\n    }\n\n    if (params.excludeInflationAdjustment == 0u && (step % params.timeStepsPerYear) == 0u) {\n      currentCashflow = currentCashflow * params.inflationFactor;\n    }\n  }\n\n  var finalEffective: f32 = currentValue;\n  var finalPreTax: f32 = select(currentValue, preTaxValue, (params.taxEnabled == 1u && params.taxType == 1u));\n\n  if (params.mode == 0u && params.taxEnabled == 1u) {\n    if (params.taxType == 0u) {\n      let profit = currentValue - totalInvested;\n      if (profit > 0.0) {\n        finalEffective = currentValue - (profit * params.taxRate);\n      }\n    } else if (params.taxType == 2u) {\n      finalEffective = currentValue * (1.0 - params.taxRate);\n    }\n  }\n\n  endingValues[path] = finalEffective;\n  preTaxEndingValues[path] = finalPreTax;\n  lowestValues[path] = lowest;\n  maxDrawdowns[path] = maxDD;\n  totalInvestedOut[path] = totalInvested;\n}\n"
+const WGSL_SOURCE = `
+struct Params {
+  initialValue: f32,
+  startingCostBasis: f32,
+  postTaxReturn: f32,
+  preTaxReturn: f32,
+  sigma: f32,
+  dt: f32,
+  drift: f32,
+  driftPreTax: f32,
+  diffusion: f32,
+  cashflowPerStep0: f32,
+  inflationFactor: f32,
+  taxRate: f32,
+  portfolioGoal: f32,
+
+  timeStepsPerYear: u32,
+  totalTimeSteps: u32,
+  recordFrequency: u32,
+  numRecordedSteps: u32,
+  taxEnabled: u32,
+  taxType: u32,
+  mode: u32,
+  excludeInflationAdjustment: u32,
+  seed: u32,
+  _pad: u32,
+};
+
+@group(0) @binding(0) var<uniform> params: Params;
+
+// Record buffers are laid out as [recordIndex][pathIndex], row-major.
+@group(0) @binding(1) var<storage, read_write> netRecords: array<f32>;
+@group(0) @binding(2) var<storage, read_write> grossRecords: array<f32>;
+
+@group(0) @binding(3) var<storage, read_write> endingValues: array<f32>;
+@group(0) @binding(4) var<storage, read_write> preTaxEndingValues: array<f32>;
+@group(0) @binding(5) var<storage, read_write> lowestValues: array<f32>;
+@group(0) @binding(6) var<storage, read_write> maxDrawdowns: array<f32>;
+@group(0) @binding(7) var<storage, read_write> totalInvestedOut: array<f32>;
+@group(0) @binding(8) var<storage, read_write> performanceRecords: array<f32>;
+
+fn xorshift32(state: ptr<function, u32>) -> u32 {
+  var x = (*state);
+  x = x ^ (x << 13u);
+  x = x ^ (x >> 17u);
+  x = x ^ (x << 5u);
+  (*state) = x;
+  return x;
+}
+
+fn rng_f32(state: ptr<function, u32>) -> f32 {
+  // (0,1], avoid 0 exactly.
+  let x = xorshift32(state);
+  return (f32(x) + 1.0) * (1.0 / 4294967296.0);
+}
+
+fn normal_rand(state: ptr<function, u32>) -> f32 {
+  let u1 = max(rng_f32(state), 1e-7);
+  let u2 = rng_f32(state);
+  let r = sqrt(-2.0 * log(u1));
+  let theta = 6.283185307179586 * u2;
+  return r * cos(theta);
+}
+
+fn net_liquidation(balance: f32, basis: f32) -> f32 {
+  if (params.taxEnabled == 0u) {
+    return balance;
+  }
+  // taxType: 0=capital_gains, 1=income, 2=tax_deferred
+  if (params.taxType == 2u) {
+    return balance * (1.0 - params.taxRate);
+  }
+  if (params.taxType == 0u) {
+    let profit = balance - basis;
+    if (profit > 0.0) {
+      return balance - (profit * params.taxRate);
+    }
+    return balance;
+  }
+  return balance;
+}
+
+@compute @workgroup_size(128)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let path = gid.x;
+  let numPaths = arrayLength(&endingValues);
+  if (path >= numPaths) {
+    return;
+  }
+
+  var rngState: u32 = params.seed ^ (path * 747796405u + 2891336453u);
+
+  var currentValue: f32 = params.initialValue;
+  var preTaxValue: f32 = params.initialValue;
+  var currentCashflow: f32 = params.cashflowPerStep0;
+  var totalInvested: f32 = params.startingCostBasis;
+  var totalBasis: f32 = params.startingCostBasis;
+
+  var performanceValue: f32 = 1.0;
+
+  var peak: f32 = net_liquidation(currentValue, totalBasis);
+  var lowest: f32 = params.initialValue;
+  var maxDD: f32 = 0.0;
+
+  // record step 0
+  netRecords[path] = peak;
+  grossRecords[path] = currentValue;
+  performanceRecords[path] = 1.0;
+
+  for (var step: u32 = 1u; step <= params.totalTimeSteps; step = step + 1u) {
+    let z = normal_rand(&rngState);
+    let growthFactor = exp(params.drift + params.diffusion * z);
+    let isIncomeTax = (params.taxEnabled == 1u && params.taxType == 1u);
+    let growthFactorPreTax = select(0.0, exp(params.driftPreTax + params.diffusion * z), isIncomeTax);
+
+    // Track pure asset performance (independent of cashflows)
+    performanceValue = performanceValue * growthFactor;
+
+    if (params.mode == 1u) {
+      // withdrawal
+      var stepWithdrawal: f32 = currentCashflow;
+
+      if (params.taxEnabled == 1u && params.taxType != 1u) {
+        if (params.taxType == 2u) {
+          stepWithdrawal = currentCashflow;
+        } else {
+          let gainFraction = select(0.0, (currentValue - totalBasis) / currentValue, currentValue > totalBasis && currentValue > 0.0);
+          var effectiveTaxRate = params.taxRate * gainFraction;
+          effectiveTaxRate = min(effectiveTaxRate, 0.99);
+          stepWithdrawal = currentCashflow;
+        }
+      }
+
+      if (stepWithdrawal > currentValue) {
+        stepWithdrawal = currentValue;
+      }
+
+      if (params.taxType != 2u) {
+        if (currentValue > 0.0) {
+          totalBasis = totalBasis * (1.0 - (stepWithdrawal / currentValue));
+        }
+      }
+
+      currentValue = max(0.0, currentValue - stepWithdrawal);
+      currentValue = currentValue * growthFactor;
+
+      if (isIncomeTax) {
+        var preTaxWithdrawal: f32 = stepWithdrawal;
+        if (preTaxWithdrawal > preTaxValue) {
+          preTaxWithdrawal = preTaxValue;
+        }
+        preTaxValue = max(0.0, preTaxValue - preTaxWithdrawal);
+        preTaxValue = preTaxValue * growthFactorPreTax;
+      }
+    } else {
+      // growth
+      currentValue = currentValue * growthFactor;
+      currentValue = currentValue + currentCashflow;
+      totalInvested = totalInvested + currentCashflow;
+
+      if (isIncomeTax) {
+        preTaxValue = preTaxValue * growthFactorPreTax;
+        preTaxValue = preTaxValue + currentCashflow;
+      }
+    }
+
+    let basisForNet = select(totalBasis, totalInvested, params.mode == 0u);
+    let netValue = net_liquidation(currentValue, basisForNet);
+
+    if (netValue < lowest) {
+      lowest = netValue;
+    }
+    if (netValue > peak) {
+      peak = netValue;
+    }
+    if (peak > 0.0) {
+      let dd = (peak - netValue) / peak;
+      if (dd > maxDD) {
+        maxDD = dd;
+      }
+    }
+
+    if (params.recordFrequency > 0u && (step % params.recordFrequency) == 0u) {
+      let recordIndex = step / params.recordFrequency;
+      let outIndex = recordIndex * numPaths + path;
+      netRecords[outIndex] = netValue;
+      grossRecords[outIndex] = currentValue;
+      performanceRecords[outIndex] = performanceValue;
+    }
+
+    if (params.excludeInflationAdjustment == 0u && (step % params.timeStepsPerYear) == 0u) {
+      currentCashflow = currentCashflow * params.inflationFactor;
+    }
+  }
+
+  var finalEffective: f32 = currentValue;
+  var finalPreTax: f32 = select(currentValue, preTaxValue, (params.taxEnabled == 1u && params.taxType == 1u));
+
+  if (params.mode == 0u && params.taxEnabled == 1u) {
+    if (params.taxType == 0u) {
+      let profit = currentValue - totalInvested;
+      if (profit > 0.0) {
+        finalEffective = currentValue - (profit * params.taxRate);
+      }
+    } else if (params.taxType == 2u) {
+      finalEffective = currentValue * (1.0 - params.taxRate);
+    }
+  }
+
+  endingValues[path] = finalEffective;
+  preTaxEndingValues[path] = finalPreTax;
+  lowestValues[path] = lowest;
+  maxDrawdowns[path] = maxDD;
+  totalInvestedOut[path] = totalInvested;
+}
+`
 
 async function readBuffer(device: any, buffer: any, byteLength: number): Promise<ArrayBuffer> {
   const readback = device.createBuffer({
@@ -375,6 +590,11 @@ export async function performMonteCarloSimulationWebGPU(
     size: recordsByteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
   })
+  // NEW: Buffer for Pure Asset Performance tracking
+  const performanceRecordsBuffer = device.createBuffer({
+    size: recordsByteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+  })
 
   const endingValuesBuffer = device.createBuffer({
     size: numPaths * 4,
@@ -420,6 +640,7 @@ export async function performMonteCarloSimulationWebGPU(
       { binding: 5, resource: { buffer: lowestValuesBuffer } },
       { binding: 6, resource: { buffer: maxDrawdownsBuffer } },
       { binding: 7, resource: { buffer: investedBuffer } },
+      { binding: 8, resource: { buffer: performanceRecordsBuffer } },
     ]
   })
 
@@ -436,6 +657,7 @@ export async function performMonteCarloSimulationWebGPU(
 
   const netRecordsData = new Float32Array(await readBuffer(device, netRecordsBuffer, recordsByteLength))
   const grossRecordsData = new Float32Array(await readBuffer(device, grossRecordsBuffer, recordsByteLength))
+  const performanceRecordsData = new Float32Array(await readBuffer(device, performanceRecordsBuffer, recordsByteLength))
   const endingValuesData = new Float32Array(await readBuffer(device, endingValuesBuffer, numPaths * 4))
   const preTaxEndingValuesData = new Float32Array(await readBuffer(device, preTaxEndingValuesBuffer, numPaths * 4))
   const lowestValuesData = new Float32Array(await readBuffer(device, lowestValuesBuffer, numPaths * 4))
@@ -446,6 +668,7 @@ export async function performMonteCarloSimulationWebGPU(
   uniformBuffer.destroy()
   netRecordsBuffer.destroy()
   grossRecordsBuffer.destroy()
+  performanceRecordsBuffer.destroy()
   endingValuesBuffer.destroy()
   preTaxEndingValuesBuffer.destroy()
   lowestValuesBuffer.destroy()
@@ -462,6 +685,12 @@ export async function performMonteCarloSimulationWebGPU(
     const start = i * numPaths
     const end = start + numPaths
     return Array.from(grossRecordsData.subarray(start, end))
+  })
+  // Reconstruct performance data
+  const stepPerformance: number[][] = Array.from({ length: numRecordedSteps + 1 }, (_, i) => {
+    const start = i * numPaths
+    const end = start + numPaths
+    return Array.from(performanceRecordsData.subarray(start, end))
   })
 
   const endingValues: number[] = Array.from(endingValuesData)
@@ -498,19 +727,20 @@ export async function performMonteCarloSimulationWebGPU(
   const sortedPreTaxEndingValues = [...preTaxEndingValues].sort((a, b) => a - b)
   const annualReturnsData: any[] = []
 
-  // Annual return bands computed from net values at each recorded step
+  // Annual return bands computed from PURE PERFORMANCE values (asset only)
   for (let i = 1; i <= numRecordedSteps; i++) {
     const currentStepNumber = i * recordFrequency
     const yearValue = currentStepNumber / timeStepsPerYear
-    const values = stepDistributions[i]
-    const initialNet = getNetLiquidationValue(initialValue, clampedStartingCostBasis)
+    const values = stepPerformance[i]
+    
+    // Values track 1.0 -> growth. so Value = (1 + r)^t
+    // CAGR = Value^(1/t) - 1
     const cagrs = values.map((v) => {
       const timeInYears = yearValue
       if (timeInYears <= 0) return 0
-      const numer = (v || 1)
-      const denom = (initialNet || 1)
-      return (Math.pow(numer / denom, 1 / timeInYears) - 1) * 100
+      return (Math.pow(v, 1 / timeInYears) - 1) * 100
     })
+
     cagrs.sort((a, b) => a - b)
     const probOf = (threshold: number) => (cagrs.filter(v => v >= threshold).length / numPaths) * 100
     annualReturnsData.push({
@@ -520,7 +750,14 @@ export async function performMonteCarloSimulationWebGPU(
       median: calculatePercentile(cagrs, 0.5),
       p75: calculatePercentile(cagrs, 0.75),
       p90: calculatePercentile(cagrs, 0.9),
-      prob5: probOf(5), prob8: probOf(8), prob10: probOf(10), prob12: probOf(12), prob15: probOf(15), prob20: probOf(20), prob25: probOf(25), prob30: probOf(30)
+      prob5: probOf(5),
+      prob8: probOf(8),
+      prob10: probOf(10),
+      prob12: probOf(12),
+      prob15: probOf(15),
+      prob20: probOf(20),
+      prob25: probOf(25),
+      prob30: probOf(30)
     })
   }
 
