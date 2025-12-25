@@ -356,13 +356,13 @@ export async function performMonteCarloSimulationWebGPU(
   )
 
   const maxPointsPerRecordsBuffer = maxRecordsBufferBytes === Number.POSITIVE_INFINITY
-    ? 2_500_000 
+    ? 10_000_000 
     : Math.max(0, Math.floor(maxRecordsBufferBytes / 4))
 
   const MAX_TOTAL_DATA_POINTS = Math.max(
     0,
     Math.min(
-      2_500_000,
+      10_000_000,
       Math.max(0, maxPointsPerRecordsBuffer - Math.max(0, numPaths))
     )
   )

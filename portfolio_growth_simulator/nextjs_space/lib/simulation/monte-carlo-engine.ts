@@ -75,7 +75,6 @@ export function performMonteCarloSimulation(
 
   const timeStepsPerYear = getStepsPerYear(cashflowFrequency)
 
-  // UPDATED: Match the WebGPU optimization (2.5M) to prevent CPU crashes on mobile
   const MAX_TOTAL_DATA_POINTS = 2_500_000 
   const MAX_CHART_STEPS = 500
   const totalSimulationSteps = Math.floor(duration * timeStepsPerYear)
