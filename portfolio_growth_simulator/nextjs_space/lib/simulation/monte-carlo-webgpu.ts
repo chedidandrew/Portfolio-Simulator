@@ -352,13 +352,13 @@ export async function performMonteCarloSimulationWebGPU(
   )
 
   const maxPointsPerRecordsBuffer = maxRecordsBufferBytes === Number.POSITIVE_INFINITY
-    ? 10_000_000
+    ? 5_000_000 // REDUCED FROM 10M TO 5M to save memory on mobile
     : Math.max(0, Math.floor(maxRecordsBufferBytes / 4))
 
   const MAX_TOTAL_DATA_POINTS = Math.max(
     0,
     Math.min(
-      10_000_000,
+      5_000_000, // REDUCED FROM 10M TO 5M
       Math.max(0, maxPointsPerRecordsBuffer - Math.max(0, numPaths))
     )
   )
@@ -590,7 +590,6 @@ export async function performMonteCarloSimulationWebGPU(
     size: recordsByteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
   })
-  // NEW: Buffer for Pure Asset Performance tracking
   const performanceRecordsBuffer = device.createBuffer({
     size: recordsByteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
@@ -659,6 +658,9 @@ export async function performMonteCarloSimulationWebGPU(
   // SEQUENTIAL READ & PROCESSING to save memory on mobile devices
   // -----------------------------------------------------------------------
 
+  // Helper to yield to main thread to prevent UI freezing / OOM triggers
+  const yieldToMain = () => new Promise(r => setTimeout(r, 0))
+
   // 1. Read small summary buffers first
   const endingValuesData = new Float32Array(await readBuffer(device, endingValuesBuffer, numPaths * 4))
   const preTaxEndingValuesData = new Float32Array(await readBuffer(device, preTaxEndingValuesBuffer, numPaths * 4))
@@ -681,13 +683,18 @@ export async function performMonteCarloSimulationWebGPU(
   const maxDrawdowns: number[] = Array.from(maxDrawdownsData)
   const totalInvestedOut: number[] = Array.from(investedData)
 
+  await yieldToMain() // Breathe
+
   // 2. Read NET RECORDS -> Process Chart & Solvency -> Discard
-  // CHANGED: 'let' instead of 'const' so we can nullify it
   let netRecordsData: Float32Array | null = new Float32Array(await readBuffer(device, netRecordsBuffer, recordsByteLength))
   netRecordsBuffer.destroy()
 
   const solvencySeries: { year: number, solventRate: number }[] = []
   const chartData = []
+
+  // Optimization: Pre-allocate a scratch buffer for sorting to avoid thousands of allocations
+  // This prevents GC churn crashes on iOS
+  let scratchSortBuffer: Float32Array | null = new Float32Array(numPaths)
 
   for (let i = 0; i <= numRecordedSteps; i++) {
     const start = i * numPaths
@@ -696,8 +703,6 @@ export async function performMonteCarloSimulationWebGPU(
     const yearValue = stepNumber / timeStepsPerYear
     
     // Create subarray view (no copy)
-    // Note: TypeScript might complain if netRecordsData is possibly null inside loop,
-    // but logic flow ensures it isn't null here.
     const stepValues = netRecordsData!.subarray(start, end)
 
     // Solvency
@@ -710,24 +715,32 @@ export async function performMonteCarloSimulationWebGPU(
       solventRate: (solventCount / numPaths) * 100
     })
 
-    // Chart Data (requires sorting, so we slice to copy)
-    const sortedPeriodValues = netRecordsData!.slice(start, end).sort() as unknown as number[]
+    // Copy to scratch buffer for sorting (avoids creating new ArrayBuffer)
+    scratchSortBuffer!.set(stepValues)
+    scratchSortBuffer!.sort()
+
+    // Pass the sorted scratch buffer (casted as any/number[]) to calculatePercentile
+    const sortedRef = scratchSortBuffer as unknown as number[]
+
     chartData.push({
       year: yearValue,
-      p10: calculatePercentile(sortedPeriodValues, 0.1),
-      p25: calculatePercentile(sortedPeriodValues, 0.25),
-      p50: calculatePercentile(sortedPeriodValues, 0.5),
-      p75: calculatePercentile(sortedPeriodValues, 0.75),
-      p90: calculatePercentile(sortedPeriodValues, 0.9),
+      p10: calculatePercentile(sortedRef, 0.1),
+      p25: calculatePercentile(sortedRef, 0.25),
+      p50: calculatePercentile(sortedRef, 0.5),
+      p75: calculatePercentile(sortedRef, 0.75),
+      p90: calculatePercentile(sortedRef, 0.9),
     })
+
+    // Yield every 20 steps to prevent blocking
+    if (i % 20 === 0) await yieldToMain()
   }
   
-  // Explicitly release net records reference (GC hint)
+  // Explicitly release memory
   // @ts-ignore
   netRecordsData = null 
+  await yieldToMain() // Breathe
 
   // 3. Read GROSS RECORDS -> Process Chart -> Discard
-  // CHANGED: 'let' instead of 'const'
   let grossRecordsData: Float32Array | null = new Float32Array(await readBuffer(device, grossRecordsBuffer, recordsByteLength))
   grossRecordsBuffer.destroy()
 
@@ -738,29 +751,33 @@ export async function performMonteCarloSimulationWebGPU(
     const stepNumber = i * recordFrequency
     const yearValue = stepNumber / timeStepsPerYear
     
-    const sortedPeriodValues = grossRecordsData!.slice(start, end).sort() as unknown as number[]
+    // Copy to scratch
+    scratchSortBuffer!.set(grossRecordsData!.subarray(start, end))
+    scratchSortBuffer!.sort()
+    const sortedRef = scratchSortBuffer as unknown as number[]
+    
     chartDataGross.push({
       year: yearValue,
-      p10: calculatePercentile(sortedPeriodValues, 0.1),
-      p25: calculatePercentile(sortedPeriodValues, 0.25),
-      p50: calculatePercentile(sortedPeriodValues, 0.5),
-      p75: calculatePercentile(sortedPeriodValues, 0.75),
-      p90: calculatePercentile(sortedPeriodValues, 0.9),
+      p10: calculatePercentile(sortedRef, 0.1),
+      p25: calculatePercentile(sortedRef, 0.25),
+      p50: calculatePercentile(sortedRef, 0.5),
+      p75: calculatePercentile(sortedRef, 0.75),
+      p90: calculatePercentile(sortedRef, 0.9),
     })
+
+    if (i % 20 === 0) await yieldToMain()
   }
   // @ts-ignore
   grossRecordsData = null
+  await yieldToMain()
 
   // 4. Read PERFORMANCE RECORDS -> Process Annual Returns -> Discard
-  // CHANGED: 'let' instead of 'const'
   let performanceRecordsData: Float32Array | null = new Float32Array(await readBuffer(device, performanceRecordsBuffer, recordsByteLength))
   performanceRecordsBuffer.destroy()
 
   const annualReturnsData: any[] = []
-  // Reuse a single temporary buffer for calculations to save allocation overhead
-  // CHANGED: 'let' instead of 'const'
-  let tempCagrBuffer: Float32Array | null = new Float32Array(numPaths)
-
+  // Reuse scratch buffer for CAGRs
+  
   for (let i = 1; i <= numRecordedSteps; i++) {
     const currentStepNumber = i * recordFrequency
     const yearValue = currentStepNumber / timeStepsPerYear
@@ -768,28 +785,26 @@ export async function performMonteCarloSimulationWebGPU(
     const end = start + numPaths
     const values = performanceRecordsData!.subarray(start, end)
     
-    // Fill temp buffer
+    // Calculate CAGRs into scratch buffer
     if (yearValue <= 0) {
-       for(let k=0; k<numPaths; k++) tempCagrBuffer![k] = 0;
+       for(let k=0; k<numPaths; k++) scratchSortBuffer![k] = 0;
     } else {
        for(let k=0; k<numPaths; k++) {
-          tempCagrBuffer![k] = (Math.pow(values[k], 1 / yearValue) - 1) * 100
+          scratchSortBuffer![k] = (Math.pow(values[k], 1 / yearValue) - 1) * 100
        }
     }
     
-    // Sort temp buffer in place
-    tempCagrBuffer!.sort()
+    scratchSortBuffer!.sort()
     
     const countAbove = (threshold: number) => {
-        // Binary search could be faster but simple loop on sorted array is linear and fine for JS
         let count = 0
         for(let k = 0; k < numPaths; k++) {
-            if(tempCagrBuffer![k] >= threshold) count++
+            if(scratchSortBuffer![k] >= threshold) count++
         }
         return (count / numPaths) * 100
     }
 
-    const sortedCagrs = tempCagrBuffer as unknown as number[]
+    const sortedCagrs = scratchSortBuffer as unknown as number[]
 
     annualReturnsData.push({
       year: yearValue,
@@ -807,11 +822,13 @@ export async function performMonteCarloSimulationWebGPU(
       prob25: countAbove(25),
       prob30: countAbove(30)
     })
+
+    if (i % 20 === 0) await yieldToMain()
   }
   // @ts-ignore
   performanceRecordsData = null
   // @ts-ignore
-  tempCagrBuffer = null
+  scratchSortBuffer = null
 
   // -----------------------------------------------------------------------
   // END SEQUENTIAL PROCESSING
