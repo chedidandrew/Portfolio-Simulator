@@ -682,7 +682,8 @@ export async function performMonteCarloSimulationWebGPU(
   const totalInvestedOut: number[] = Array.from(investedData)
 
   // 2. Read NET RECORDS -> Process Chart & Solvency -> Discard
-  const netRecordsData = new Float32Array(await readBuffer(device, netRecordsBuffer, recordsByteLength))
+  // CHANGED: 'let' instead of 'const' so we can nullify it
+  let netRecordsData: Float32Array | null = new Float32Array(await readBuffer(device, netRecordsBuffer, recordsByteLength))
   netRecordsBuffer.destroy()
 
   const solvencySeries: { year: number, solventRate: number }[] = []
@@ -695,7 +696,9 @@ export async function performMonteCarloSimulationWebGPU(
     const yearValue = stepNumber / timeStepsPerYear
     
     // Create subarray view (no copy)
-    const stepValues = netRecordsData.subarray(start, end)
+    // Note: TypeScript might complain if netRecordsData is possibly null inside loop,
+    // but logic flow ensures it isn't null here.
+    const stepValues = netRecordsData!.subarray(start, end)
 
     // Solvency
     let solventCount = 0
@@ -708,7 +711,7 @@ export async function performMonteCarloSimulationWebGPU(
     })
 
     // Chart Data (requires sorting, so we slice to copy)
-    const sortedPeriodValues = netRecordsData.slice(start, end).sort() as unknown as number[]
+    const sortedPeriodValues = netRecordsData!.slice(start, end).sort() as unknown as number[]
     chartData.push({
       year: yearValue,
       p10: calculatePercentile(sortedPeriodValues, 0.1),
@@ -724,7 +727,8 @@ export async function performMonteCarloSimulationWebGPU(
   netRecordsData = null 
 
   // 3. Read GROSS RECORDS -> Process Chart -> Discard
-  const grossRecordsData = new Float32Array(await readBuffer(device, grossRecordsBuffer, recordsByteLength))
+  // CHANGED: 'let' instead of 'const'
+  let grossRecordsData: Float32Array | null = new Float32Array(await readBuffer(device, grossRecordsBuffer, recordsByteLength))
   grossRecordsBuffer.destroy()
 
   const chartDataGross = []
@@ -734,7 +738,7 @@ export async function performMonteCarloSimulationWebGPU(
     const stepNumber = i * recordFrequency
     const yearValue = stepNumber / timeStepsPerYear
     
-    const sortedPeriodValues = grossRecordsData.slice(start, end).sort() as unknown as number[]
+    const sortedPeriodValues = grossRecordsData!.slice(start, end).sort() as unknown as number[]
     chartDataGross.push({
       year: yearValue,
       p10: calculatePercentile(sortedPeriodValues, 0.1),
@@ -748,37 +752,39 @@ export async function performMonteCarloSimulationWebGPU(
   grossRecordsData = null
 
   // 4. Read PERFORMANCE RECORDS -> Process Annual Returns -> Discard
-  const performanceRecordsData = new Float32Array(await readBuffer(device, performanceRecordsBuffer, recordsByteLength))
+  // CHANGED: 'let' instead of 'const'
+  let performanceRecordsData: Float32Array | null = new Float32Array(await readBuffer(device, performanceRecordsBuffer, recordsByteLength))
   performanceRecordsBuffer.destroy()
 
   const annualReturnsData: any[] = []
   // Reuse a single temporary buffer for calculations to save allocation overhead
-  const tempCagrBuffer = new Float32Array(numPaths)
+  // CHANGED: 'let' instead of 'const'
+  let tempCagrBuffer: Float32Array | null = new Float32Array(numPaths)
 
   for (let i = 1; i <= numRecordedSteps; i++) {
     const currentStepNumber = i * recordFrequency
     const yearValue = currentStepNumber / timeStepsPerYear
     const start = i * numPaths
     const end = start + numPaths
-    const values = performanceRecordsData.subarray(start, end)
+    const values = performanceRecordsData!.subarray(start, end)
     
     // Fill temp buffer
     if (yearValue <= 0) {
-       for(let k=0; k<numPaths; k++) tempCagrBuffer[k] = 0;
+       for(let k=0; k<numPaths; k++) tempCagrBuffer![k] = 0;
     } else {
        for(let k=0; k<numPaths; k++) {
-          tempCagrBuffer[k] = (Math.pow(values[k], 1 / yearValue) - 1) * 100
+          tempCagrBuffer![k] = (Math.pow(values[k], 1 / yearValue) - 1) * 100
        }
     }
     
     // Sort temp buffer in place
-    tempCagrBuffer.sort()
+    tempCagrBuffer!.sort()
     
     const countAbove = (threshold: number) => {
         // Binary search could be faster but simple loop on sorted array is linear and fine for JS
         let count = 0
         for(let k = 0; k < numPaths; k++) {
-            if(tempCagrBuffer[k] >= threshold) count++
+            if(tempCagrBuffer![k] >= threshold) count++
         }
         return (count / numPaths) * 100
     }
