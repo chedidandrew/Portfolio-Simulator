@@ -457,7 +457,7 @@ export function MonteCarloParameters({
               
               {params.numPaths === 100000 && (
                 <p className="text-[10px] text-orange-500 font-medium animate-pulse pt-1 print:hidden">
-                  Warning: 100,000 paths might freeze the browser UI for a few seconds on slower devices.
+                  Warning: 100,000 paths might freeze/crash on slower devices. Recommended: Enable webGPU on your browser for best performance.
                 </p>
               )}
 
