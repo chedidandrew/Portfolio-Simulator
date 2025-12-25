@@ -30,9 +30,11 @@ export async function performMonteCarloSimulationAsync(
     if (typeof navigator !== 'undefined' && (navigator as any).gpu) {
       const { performMonteCarloSimulationWebGPU } = await import('./monte-carlo-webgpu')
       return await performMonteCarloSimulationWebGPU(params, mode, seed)
+    } else {
+       console.warn("WebGPU not available on this device/browser. Using CPU fallback.")
     }
   } catch (e) {
-    // Fall back to CPU implementation
+    console.error("WebGPU initialization failed. Using CPU fallback.", e)
   }
   return performMonteCarloSimulation(params, mode, seed)
 }
@@ -73,7 +75,8 @@ export function performMonteCarloSimulation(
 
   const timeStepsPerYear = getStepsPerYear(cashflowFrequency)
 
-  const MAX_TOTAL_DATA_POINTS = 10_000_000
+  // UPDATED: Match the WebGPU optimization (2.5M) to prevent CPU crashes on mobile
+  const MAX_TOTAL_DATA_POINTS = 2_500_000 
   const MAX_CHART_STEPS = 500
   const totalSimulationSteps = Math.floor(duration * timeStepsPerYear)
   const memoryAllowedSteps = Math.floor(MAX_TOTAL_DATA_POINTS / numPaths)
@@ -364,9 +367,7 @@ export function performMonteCarloSimulation(
         stepDistributions[recordIndex].push(netValue)
         stepDistributionsGross[recordIndex].push(currentValue)
         const timeInYears = step / timeStepsPerYear
-        
-        // Use pureValue (which excludes contributions) for CAGR calculation
-        // to show pure asset performance instead of portfolio growth via deposits
+        // Use pureValue for CAGR (matches GPU logic)
         const cagr = Math.pow(pureValue / initialValue, 1 / timeInYears) - 1
         stepCAGRs[recordIndex].push(cagr * 100)
       }
