@@ -34,6 +34,7 @@ function createUniformBufferData(args: {
   mode: number
   excludeInflationAdjustment: number
   seed: number
+  pathOffset: number // New param for batching
 }): ArrayBuffer {
   // WGSL struct is 96 bytes (padded to 16)
   const buffer = new ArrayBuffer(96)
@@ -65,7 +66,7 @@ function createUniformBufferData(args: {
   u32[19] = args.mode >>> 0
   u32[20] = args.excludeInflationAdjustment >>> 0
   u32[21] = args.seed >>> 0
-  u32[22] = 0
+  u32[22] = args.pathOffset >>> 0 // Use the pad slot for offset
 
   return buffer
 }
@@ -95,7 +96,7 @@ struct Params {
   mode: u32,
   excludeInflationAdjustment: u32,
   seed: u32,
-  _pad: u32,
+  pathOffset: u32,
 };
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -154,8 +155,11 @@ fn net_liquidation(balance: f32, basis: f32) -> f32 {
 
 @compute @workgroup_size(128)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let path = gid.x;
+  // Apply batch offset to get the real path index
+  let path = gid.x + params.pathOffset;
   let numPaths = arrayLength(&endingValues);
+  
+  // Guard against out of bounds (important for last partial batch)
   if (path >= numPaths) {
     return;
   }
@@ -352,13 +356,13 @@ export async function performMonteCarloSimulationWebGPU(
   )
 
   const maxPointsPerRecordsBuffer = maxRecordsBufferBytes === Number.POSITIVE_INFINITY
-    ? 2_000_000 // REDUCED FROM 10M TO 5M to save memory on mobile
+    ? 2_500_000 
     : Math.max(0, Math.floor(maxRecordsBufferBytes / 4))
 
   const MAX_TOTAL_DATA_POINTS = Math.max(
     0,
     Math.min(
-      2_000_000, // REDUCED FROM 10M TO 5M to save memory on mobile
+      2_500_000,
       Math.max(0, maxPointsPerRecordsBuffer - Math.max(0, numPaths))
     )
   )
@@ -448,6 +452,7 @@ export async function performMonteCarloSimulationWebGPU(
   deterministicSeriesGross.push({ year: 0, value: initialValue })
 
   for (let step = 1; step <= totalTimeSteps; step++) {
+    // ... (Deterministic Logic Same as Before) ...
     let stepTaxPaid = 0
     let stepWithdrawal = 0
     let stepNet = 0
@@ -455,7 +460,6 @@ export async function performMonteCarloSimulationWebGPU(
     if (mode === 'withdrawal') {
       stepWithdrawal = detCashflow
       stepNet = detCashflow
-
       if (taxEnabled && taxType !== 'income') {
         if (taxType === 'tax_deferred') {
           stepWithdrawal = detCashflow
@@ -470,31 +474,25 @@ export async function performMonteCarloSimulationWebGPU(
           stepNet = stepWithdrawal - stepTaxPaid
         }
       }
-
       if (stepWithdrawal > detValue) {
         const ratio = detValue / (stepWithdrawal || 1)
         stepWithdrawal = detValue
         stepNet = stepNet * ratio
         stepTaxPaid = stepTaxPaid * ratio
       }
-
       if (taxType !== 'tax_deferred') {
         if (detValue > 0) {
           detBasis = detBasis * (1 - (stepWithdrawal / detValue))
         }
       }
-
       detValue -= stepWithdrawal
       detValue = Math.max(0, detValue)
-
       detYearWithdrawals += stepWithdrawal
       detYearNetIncome += stepNet
       detYearTaxPaid += stepTaxPaid
     }
-
     const valueBeforeGrowth = detValue
     detValue = detValue * (1 + detStepRate)
-
     if (taxEnabled && taxType === 'income') {
       const growth = detValue - valueBeforeGrowth
       let t = taxRate / 100
@@ -504,18 +502,15 @@ export async function performMonteCarloSimulationWebGPU(
       detValue = Math.max(0, detValue)
       detYearTaxPaid += drag
     }
-
     if (mode === 'growth') {
       detValue += detCashflow
       detBasis += detCashflow
     }
-
     if (step % recordFrequency === 0) {
       const yearValue = step / timeStepsPerYear
       deterministicSeries.push({ year: yearValue, value: getNetLiquidationValue(detValue, mode === 'growth' ? detBasis : detBasis) })
       deterministicSeriesGross.push({ year: yearValue, value: detValue })
     }
-
     if (step % timeStepsPerYear === 0) {
       if (mode === 'withdrawal') {
         deterministicYearData.push({
@@ -532,7 +527,6 @@ export async function performMonteCarloSimulationWebGPU(
         detYearNetIncome = 0
         detYearTaxPaid = 0
       }
-
       if (!excludeInflationAdjustment) {
         detCashflow *= inflationFactor
       }
@@ -548,37 +542,7 @@ export async function performMonteCarloSimulationWebGPU(
   const seedStr = seed ?? `monte-carlo-${Date.now()}-${Math.random()}`
   const seedU32 = hashStringToU32(seedStr)
 
-  const uniformData = createUniformBufferData({
-    initialValue,
-    startingCostBasis: clampedStartingCostBasis,
-    postTaxReturn: r,
-    preTaxReturn: rPreTax,
-    sigma,
-    dt,
-    drift,
-    driftPreTax,
-    diffusion,
-    cashflowPerStep0: cashflowPerStep,
-    inflationFactor,
-    taxRate: (taxRate / 100),
-    portfolioGoal: portfolioGoal ?? 0,
-    timeStepsPerYear,
-    totalTimeSteps,
-    recordFrequency,
-    numRecordedSteps,
-    taxEnabled: taxEnabled ? 1 : 0,
-    taxType: taxTypeCode,
-    mode: mode === 'withdrawal' ? 1 : 0,
-    excludeInflationAdjustment: excludeInflationAdjustment ? 1 : 0,
-    seed: seedU32
-  })
-
-  const uniformBuffer = device.createBuffer({
-    size: 96,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  })
-  device.queue.writeBuffer(uniformBuffer, 0, uniformData)
-
+  // Calculate buffer sizes once
   const recordsLength = (numRecordedSteps + 1) * numPaths
   const recordsByteLength = recordsLength * 4
 
@@ -616,6 +580,11 @@ export async function performMonteCarloSimulationWebGPU(
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
   })
 
+  const uniformBuffer = device.createBuffer({
+    size: 96,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  })
+
   const shaderModule = device.createShaderModule({
     code: WGSL_SOURCE
   })
@@ -643,32 +612,72 @@ export async function performMonteCarloSimulationWebGPU(
     ]
   })
 
-  const encoder = device.createCommandEncoder()
-  const pass = encoder.beginComputePass()
-  pass.setPipeline(pipeline)
-  pass.setBindGroup(0, bindGroup)
+  // --------------------------------------------------------------------------
+  // BATCHED DISPATCH: Prevent TDR (Timeout) on iOS
+  // --------------------------------------------------------------------------
+  
+  // Safe batch size for mobile GPUs (20k paths * 10k steps = ~200M ops per batch)
+  const BATCH_SIZE = 20000 
   const workgroupSize = 128
-  const dispatchX = Math.ceil(numPaths / workgroupSize)
-  pass.dispatchWorkgroups(dispatchX)
-  pass.end()
-  device.queue.submit([encoder.finish()])
-  await device.queue.onSubmittedWorkDone()
+
+  for (let offset = 0; offset < numPaths; offset += BATCH_SIZE) {
+    // 1. Update Uniform Data with new offset
+    const uniformData = createUniformBufferData({
+      initialValue,
+      startingCostBasis: clampedStartingCostBasis,
+      postTaxReturn: r,
+      preTaxReturn: rPreTax,
+      sigma,
+      dt,
+      drift,
+      driftPreTax,
+      diffusion,
+      cashflowPerStep0: cashflowPerStep,
+      inflationFactor,
+      taxRate: (taxRate / 100),
+      portfolioGoal: portfolioGoal ?? 0,
+      timeStepsPerYear,
+      totalTimeSteps,
+      recordFrequency,
+      numRecordedSteps,
+      taxEnabled: taxEnabled ? 1 : 0,
+      taxType: taxTypeCode,
+      mode: mode === 'withdrawal' ? 1 : 0,
+      excludeInflationAdjustment: excludeInflationAdjustment ? 1 : 0,
+      seed: seedU32,
+      pathOffset: offset // Pass the current batch offset to the shader
+    })
+    device.queue.writeBuffer(uniformBuffer, 0, uniformData)
+
+    // 2. Dispatch this batch
+    const currentBatchSize = Math.min(BATCH_SIZE, numPaths - offset)
+    const dispatchX = Math.ceil(currentBatchSize / workgroupSize)
+
+    const encoder = device.createCommandEncoder()
+    const pass = encoder.beginComputePass()
+    pass.setPipeline(pipeline)
+    pass.setBindGroup(0, bindGroup)
+    pass.dispatchWorkgroups(dispatchX)
+    pass.end()
+    
+    // 3. Submit and WAIT to reset watchdog timer
+    device.queue.submit([encoder.finish()])
+    await device.queue.onSubmittedWorkDone()
+  }
 
   // -----------------------------------------------------------------------
-  // SEQUENTIAL READ & PROCESSING to save memory on mobile devices
+  // SEQUENTIAL READ & PROCESSING
   // -----------------------------------------------------------------------
 
-  // Helper to yield to main thread to prevent UI freezing / OOM triggers
   const yieldToMain = () => new Promise(r => setTimeout(r, 0))
 
-  // 1. Read small summary buffers first
+  // 1. Read small summary buffers
   const endingValuesData = new Float32Array(await readBuffer(device, endingValuesBuffer, numPaths * 4))
   const preTaxEndingValuesData = new Float32Array(await readBuffer(device, preTaxEndingValuesBuffer, numPaths * 4))
   const lowestValuesData = new Float32Array(await readBuffer(device, lowestValuesBuffer, numPaths * 4))
   const maxDrawdownsData = new Float32Array(await readBuffer(device, maxDrawdownsBuffer, numPaths * 4))
   const investedData = new Float32Array(await readBuffer(device, investedBuffer, numPaths * 4))
 
-  // Cleanup summary buffers
   endingValuesBuffer.destroy()
   preTaxEndingValuesBuffer.destroy()
   lowestValuesBuffer.destroy()
@@ -676,24 +685,21 @@ export async function performMonteCarloSimulationWebGPU(
   investedBuffer.destroy()
   uniformBuffer.destroy()
 
-  // Prepare standard JS arrays for summary stats
   const endingValues: number[] = Array.from(endingValuesData)
   const preTaxEndingValues: number[] = Array.from(preTaxEndingValuesData)
   const lowestValues: number[] = Array.from(lowestValuesData)
   const maxDrawdowns: number[] = Array.from(maxDrawdownsData)
   const totalInvestedOut: number[] = Array.from(investedData)
 
-  await yieldToMain() // Breathe
+  await yieldToMain() 
 
-  // 2. Read NET RECORDS -> Process Chart & Solvency -> Discard
+  // 2. Read NET RECORDS
   let netRecordsData: Float32Array | null = new Float32Array(await readBuffer(device, netRecordsBuffer, recordsByteLength))
   netRecordsBuffer.destroy()
 
   const solvencySeries: { year: number, solventRate: number }[] = []
   const chartData = []
 
-  // Optimization: Pre-allocate a scratch buffer for sorting to avoid thousands of allocations
-  // This prevents GC churn crashes on iOS
   let scratchSortBuffer: Float32Array | null = new Float32Array(numPaths)
 
   for (let i = 0; i <= numRecordedSteps; i++) {
@@ -702,10 +708,8 @@ export async function performMonteCarloSimulationWebGPU(
     const stepNumber = i * recordFrequency
     const yearValue = stepNumber / timeStepsPerYear
     
-    // Create subarray view (no copy)
     const stepValues = netRecordsData!.subarray(start, end)
 
-    // Solvency
     let solventCount = 0
     for(let k = 0; k < stepValues.length; k++) {
       if(stepValues[k] > 0.01) solventCount++
@@ -715,11 +719,8 @@ export async function performMonteCarloSimulationWebGPU(
       solventRate: (solventCount / numPaths) * 100
     })
 
-    // Copy to scratch buffer for sorting (avoids creating new ArrayBuffer)
     scratchSortBuffer!.set(stepValues)
     scratchSortBuffer!.sort()
-
-    // Pass the sorted scratch buffer (casted as any/number[]) to calculatePercentile
     const sortedRef = scratchSortBuffer as unknown as number[]
 
     chartData.push({
@@ -731,16 +732,14 @@ export async function performMonteCarloSimulationWebGPU(
       p90: calculatePercentile(sortedRef, 0.9),
     })
 
-    // Yield every 20 steps to prevent blocking
     if (i % 20 === 0) await yieldToMain()
   }
   
-  // Explicitly release memory
   // @ts-ignore
   netRecordsData = null 
-  await yieldToMain() // Breathe
+  await yieldToMain() 
 
-  // 3. Read GROSS RECORDS -> Process Chart -> Discard
+  // 3. Read GROSS RECORDS
   let grossRecordsData: Float32Array | null = new Float32Array(await readBuffer(device, grossRecordsBuffer, recordsByteLength))
   grossRecordsBuffer.destroy()
 
@@ -751,7 +750,6 @@ export async function performMonteCarloSimulationWebGPU(
     const stepNumber = i * recordFrequency
     const yearValue = stepNumber / timeStepsPerYear
     
-    // Copy to scratch
     scratchSortBuffer!.set(grossRecordsData!.subarray(start, end))
     scratchSortBuffer!.sort()
     const sortedRef = scratchSortBuffer as unknown as number[]
@@ -771,12 +769,11 @@ export async function performMonteCarloSimulationWebGPU(
   grossRecordsData = null
   await yieldToMain()
 
-  // 4. Read PERFORMANCE RECORDS -> Process Annual Returns -> Discard
+  // 4. Read PERFORMANCE RECORDS
   let performanceRecordsData: Float32Array | null = new Float32Array(await readBuffer(device, performanceRecordsBuffer, recordsByteLength))
   performanceRecordsBuffer.destroy()
 
   const annualReturnsData: any[] = []
-  // Reuse scratch buffer for CAGRs
   
   for (let i = 1; i <= numRecordedSteps; i++) {
     const currentStepNumber = i * recordFrequency
@@ -785,7 +782,6 @@ export async function performMonteCarloSimulationWebGPU(
     const end = start + numPaths
     const values = performanceRecordsData!.subarray(start, end)
     
-    // Calculate CAGRs into scratch buffer
     if (yearValue <= 0) {
        for(let k=0; k<numPaths; k++) scratchSortBuffer![k] = 0;
     } else {
@@ -849,7 +845,6 @@ export async function performMonteCarloSimulationWebGPU(
   const sortedEndingValues = [...endingValues].sort((a, b) => a - b)
   const sortedPreTaxEndingValues = [...preTaxEndingValues].sort((a, b) => a - b)
 
-  // Loss probabilities
   const lossThresholds = [0, 2.5, 5, 10, 15, 20, 30, 50]
   const lossProbData: {
     threshold: string
@@ -874,7 +869,6 @@ export async function performMonteCarloSimulationWebGPU(
     }
   })
 
-  // Tax Drag Calc
   const mean = endingValues.reduce((sum, val) => sum + val, 0) / numPaths
   const meanPreTax = preTaxEndingValues.reduce((sum, val) => sum + val, 0) / numPaths
   let taxDragAmount = 0
@@ -916,7 +910,6 @@ export async function performMonteCarloSimulationWebGPU(
   const profitableRate = (pathsProfitable / numPaths) * 100
   const solventRate = (pathsSolvent / numPaths) * 100
 
-  // Investment data (discrete schedule)
   const investmentData: {
     year: number
     initial: number
