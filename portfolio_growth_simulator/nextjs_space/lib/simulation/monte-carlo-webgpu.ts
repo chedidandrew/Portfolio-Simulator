@@ -675,24 +675,6 @@ export async function performMonteCarloSimulationWebGPU(
   maxDrawdownsBuffer.destroy()
   investedBuffer.destroy()
 
-  // Rebuild the same structures as the CPU engine
-  const stepDistributions: number[][] = Array.from({ length: numRecordedSteps + 1 }, (_, i) => {
-    const start = i * numPaths
-    const end = start + numPaths
-    return Array.from(netRecordsData.subarray(start, end))
-  })
-  const stepDistributionsGross: number[][] = Array.from({ length: numRecordedSteps + 1 }, (_, i) => {
-    const start = i * numPaths
-    const end = start + numPaths
-    return Array.from(grossRecordsData.subarray(start, end))
-  })
-  // Reconstruct performance data
-  const stepPerformance: number[][] = Array.from({ length: numRecordedSteps + 1 }, (_, i) => {
-    const start = i * numPaths
-    const end = start + numPaths
-    return Array.from(performanceRecordsData.subarray(start, end))
-  })
-
   const endingValues: number[] = Array.from(endingValuesData)
   const preTaxEndingValues: number[] = Array.from(preTaxEndingValuesData)
   const lowestValues: number[] = Array.from(lowestValuesData)
@@ -713,15 +695,25 @@ export async function performMonteCarloSimulationWebGPU(
 
   // --- SOLVENCY SERIES ---
   const solvencySeries: { year: number, solventRate: number }[] = []
-  stepDistributions.forEach((stepValues, index) => {
-    const solventCount = stepValues.filter(v => v > 0.01).length
+  
+  for (let i = 0; i <= numRecordedSteps; i++) {
+    const start = i * numPaths
+    const end = start + numPaths
+    const stepValues = netRecordsData.subarray(start, end)
+    
+    // Quick iterate without creating new array
+    let solventCount = 0
+    for(let k = 0; k < stepValues.length; k++) {
+      if(stepValues[k] > 0.01) solventCount++
+    }
+
     const rate = (solventCount / numPaths) * 100
-    const stepNumber = index * recordFrequency
+    const stepNumber = i * recordFrequency
     solvencySeries.push({
       year: stepNumber / timeStepsPerYear,
       solventRate: rate
     })
-  })
+  }
 
   const sortedEndingValues = [...endingValues].sort((a, b) => a - b)
   const sortedPreTaxEndingValues = [...preTaxEndingValues].sort((a, b) => a - b)
@@ -731,25 +723,50 @@ export async function performMonteCarloSimulationWebGPU(
   for (let i = 1; i <= numRecordedSteps; i++) {
     const currentStepNumber = i * recordFrequency
     const yearValue = currentStepNumber / timeStepsPerYear
-    const values = stepPerformance[i]
     
-    // Values track 1.0 -> growth. so Value = (1 + r)^t
-    // CAGR = Value^(1/t) - 1
-    const cagrs = values.map((v) => {
-      const timeInYears = yearValue
-      if (timeInYears <= 0) return 0
-      return (Math.pow(v, 1 / timeInYears) - 1) * 100
-    })
+    const start = i * numPaths
+    const end = start + numPaths
+    // slice() to create a copy we can sort
+    const values = performanceRecordsData.subarray(start, end)
+    
+    // Calculate CAGRs into a temp array to avoid massive map() object creation?
+    // Actually map() on subarray creates Float32Array (if standard lib supports) or Array.
+    // Let's iterate manually to be safe on memory.
+    const cagrs = new Float32Array(numPaths)
+    for(let k = 0; k < numPaths; k++) {
+        const v = values[k]
+        if (yearValue <= 0) {
+            cagrs[k] = 0
+        } else {
+            cagrs[k] = (Math.pow(v, 1 / yearValue) - 1) * 100
+        }
+    }
+    
+    // Sort in place
+    cagrs.sort()
 
-    cagrs.sort((a, b) => a - b)
-    const probOf = (threshold: number) => (cagrs.filter(v => v >= threshold).length / numPaths) * 100
+    const probOf = (threshold: number) => {
+        // Since sorted, we can find index
+        // But filter is O(N). Binary search is O(logN).
+        // For simplicity and since we did filter before:
+        let count = 0
+        for(let k = 0; k < numPaths; k++) {
+            if(cagrs[k] >= threshold) count++
+        }
+        return (count / numPaths) * 100
+    }
+    
+    // cast to any/unknown to pass to calculatePercentile which expects number[]
+    // but works with Float32Array at runtime
+    const sortedCagrs = cagrs as unknown as number[]
+
     annualReturnsData.push({
       year: yearValue,
-      p10: calculatePercentile(cagrs, 0.1),
-      p25: calculatePercentile(cagrs, 0.25),
-      median: calculatePercentile(cagrs, 0.5),
-      p75: calculatePercentile(cagrs, 0.75),
-      p90: calculatePercentile(cagrs, 0.9),
+      p10: calculatePercentile(sortedCagrs, 0.1),
+      p25: calculatePercentile(sortedCagrs, 0.25),
+      median: calculatePercentile(sortedCagrs, 0.5),
+      p75: calculatePercentile(sortedCagrs, 0.75),
+      p90: calculatePercentile(sortedCagrs, 0.9),
       prob5: probOf(5),
       prob8: probOf(8),
       prob10: probOf(10),
@@ -762,33 +779,43 @@ export async function performMonteCarloSimulationWebGPU(
   }
 
   // Chart Data (net)
-  const chartData = stepDistributions.map((values, index) => {
-    const sortedPeriodValues = [...values].sort((a, b) => a - b)
-    const stepNumber = index * recordFrequency
+  const chartData = []
+  for (let i = 0; i <= numRecordedSteps; i++) {
+    const start = i * numPaths
+    const end = start + numPaths
+    // Slice to sort
+    const sortedPeriodValues = netRecordsData.slice(start, end).sort() as unknown as number[]
+    const stepNumber = i * recordFrequency
     const yearValue = stepNumber / timeStepsPerYear
-    return {
+    
+    chartData.push({
       year: yearValue,
       p10: calculatePercentile(sortedPeriodValues, 0.1),
       p25: calculatePercentile(sortedPeriodValues, 0.25),
       p50: calculatePercentile(sortedPeriodValues, 0.5),
       p75: calculatePercentile(sortedPeriodValues, 0.75),
       p90: calculatePercentile(sortedPeriodValues, 0.9),
-    }
-  })
+    })
+  }
 
-  const chartDataGross = stepDistributionsGross.map((values, index) => {
-    const sortedPeriodValues = [...values].sort((a, b) => a - b)
-    const stepNumber = index * recordFrequency
+  const chartDataGross = []
+  for (let i = 0; i <= numRecordedSteps; i++) {
+    const start = i * numPaths
+    const end = start + numPaths
+    // Slice to sort
+    const sortedPeriodValues = grossRecordsData.slice(start, end).sort() as unknown as number[]
+    const stepNumber = i * recordFrequency
     const yearValue = stepNumber / timeStepsPerYear
-    return {
+    
+    chartDataGross.push({
       year: yearValue,
       p10: calculatePercentile(sortedPeriodValues, 0.1),
       p25: calculatePercentile(sortedPeriodValues, 0.25),
       p50: calculatePercentile(sortedPeriodValues, 0.5),
       p75: calculatePercentile(sortedPeriodValues, 0.75),
       p90: calculatePercentile(sortedPeriodValues, 0.9),
-    }
-  })
+    })
+  }
 
   // Loss probabilities
   const lossThresholds = [0, 2.5, 5, 10, 15, 20, 30, 50]
