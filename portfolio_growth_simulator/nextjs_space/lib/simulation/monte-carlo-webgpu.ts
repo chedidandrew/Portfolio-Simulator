@@ -655,31 +655,161 @@ export async function performMonteCarloSimulationWebGPU(
   device.queue.submit([encoder.finish()])
   await device.queue.onSubmittedWorkDone()
 
-  const netRecordsData = new Float32Array(await readBuffer(device, netRecordsBuffer, recordsByteLength))
-  const grossRecordsData = new Float32Array(await readBuffer(device, grossRecordsBuffer, recordsByteLength))
-  const performanceRecordsData = new Float32Array(await readBuffer(device, performanceRecordsBuffer, recordsByteLength))
+  // -----------------------------------------------------------------------
+  // SEQUENTIAL READ & PROCESSING to save memory on mobile devices
+  // -----------------------------------------------------------------------
+
+  // 1. Read small summary buffers first
   const endingValuesData = new Float32Array(await readBuffer(device, endingValuesBuffer, numPaths * 4))
   const preTaxEndingValuesData = new Float32Array(await readBuffer(device, preTaxEndingValuesBuffer, numPaths * 4))
   const lowestValuesData = new Float32Array(await readBuffer(device, lowestValuesBuffer, numPaths * 4))
   const maxDrawdownsData = new Float32Array(await readBuffer(device, maxDrawdownsBuffer, numPaths * 4))
   const investedData = new Float32Array(await readBuffer(device, investedBuffer, numPaths * 4))
 
-  // Cleanup GPU resources
-  uniformBuffer.destroy()
-  netRecordsBuffer.destroy()
-  grossRecordsBuffer.destroy()
-  performanceRecordsBuffer.destroy()
+  // Cleanup summary buffers
   endingValuesBuffer.destroy()
   preTaxEndingValuesBuffer.destroy()
   lowestValuesBuffer.destroy()
   maxDrawdownsBuffer.destroy()
   investedBuffer.destroy()
+  uniformBuffer.destroy()
 
+  // Prepare standard JS arrays for summary stats
   const endingValues: number[] = Array.from(endingValuesData)
   const preTaxEndingValues: number[] = Array.from(preTaxEndingValuesData)
   const lowestValues: number[] = Array.from(lowestValuesData)
   const maxDrawdowns: number[] = Array.from(maxDrawdownsData)
   const totalInvestedOut: number[] = Array.from(investedData)
+
+  // 2. Read NET RECORDS -> Process Chart & Solvency -> Discard
+  const netRecordsData = new Float32Array(await readBuffer(device, netRecordsBuffer, recordsByteLength))
+  netRecordsBuffer.destroy()
+
+  const solvencySeries: { year: number, solventRate: number }[] = []
+  const chartData = []
+
+  for (let i = 0; i <= numRecordedSteps; i++) {
+    const start = i * numPaths
+    const end = start + numPaths
+    const stepNumber = i * recordFrequency
+    const yearValue = stepNumber / timeStepsPerYear
+    
+    // Create subarray view (no copy)
+    const stepValues = netRecordsData.subarray(start, end)
+
+    // Solvency
+    let solventCount = 0
+    for(let k = 0; k < stepValues.length; k++) {
+      if(stepValues[k] > 0.01) solventCount++
+    }
+    solvencySeries.push({
+      year: yearValue,
+      solventRate: (solventCount / numPaths) * 100
+    })
+
+    // Chart Data (requires sorting, so we slice to copy)
+    const sortedPeriodValues = netRecordsData.slice(start, end).sort() as unknown as number[]
+    chartData.push({
+      year: yearValue,
+      p10: calculatePercentile(sortedPeriodValues, 0.1),
+      p25: calculatePercentile(sortedPeriodValues, 0.25),
+      p50: calculatePercentile(sortedPeriodValues, 0.5),
+      p75: calculatePercentile(sortedPeriodValues, 0.75),
+      p90: calculatePercentile(sortedPeriodValues, 0.9),
+    })
+  }
+  
+  // Explicitly release net records reference (GC hint)
+  // @ts-ignore
+  netRecordsData = null 
+
+  // 3. Read GROSS RECORDS -> Process Chart -> Discard
+  const grossRecordsData = new Float32Array(await readBuffer(device, grossRecordsBuffer, recordsByteLength))
+  grossRecordsBuffer.destroy()
+
+  const chartDataGross = []
+  for (let i = 0; i <= numRecordedSteps; i++) {
+    const start = i * numPaths
+    const end = start + numPaths
+    const stepNumber = i * recordFrequency
+    const yearValue = stepNumber / timeStepsPerYear
+    
+    const sortedPeriodValues = grossRecordsData.slice(start, end).sort() as unknown as number[]
+    chartDataGross.push({
+      year: yearValue,
+      p10: calculatePercentile(sortedPeriodValues, 0.1),
+      p25: calculatePercentile(sortedPeriodValues, 0.25),
+      p50: calculatePercentile(sortedPeriodValues, 0.5),
+      p75: calculatePercentile(sortedPeriodValues, 0.75),
+      p90: calculatePercentile(sortedPeriodValues, 0.9),
+    })
+  }
+  // @ts-ignore
+  grossRecordsData = null
+
+  // 4. Read PERFORMANCE RECORDS -> Process Annual Returns -> Discard
+  const performanceRecordsData = new Float32Array(await readBuffer(device, performanceRecordsBuffer, recordsByteLength))
+  performanceRecordsBuffer.destroy()
+
+  const annualReturnsData: any[] = []
+  // Reuse a single temporary buffer for calculations to save allocation overhead
+  const tempCagrBuffer = new Float32Array(numPaths)
+
+  for (let i = 1; i <= numRecordedSteps; i++) {
+    const currentStepNumber = i * recordFrequency
+    const yearValue = currentStepNumber / timeStepsPerYear
+    const start = i * numPaths
+    const end = start + numPaths
+    const values = performanceRecordsData.subarray(start, end)
+    
+    // Fill temp buffer
+    if (yearValue <= 0) {
+       for(let k=0; k<numPaths; k++) tempCagrBuffer[k] = 0;
+    } else {
+       for(let k=0; k<numPaths; k++) {
+          tempCagrBuffer[k] = (Math.pow(values[k], 1 / yearValue) - 1) * 100
+       }
+    }
+    
+    // Sort temp buffer in place
+    tempCagrBuffer.sort()
+    
+    const countAbove = (threshold: number) => {
+        // Binary search could be faster but simple loop on sorted array is linear and fine for JS
+        let count = 0
+        for(let k = 0; k < numPaths; k++) {
+            if(tempCagrBuffer[k] >= threshold) count++
+        }
+        return (count / numPaths) * 100
+    }
+
+    const sortedCagrs = tempCagrBuffer as unknown as number[]
+
+    annualReturnsData.push({
+      year: yearValue,
+      p10: calculatePercentile(sortedCagrs, 0.1),
+      p25: calculatePercentile(sortedCagrs, 0.25),
+      median: calculatePercentile(sortedCagrs, 0.5),
+      p75: calculatePercentile(sortedCagrs, 0.75),
+      p90: calculatePercentile(sortedCagrs, 0.9),
+      prob5: countAbove(5),
+      prob8: countAbove(8),
+      prob10: countAbove(10),
+      prob12: countAbove(12),
+      prob15: countAbove(15),
+      prob20: countAbove(20),
+      prob25: countAbove(25),
+      prob30: countAbove(30)
+    })
+  }
+  // @ts-ignore
+  performanceRecordsData = null
+  // @ts-ignore
+  tempCagrBuffer = null
+
+  // -----------------------------------------------------------------------
+  // END SEQUENTIAL PROCESSING
+  // -----------------------------------------------------------------------
 
   let pathsReachingGoal = 0
   let pathsProfitable = 0
@@ -693,129 +823,8 @@ export async function performMonteCarloSimulationWebGPU(
     if (finalValueEffective > 0) pathsSolvent++
   }
 
-  // --- SOLVENCY SERIES ---
-  const solvencySeries: { year: number, solventRate: number }[] = []
-  
-  for (let i = 0; i <= numRecordedSteps; i++) {
-    const start = i * numPaths
-    const end = start + numPaths
-    const stepValues = netRecordsData.subarray(start, end)
-    
-    // Quick iterate without creating new array
-    let solventCount = 0
-    for(let k = 0; k < stepValues.length; k++) {
-      if(stepValues[k] > 0.01) solventCount++
-    }
-
-    const rate = (solventCount / numPaths) * 100
-    const stepNumber = i * recordFrequency
-    solvencySeries.push({
-      year: stepNumber / timeStepsPerYear,
-      solventRate: rate
-    })
-  }
-
   const sortedEndingValues = [...endingValues].sort((a, b) => a - b)
   const sortedPreTaxEndingValues = [...preTaxEndingValues].sort((a, b) => a - b)
-  const annualReturnsData: any[] = []
-
-  // Annual return bands computed from PURE PERFORMANCE values (asset only)
-  for (let i = 1; i <= numRecordedSteps; i++) {
-    const currentStepNumber = i * recordFrequency
-    const yearValue = currentStepNumber / timeStepsPerYear
-    
-    const start = i * numPaths
-    const end = start + numPaths
-    // slice() to create a copy we can sort
-    const values = performanceRecordsData.subarray(start, end)
-    
-    // Calculate CAGRs into a temp array to avoid massive map() object creation?
-    // Actually map() on subarray creates Float32Array (if standard lib supports) or Array.
-    // Let's iterate manually to be safe on memory.
-    const cagrs = new Float32Array(numPaths)
-    for(let k = 0; k < numPaths; k++) {
-        const v = values[k]
-        if (yearValue <= 0) {
-            cagrs[k] = 0
-        } else {
-            cagrs[k] = (Math.pow(v, 1 / yearValue) - 1) * 100
-        }
-    }
-    
-    // Sort in place
-    cagrs.sort()
-
-    const probOf = (threshold: number) => {
-        // Since sorted, we can find index
-        // But filter is O(N). Binary search is O(logN).
-        // For simplicity and since we did filter before:
-        let count = 0
-        for(let k = 0; k < numPaths; k++) {
-            if(cagrs[k] >= threshold) count++
-        }
-        return (count / numPaths) * 100
-    }
-    
-    // cast to any/unknown to pass to calculatePercentile which expects number[]
-    // but works with Float32Array at runtime
-    const sortedCagrs = cagrs as unknown as number[]
-
-    annualReturnsData.push({
-      year: yearValue,
-      p10: calculatePercentile(sortedCagrs, 0.1),
-      p25: calculatePercentile(sortedCagrs, 0.25),
-      median: calculatePercentile(sortedCagrs, 0.5),
-      p75: calculatePercentile(sortedCagrs, 0.75),
-      p90: calculatePercentile(sortedCagrs, 0.9),
-      prob5: probOf(5),
-      prob8: probOf(8),
-      prob10: probOf(10),
-      prob12: probOf(12),
-      prob15: probOf(15),
-      prob20: probOf(20),
-      prob25: probOf(25),
-      prob30: probOf(30)
-    })
-  }
-
-  // Chart Data (net)
-  const chartData = []
-  for (let i = 0; i <= numRecordedSteps; i++) {
-    const start = i * numPaths
-    const end = start + numPaths
-    // Slice to sort
-    const sortedPeriodValues = netRecordsData.slice(start, end).sort() as unknown as number[]
-    const stepNumber = i * recordFrequency
-    const yearValue = stepNumber / timeStepsPerYear
-    
-    chartData.push({
-      year: yearValue,
-      p10: calculatePercentile(sortedPeriodValues, 0.1),
-      p25: calculatePercentile(sortedPeriodValues, 0.25),
-      p50: calculatePercentile(sortedPeriodValues, 0.5),
-      p75: calculatePercentile(sortedPeriodValues, 0.75),
-      p90: calculatePercentile(sortedPeriodValues, 0.9),
-    })
-  }
-
-  const chartDataGross = []
-  for (let i = 0; i <= numRecordedSteps; i++) {
-    const start = i * numPaths
-    const end = start + numPaths
-    // Slice to sort
-    const sortedPeriodValues = grossRecordsData.slice(start, end).sort() as unknown as number[]
-    const stepNumber = i * recordFrequency
-    const yearValue = stepNumber / timeStepsPerYear
-    
-    chartDataGross.push({
-      year: yearValue,
-      p10: calculatePercentile(sortedPeriodValues, 0.1),
-      p25: calculatePercentile(sortedPeriodValues, 0.25),
-      p50: calculatePercentile(sortedPeriodValues, 0.5),
-      p75: calculatePercentile(sortedPeriodValues, 0.75),
-      p90: calculatePercentile(sortedPeriodValues, 0.9),
-    })
-  }
 
   // Loss probabilities
   const lossThresholds = [0, 2.5, 5, 10, 15, 20, 30, 50]
