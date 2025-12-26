@@ -488,6 +488,9 @@ export function MonteCarloParameters({
                <p className="text-xs text-muted-foreground pt-1">
                   Interest Rate Calculation: {(params.calculationMode ?? 'effective') === 'nominal' ? 'Nominal Rate (APR)' : 'Effective Rate (APY)'}
                </p>
+               <p className="text-xs text-muted-foreground pt-1">
+                  Extreme crash cycles: {params.enableCrashRisk ? 'Enabled' : 'Disabled'}
+               </p>
             </div>
             
             {showAdvanced && (
@@ -510,6 +513,19 @@ export function MonteCarloParameters({
                     {params.calculationMode === 'nominal'
                       ? "Input is Nominal (APR). We convert this to a higher Effective Annual Rate for the simulation to account for monthly compounding."
                       : "Input is Effective (APY). The simulation's Median (most likely) outcome will match this return rate exactly."}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="mc-crash-risk">Extreme crash & recovery cycles</Label>
+                    <Switch
+                      id="mc-crash-risk"
+                      checked={params.enableCrashRisk ?? false}
+                      onCheckedChange={(checked) => setParams({ ...params, enableCrashRisk: checked })}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Simulates historically common volatility spikes (2x-3x) for short windows, roughly once or twice per decade.
                   </p>
                 </div>
               </div>

@@ -58,6 +58,7 @@ export function useMonteCarlo(
       initialValue: initialValues?.startingBalance ?? 100000,
       expectedReturn: PRESET_PROFILES.moderate.expectedReturn,
       volatility: PRESET_PROFILES.moderate.volatility,
+      enableCrashRisk: false,
       duration: initialValues?.duration ?? 30,
       cashflowAmount:
         mode === 'growth'

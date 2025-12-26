@@ -38,6 +38,7 @@ export interface SimulationParams {
   startingCostBasis?: number
   expectedReturn: number
   volatility: number
+  enableCrashRisk?: boolean
   duration: number
   cashflowAmount: number
   cashflowFrequency: 'yearly' | 'quarterly' | 'monthly' | 'weekly'
