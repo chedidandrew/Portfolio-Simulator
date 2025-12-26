@@ -40,6 +40,9 @@ export function WithdrawalMode() {
   const [initialRngSeed, setInitialRngSeed] = useState<string | null>(null)
   const [initialMCParams, setInitialMCParams] = useState<SimulationParams | undefined>(undefined)
 
+  const [initialLogScales, setInitialLogScales] = useState<SharePayload['logScales'] | undefined>(undefined)
+  const [initialMCShowFullPrecision, setInitialMCShowFullPrecision] = useState<boolean | undefined>(undefined)
+
   const calculation = useWithdrawalCalculation(state)
 
   // Listen for the event dispatched by app/page.tsx
@@ -319,6 +322,8 @@ export function WithdrawalMode() {
           initialValues={state}
           initialRngSeed={initialRngSeed}
           initialMCParams={initialMCParams}
+          initialLogScales={initialLogScales}
+          initialShowFullPrecision={initialMCShowFullPrecision}
         />
       ) : (
         <>

@@ -43,7 +43,9 @@ export function useMonteCarlo(
   initialValues: any,
   // NEW: Accept overrides from parent
   initialRngSeed?: string | null,
-  initialMCParams?: SimulationParams
+  initialMCParams?: SimulationParams,
+  initialLogScales?: LogScaleSettings,
+  initialShowFullPrecision?: boolean
 ) {
   const [profile, setProfile] = useLocalStorage<keyof typeof PRESET_PROFILES>(
     'mc-profile-' + mode,
@@ -97,7 +99,13 @@ export function useMonteCarlo(
     if (initialRngSeed) {
       setRngSeed(initialRngSeed)
     }
-  }, [initialMCParams, initialRngSeed, setParams, setRngSeed, setProfile])
+    if (initialLogScales) {
+      setLogScales(initialLogScales)
+    }
+    if (typeof initialShowFullPrecision === 'boolean') {
+      setShowFullPrecision(initialShowFullPrecision)
+    }
+  }, [initialMCParams, initialRngSeed, initialLogScales, initialShowFullPrecision, setParams, setRngSeed, setProfile, setLogScales, setShowFullPrecision])
 
   // 2. Profile Switch Logic (only if NOT custom)
   useEffect(() => {

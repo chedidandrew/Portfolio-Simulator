@@ -20,6 +20,8 @@ interface MonteCarloSimulatorProps {
   // Props for restoring state from URL
   initialRngSeed?: string | null
   initialMCParams?: SimulationParams
+  initialLogScales?: SharePayload['logScales']
+  initialShowFullPrecision?: boolean
 }
 
 export function MonteCarloSimulator({
@@ -27,6 +29,8 @@ export function MonteCarloSimulator({
   initialValues,
   initialRngSeed,
   initialMCParams,
+  initialLogScales,
+  initialShowFullPrecision,
 }: MonteCarloSimulatorProps) {
   const {
     profile,
@@ -42,7 +46,7 @@ export function MonteCarloSimulator({
     setShowFullPrecision,
     runSimulation,
     PRESET_PROFILES,
-  } = useMonteCarlo(mode, initialValues, initialRngSeed, initialMCParams)
+  } = useMonteCarlo(mode, initialValues, initialRngSeed, initialMCParams, initialLogScales, initialShowFullPrecision)
 
   const [exportState, setExportState] = useState<ExportState>('idle')
 
@@ -62,11 +66,18 @@ export function MonteCarloSimulator({
     if (typeof window === 'undefined') return ''
     const url = new URL(window.location.href)
 
+    let mcParamsToShare = params
+    if (isOutdated) {
+      try {
+        mcParamsToShare = JSON.parse(lastRunParamsStr)
+      } catch {}
+    }
+
     const payload: SharePayload = {
       mode,
       type: 'monte-carlo',
       deterministicParams: initialValues, // parent state
-      mcParams: params, // child state
+      mcParams: mcParamsToShare, // child state
       rngSeed,
       logScales,
       showFullPrecision,
