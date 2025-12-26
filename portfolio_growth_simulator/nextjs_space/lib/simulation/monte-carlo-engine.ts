@@ -27,6 +27,9 @@ export async function performMonteCarloSimulationAsync(
   seed?: string
 ) {
   try {
+    if (params.enableCrashRisk) {
+      return performMonteCarloSimulation(params, mode, seed)
+    }
     if (typeof navigator !== 'undefined' && (navigator as any).gpu) {
       const { performMonteCarloSimulationWebGPU } = await import('./monte-carlo-webgpu')
       return await performMonteCarloSimulationWebGPU(params, mode, seed)
@@ -53,6 +56,7 @@ export function performMonteCarloSimulation(
     startingCostBasis,
     expectedReturn,
     volatility,
+    enableCrashRisk = false,
     duration,
     cashflowAmount,
     cashflowFrequency,
@@ -119,6 +123,55 @@ export function performMonteCarloSimulation(
     while (u === 0) u = rng()
     while (v === 0) v = rng()
     return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)
+  }
+
+  const createCrashSchedule = (totalSteps: number, stepsPerYear: number, scheduleRng: seedrandom.PRNG) => {
+    const multipliers = new Float32Array(totalSteps + 1)
+    multipliers.fill(1)
+
+    if (!enableCrashRisk) return multipliers
+
+    const decadeSteps = stepsPerYear * 10
+    const minShockSteps = Math.max(1, Math.round(stepsPerYear * 0.25))
+    const maxShockSteps = Math.max(minShockSteps, Math.round(stepsPerYear * 1))
+
+    const randomInt = (min: number, max: number) => {
+      const span = Math.max(1, max - min + 1)
+      return min + Math.floor(scheduleRng() * span)
+    }
+
+    for (let decadeStart = 1; decadeStart <= totalSteps; decadeStart += decadeSteps) {
+      const decadeEnd = Math.min(totalSteps, decadeStart + decadeSteps - 1)
+      const eventsThisDecade = scheduleRng() < 0.7 ? 1 : 2
+      let scheduled = 0
+      let attempts = 0
+
+      while (scheduled < eventsThisDecade && attempts < 25) {
+        attempts += 1
+        const durationSteps = randomInt(minShockSteps, maxShockSteps)
+        const latestStart = Math.max(decadeStart, decadeEnd - durationSteps + 1)
+        const windowStart = randomInt(decadeStart, latestStart)
+        const windowEnd = Math.min(decadeEnd, windowStart + durationSteps - 1)
+
+        let overlaps = false
+        for (let i = windowStart; i <= windowEnd; i += 1) {
+          if (multipliers[i] > 1) {
+            overlaps = true
+            break
+          }
+        }
+
+        if (overlaps) continue
+
+        const spike = scheduleRng() < 0.75 ? 2 : 3
+        for (let i = windowStart; i <= windowEnd; i += 1) {
+          multipliers[i] = spike
+        }
+        scheduled += 1
+      }
+    }
+
+    return multipliers
   }
 
   const numRecordedSteps = Math.floor(totalTimeSteps / recordFrequency)
@@ -295,6 +348,9 @@ export function performMonteCarloSimulation(
     let peak = getNetLiquidationValue(currentValue, totalBasis)
     let maxDrawdownForPath = 0
     let preTaxValue = initialValue 
+    const crashSchedule = enableCrashRisk
+      ? createCrashSchedule(totalTimeSteps, timeStepsPerYear, seedrandom(`${seed ?? 'monte-carlo'}-shock-${path}`))
+      : null
 
     stepDistributions[0].push(getNetLiquidationValue(currentValue, totalBasis))
     stepDistributionsGross[0].push(currentValue)
@@ -302,8 +358,10 @@ export function performMonteCarloSimulation(
 
     for (let step = 1; step <= totalTimeSteps; step++) {
       const z = normalRandom()
-      const growthFactor = Math.exp(drift + diffusion * z)
-      const growthFactorPreTax = isIncomeTax ? Math.exp(driftPreTax + diffusion * z) : 0
+      const shockMultiplier = crashSchedule ? crashSchedule[step] : 1
+      const adjustedDiffusion = diffusion * shockMultiplier
+      const growthFactor = Math.exp(drift + adjustedDiffusion * z)
+      const growthFactorPreTax = isIncomeTax ? Math.exp(driftPreTax + adjustedDiffusion * z) : 0
       pureValue = pureValue * growthFactor 
 
       if (mode === 'withdrawal') {
