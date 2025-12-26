@@ -15,7 +15,8 @@ import {
   Percent,
   Scale,
   HelpCircle,
-  AlertTriangle
+  AlertTriangle,
+  FileText
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -483,7 +484,92 @@ export default function MethodologyPage() {
           </MethodologySection>
         </motion.div>
 
-        {/* 5. Limitations */}
+        {/* 5. Taxes & Efficiency */}
+        <motion.div variants={itemVariants}>
+          <MethodologySection 
+            title="Taxes & Efficiency" 
+            icon={FileText} 
+            description="How the simulator handles different tax environments"
+            defaultOpen={false}
+            iconColorClass="text-slate-500"
+            iconWrapperClass="bg-slate-500/10 text-slate-500 group-hover:bg-slate-500/20"
+            className="border-slate-500/20"
+          >
+            <div className="space-y-6">
+              <p className="text-sm leading-relaxed">
+                Taxes are calculated differently depending on the &quot;Tax Type&quot; you select in settings. 
+                The simulator adapts its math to model how money leaves your account in each scenario.
+              </p>
+
+              {/* 1. Income Tax */}
+              <div className="space-y-3 p-4 rounded-lg bg-muted/40">
+                <div className="flex items-center gap-2 font-semibold text-foreground">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Type 1:</span>
+                  Income Tax (Tax Drag)
+                </div>
+                <p className="text-sm leading-relaxed">
+                  Best for High Yield Savings Accounts (HYSA) or Bonds. Taxes are paid <strong>annually</strong> on the growth, which reduces the compounding effect.
+                </p>
+                
+                <div className="p-3 bg-background/50 rounded-md border border-border/50">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    The simulator reduces your annual return rate effectively:
+                  </p>
+                  <BlockMath math={String.raw`r_{\text{after-tax}} = r_{\text{annual}} \times (1 - \text{Tax Rate})`} />
+                </div>
+              </div>
+
+              {/* 2. Capital Gains */}
+              <div className="space-y-3 p-4 rounded-lg bg-muted/40">
+                <div className="flex items-center gap-2 font-semibold text-foreground">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Type 2:</span>
+                  Capital Gains (Brokerage)
+                </div>
+                <p className="text-sm leading-relaxed">
+                  Best for Stock Portfolios. You only pay taxes when you <strong>sell</strong> (withdraw). 
+                  The simulator tracks your &quot;Cost Basis&quot; (the money you already paid taxes on) vs. your &quot;Gains&quot;.
+                </p>
+                
+                <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="p-3 bg-background/50 rounded-md border border-border/50">
+                        <p className="text-xs font-semibold text-foreground mb-1">During Growth</p>
+                        <p className="text-xs text-muted-foreground">
+                            0% tax is paid. Your money compounds tax-free until withdrawal.
+                        </p>
+                    </div>
+                    <div className="p-3 bg-background/50 rounded-md border border-border/50">
+                        <p className="text-xs font-semibold text-foreground mb-1">During Withdrawal</p>
+                        <p className="text-xs text-muted-foreground">
+                            Taxes are calculated <em>pro-rata</em> based on the ratio of profit to balance.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="mt-2 rounded-md border bg-background/40 px-3 py-3 overflow-x-auto">
+                   <p className="text-xs text-center text-muted-foreground mb-2">The Pro-Rata Formula used in withdrawals</p>
+                   <BlockMath math={String.raw`\text{Tax} = \text{Withdrawal} \times \text{Tax Rate} \times \left( \frac{\text{Current Balance} - \text{Total Basis}}{\text{Current Balance}} \right)`} />
+                </div>
+              </div>
+
+              {/* 3. Tax Deferred */}
+              <div className="space-y-3 p-4 rounded-lg bg-muted/40">
+                <div className="flex items-center gap-2 font-semibold text-foreground">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Type 3:</span>
+                  Tax Deferred (401k / Traditional IRA)
+                </div>
+                <p className="text-sm leading-relaxed">
+                  You pay 0% tax while growing, but every dollar withdrawn (both principal and interest) is taxed as income.
+                </p>
+                <div className="p-3 bg-background/50 rounded-md border border-border/50">
+                  <BlockMath math={String.raw`\text{Net Withdrawal} = \text{Gross Withdrawal} \times (1 - \text{Tax Rate})`} />
+                </div>
+              </div>
+
+            </div>
+          </MethodologySection>
+        </motion.div>
+
+        {/* 6. Limitations */}
         <motion.div variants={itemVariants}>
             <MethodologySection 
                 title="Assumptions & Limitations" 
