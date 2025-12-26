@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { ArrowLeftRight } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { formatCurrency, getAppCurrency } from '@/lib/utils'
@@ -20,7 +20,7 @@ export function CashflowChart({ params, mode }: { params: SimulationParams, mode
         : params.cashflowFrequency === 'quarterly'
           ? params.cashflowAmount * 4
           : params.cashflowAmount
-  const steps = Math.min(params.duration, 30) // Cap at 30 bars for readability
+  const steps = params.duration
   
   const currencySymbol = getAppCurrency().symbol
 
@@ -49,7 +49,7 @@ export function CashflowChart({ params, mode }: { params: SimulationParams, mode
       <CardContent>
          <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+              <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                 <XAxis 
                   dataKey="year" 
                   tickLine={false}
@@ -73,21 +73,23 @@ export function CashflowChart({ params, mode }: { params: SimulationParams, mode
                    }}
                 />
                 <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, paddingBottom: '10px' }} />
-                <Bar 
+                <Line 
+                  type="monotone"
                   dataKey="nominal" 
                   name={`Nominal (Future ${currencySymbol})`}
-                  fill="#3b82f6" 
-                  radius={[2, 2, 0, 0]} 
-                  fillOpacity={0.8}
+                  stroke="#3b82f6" 
+                  strokeWidth={2}
+                  dot={false}
                 />
-                <Bar 
+                <Line 
+                  type="monotone"
                   dataKey="real" 
                   name={`Real (Today's ${currencySymbol})`} 
-                  fill="#10b981" 
-                  radius={[2, 2, 0, 0]} 
-                  fillOpacity={0.8}
+                  stroke="#10b981" 
+                  strokeWidth={2}
+                  dot={false}
                 />
-              </BarChart>
+              </LineChart>
             </ResponsiveContainer>
          </div>
          <p className="text-[10px] text-muted-foreground text-center mt-2">
