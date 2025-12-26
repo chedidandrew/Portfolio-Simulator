@@ -93,7 +93,7 @@ export function CashflowChart({ params, mode }: { params: SimulationParams, mode
             </ResponsiveContainer>
          </div>
          <p className="text-[10px] text-muted-foreground text-center mt-2">
-            The green bars represent purchasing power in today's money, while blue bars show the actual future dollar amount needed.
+            Green represent purchasing power in today's money, while blue show the actual future dollar amount needed.
          </p>
       </CardContent>
     </Card>
