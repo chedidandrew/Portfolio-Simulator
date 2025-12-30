@@ -1,5 +1,6 @@
 {
   "name": "app",
+  "license": "BSD-3-Clause",
   "private": true,
   "engines": {
     "node": "20.x"
