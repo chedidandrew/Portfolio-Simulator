@@ -190,7 +190,7 @@ export default function MethodologyPage() {
 
                 <div className="p-3 bg-background/50 rounded-md border border-border/50">
                   <p className="text-xs font-semibold text-foreground mb-1">Which should I use?</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground overflow-x-auto">
                     Stick with <strong>Effective (Default)</strong>. This matches how investment returns (CAGR) are typically quoted. Only use Nominal if you are modeling a debt payoff (like a mortgage) calculated as APR.
                   </p>
                 </div>
@@ -202,7 +202,7 @@ export default function MethodologyPage() {
                   </div>
                   
                   <div className="rounded-md border bg-background/40 px-3 py-2">
-                    <p className="text-xs text-center text-muted-foreground mb-1">Nominal (Advanced Settings)</p>
+                    <p className="text-xs text-center text-muted-foreground mb-1 overflow-x-auto">Nominal (Advanced Settings)</p>
                     <BlockMath math={String.raw`r_m = \frac{r_{\text{annual}}}{12}`} />
                   </div>
                 </div>
@@ -255,12 +255,12 @@ export default function MethodologyPage() {
 
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   <div className="rounded-md border bg-background/40 px-3 py-2">
-                    <p className="text-xs text-center text-muted-foreground mb-1">Effective (Default)</p>
+                    <p className="text-xs text-center text-muted-foreground mb-1 overflow-x-auto">Effective (Default)</p>
                     <BlockMath math={String.raw`r_m = (1 + r_{\text{annual}})^{\tfrac{1}{12}} - 1`} />
                   </div>
                   
                   <div className="rounded-md border bg-background/40 px-3 py-2">
-                    <p className="text-xs text-center text-muted-foreground mb-1">Nominal (Advanced Settings)</p>
+                    <p className="text-xs text-center text-muted-foreground mb-1 overflow-x-auto">Nominal (Advanced Settings)</p>
                     <BlockMath math={String.raw`r_m = \frac{r_{\text{annual}}}{12}`} />
                   </div>
                 </div>
@@ -309,10 +309,8 @@ export default function MethodologyPage() {
                 </div>
               </div>
 
-              <div className="p-4 bg-background/50 rounded-lg border border-border">
-                <div className="mt-2 rounded-md border bg-background/40 px-4 py-3 flex justify-center overflow-x-auto">
-                    <BlockMath math={String.raw`\text{Real Value} = \frac{\text{Future Value}}{(1 + \text{Inflation Rate})^{\text{Years}}}`} />
-                </div>
+              <div className="mt-2 rounded-md border bg-background/40 px-4 py-3 flex justify-center overflow-x-auto">
+                  <BlockMath math={String.raw`\text{Real Value} = \frac{\text{Future Value}}{(1 + \text{Inflation Rate})^{\text{Years}}}`} />
               </div>
 
               <div className="rounded-md bg-pink-500/10 p-3 border border-pink-500/20">
@@ -511,7 +509,7 @@ export default function MethodologyPage() {
                   Best for High Yield Savings Accounts (HYSA) or Bonds. Taxes are paid <strong>annually</strong> on the growth, which reduces the compounding effect.
                 </p>
                 
-                <div className="p-3 bg-background/50 rounded-md border border-border/50">
+                <div className="p-3 bg-background/50 rounded-md border border-border/50 overflow-x-auto">
                   <p className="text-xs text-muted-foreground mb-2">
                     The simulator reduces your annual return rate effectively:
                   </p>
@@ -531,13 +529,13 @@ export default function MethodologyPage() {
                 </p>
                 
                 <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="p-3 bg-background/50 rounded-md border border-border/50">
+                    <div className="p-3 bg-background/50 rounded-md border border-border/50 overflow-x-auto">
                         <p className="text-xs font-semibold text-foreground mb-1">During Growth</p>
                         <p className="text-xs text-muted-foreground">
                             0% tax is paid. Your money compounds tax-free until withdrawal.
                         </p>
                     </div>
-                    <div className="p-3 bg-background/50 rounded-md border border-border/50">
+                    <div className="p-3 bg-background/50 rounded-md border border-border/50 overflow-x-auto">
                         <p className="text-xs font-semibold text-foreground mb-1">During Withdrawal</p>
                         <p className="text-xs text-muted-foreground">
                             Taxes are calculated <em>pro-rata</em> based on the ratio of profit to balance.
@@ -560,7 +558,7 @@ export default function MethodologyPage() {
                 <p className="text-sm leading-relaxed">
                   You pay 0% tax while growing, but every dollar withdrawn (both principal and interest) is taxed as income.
                 </p>
-                <div className="p-3 bg-background/50 rounded-md border border-border/50">
+                <div className="p-3 bg-background/50 rounded-md border border-border/50 overflow-x-auto">
                   <BlockMath math={String.raw`\text{Net Withdrawal} = \text{Gross Withdrawal} \times (1 - \text{Tax Rate})`} />
                 </div>
               </div>

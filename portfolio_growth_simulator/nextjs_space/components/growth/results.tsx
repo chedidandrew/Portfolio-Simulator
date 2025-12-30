@@ -200,12 +200,14 @@ export function GrowthResults({
               <div className="p-2 bg-indigo-500/10 rounded-md mt-1">
                 <ShoppingCart className="h-4 w-4 text-indigo-500" />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-foreground">
                   {showGrossBalance ? "Purchasing Power (Real Value After Tax)" : "Purchasing Power (Real Value)"}
                 </p>
-                <p className="text-2xl font-bold text-indigo-500 my-1">{formatResult(finalValueInTodaysDollars)}</p>
-                <p className="text-xs text-muted-foreground leading-tight">
+                <p className="text-2xl font-bold text-indigo-500 my-1 break-all leading-tight">
+                  {formatResult(finalValueInTodaysDollars)}
+                </p>
+                <p className="text-xs text-muted-foreground leading-tight break-words">
                   This is what your final balance would be worth in today&apos;s money, adjusted for inflation.
                 </p>
               </div>
@@ -215,12 +217,12 @@ export function GrowthResults({
               <div className="p-2 bg-amber-500/10 rounded-md mt-1">
                 <Percent className="h-4 w-4 text-amber-500" />
               </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">{taxEnabled ? "Return on Investment (ROI After Tax)" : "Return on Investment (ROI)"}</p>
-                <p className={`text-2xl font-bold my-1 ${roi < 0 ? 'text-destructive' : 'text-amber-500'}`}>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-foreground break-words">{taxEnabled ? "Return on Investment (ROI After Tax)" : "Return on Investment (ROI)"}</p>
+                <p className={`text-2xl font-bold my-1 break-all leading-tight whitespace-normal ${roi < 0 ? 'text-destructive' : 'text-amber-500'}`}>
                   {roi > 0 ? '+' : ''}{roi.toFixed(1)}%
                 </p>
-                <p className="text-xs text-muted-foreground leading-tight">
+                <p className="text-xs text-muted-foreground leading-tight break-words">
                   Your total percentage return on invested capital.
                 </p>
               </div>

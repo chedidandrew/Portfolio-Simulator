@@ -223,10 +223,12 @@ export function WithdrawalResults({
                 <div className="p-2 bg-indigo-500/10 rounded-md mt-1">
                   <Wallet className="h-4 w-4 text-indigo-500" />
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground"> Real Legacy Value (Purchasing Power)</p>
-                  <p className="text-2xl font-bold text-indigo-500 my-1">{renderFormattedResult(endingBalanceInTodaysDollars)}</p>
-                  <p className="text-xs text-muted-foreground leading-tight">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground break-words"> Real Legacy Value (Purchasing Power)</p>
+                  <p className="text-2xl font-bold text-indigo-500 my-1 break-all leading-tight">
+                    {renderFormattedResult(endingBalanceInTodaysDollars)}
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-tight break-words">
                     This is what your remaining balance would be worth in today&apos;s money.
                   </p>
                 </div>
@@ -236,10 +238,12 @@ export function WithdrawalResults({
                 <div className="p-2 bg-amber-500/10 rounded-md mt-1">
                   <ShoppingCart className="h-4 w-4 text-amber-500" />
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">Total Real Consumption</p>
-                  <p className="text-2xl font-bold text-amber-500 my-1">{renderFormattedResult(totalWithdrawnInTodaysDollars)}</p>
-                  <p className="text-xs text-muted-foreground leading-tight">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground break-words">Total Real Consumption</p>
+                  <p className="text-2xl font-bold text-amber-500 my-1 break-all leading-tight">
+                    {renderFormattedResult(totalWithdrawnInTodaysDollars)}
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-tight break-words">
                     The total effective purchasing power you were able to spend from this portfolio.
                   </p>
                 </div>
