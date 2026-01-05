@@ -22,16 +22,20 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000'),
-  title: 'Portfolio Simulator',
-  description: 'Calculate and simulate portfolio growth and withdrawals with Monte Carlo simulations, compound interest, and more!',
+  metadataBase: new URL('https://portfoliosimulator.org'),
+  title: {
+    default: 'Portfolio Simulator | Growth, Monte Carlo, & Withdrawal Calculator',
+    template: '%s | Portfolio Simulator',
+  },
+  description: 'Free portfolio simulator for growth and withdrawal strategies. Run Monte Carlo simulations, calculate compound interest, and test safe withdrawal rates.',
+  keywords: ['portfolio simulator', 'monte carlo simulation', 'retirement calculator', 'investment growth', 'fire calculator', 'safe withdrawal rate'],
   icons: {
     icon: '/favicon.png',
     shortcut: '/favicon.png',
   },
   openGraph: {
-    title: 'Portfolio Simulator',
-    description: 'Calculate and simulate portfolio growth and withdrawals with Monte Carlo simulations, compound interest, and more!',
+    title: 'Portfolio Simulator | Growth, Monte Carlo, & Withdrawal Calculator',
+    description: 'Free portfolio simulator for growth and withdrawal strategies. Run Monte Carlo simulations, calculate compound interest, and test safe withdrawal rates.',
     images: ['/og-image.png'],
   },
   manifest: '/manifest.json',
@@ -43,6 +47,27 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Portfolio Growth Simulator',
+    image: 'https://portfoliosimulator.org/og-image.png',
+    url: 'https://portfoliosimulator.org',
+    applicationCategory: 'FinanceApplication',
+    operatingSystem: 'Any',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+    },
+    featureList: [
+      'Monte Carlo Simulation',
+      'Portfolio Growth Calculator',
+      'Safe Withdrawal Rate Analysis',
+      'Sequence of Returns Risk',
+    ],
+  }
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -52,6 +77,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <meta name="color-scheme" content="light dark" />
         <meta name="forced-color-adjust" content="none" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <body className={inter.className}>
         <ThemeProvider
