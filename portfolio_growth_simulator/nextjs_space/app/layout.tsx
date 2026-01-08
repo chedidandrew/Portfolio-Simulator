@@ -32,6 +32,9 @@ export const metadata: Metadata = {
   icons: {
     icon: '/favicon.png',
     shortcut: '/favicon.png',
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180' },
+    ],
   },
   openGraph: {
     title: 'Portfolio Simulator | Growth, Monte Carlo, & Withdrawal Calculator',
@@ -74,7 +77,6 @@ const jsonLd = {
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <meta name="color-scheme" content="light dark" />
         <meta name="forced-color-adjust" content="none" />
         <script
