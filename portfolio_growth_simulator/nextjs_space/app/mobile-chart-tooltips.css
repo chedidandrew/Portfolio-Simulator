@@ -2,25 +2,39 @@
   /*
    * Recharts normally positions tooltips over the plot. On narrow screens that
    * can hide most of the chart, so move an active tooltip into normal document
-   * flow directly beneath its chart. The chart host expands only while the
-   * tooltip is visible, which keeps the card compact when nothing is selected.
+   * flow directly beneath its chart. The chart host becomes a real flex column
+   * while a tooltip is active so the tooltip's height pushes the graph
+   * description and the following card down instead of overlapping them.
    */
   div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"]) {
     height: auto !important;
     min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: visible !important;
   }
 
   div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"])
     > .recharts-responsive-container {
     height: auto !important;
     min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
     overflow: visible !important;
   }
 
   div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"])
     .recharts-wrapper {
     height: auto !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
     overflow: visible !important;
+  }
+
+  div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"])
+    .recharts-surface {
+    flex: 0 0 auto !important;
   }
 
   div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"])
@@ -28,6 +42,7 @@
     position: static !important;
     inset: auto !important;
     transform: none !important;
+    flex: 0 0 auto !important;
     width: 100% !important;
     max-width: 100% !important;
     margin-top: 0.5rem !important;
