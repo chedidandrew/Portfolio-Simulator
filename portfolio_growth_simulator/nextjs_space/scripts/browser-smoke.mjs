@@ -56,6 +56,49 @@ try {
     `Unexpected page-level horizontal overflow: ${dimensions.page}px > ${dimensions.viewport}px`,
   )
 
+  const annualReturnHeading = mobilePage.getByText('Expected Annual Return (CAGR)', { exact: true })
+  await annualReturnHeading.scrollIntoViewIfNeeded()
+  const annualReturnCard = annualReturnHeading.locator(
+    'xpath=ancestor::div[.//div[contains(@class, "recharts-responsive-container")]][1]',
+  )
+  const annualReturnPlot = annualReturnCard.locator('.recharts-surface').first()
+  const plotBox = await annualReturnPlot.boundingBox()
+  assert.ok(plotBox, 'Expected annual return chart to be measurable on mobile.')
+
+  await mobilePage.mouse.move(
+    plotBox.x + plotBox.width * 0.58,
+    plotBox.y + plotBox.height * 0.52,
+  )
+
+  const activeChartTooltip = annualReturnCard
+    .locator('.recharts-tooltip-wrapper[style*="visibility: visible"]')
+    .first()
+  await activeChartTooltip.waitFor({ state: 'visible', timeout: 10_000 })
+
+  const [tooltipBox, tooltipLayout] = await Promise.all([
+    activeChartTooltip.boundingBox(),
+    activeChartTooltip.evaluate((element) => {
+      const style = window.getComputedStyle(element)
+      return {
+        position: style.position,
+        transform: style.transform,
+      }
+    }),
+  ])
+  assert.ok(tooltipBox, 'Expected active mobile chart tooltip to be measurable.')
+  assert.equal(tooltipLayout.position, 'static', 'Mobile chart tooltip should participate in card layout.')
+  assert.equal(tooltipLayout.transform, 'none', 'Mobile chart tooltip should not float over the plot.')
+  assert.ok(
+    tooltipBox.y >= plotBox.y + plotBox.height - 2,
+    `Mobile chart tooltip should render beneath the graph: tooltip y=${tooltipBox.y}, plot bottom=${plotBox.y + plotBox.height}`,
+  )
+  assert.ok(
+    tooltipBox.x >= -1 && tooltipBox.x + tooltipBox.width <= 391,
+    'Mobile chart tooltip must stay within the iPhone-width viewport.',
+  )
+
+  await mobilePage.mouse.move(4, 4)
+
   await mobilePage.evaluate(() => {
     window.dispatchEvent(new CustomEvent('portfolio-simulator:simulation-progress', {
       detail: {

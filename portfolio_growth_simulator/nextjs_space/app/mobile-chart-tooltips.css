@@ -1,0 +1,70 @@
+@media (max-width: 639px) {
+  /*
+   * Recharts normally positions tooltips over the plot. On narrow screens that
+   * can hide most of the chart, so move an active tooltip into normal document
+   * flow directly beneath its chart. The chart host expands only while the
+   * tooltip is visible, which keeps the card compact when nothing is selected.
+   */
+  div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"]) {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"])
+    > .recharts-responsive-container {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"])
+    .recharts-wrapper {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"])
+    .recharts-tooltip-wrapper {
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-top: 0.5rem !important;
+    pointer-events: none !important;
+    transition: none !important;
+  }
+
+  .recharts-tooltip-wrapper[style*="visibility: hidden"] {
+    display: none !important;
+  }
+
+  .recharts-tooltip-wrapper[style*="visibility: visible"] > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    box-shadow: none !important;
+  }
+
+  .recharts-tooltip-wrapper[style*="visibility: visible"] > div,
+  .recharts-tooltip-wrapper[style*="visibility: visible"] .recharts-default-tooltip {
+    margin: 0 !important;
+    padding: 0.625rem 0.75rem !important;
+    border-color: hsl(var(--border)) !important;
+    background: hsl(var(--muted) / 0.35) !important;
+  }
+
+  .recharts-tooltip-wrapper[style*="visibility: visible"] * {
+    min-width: 0;
+  }
+
+  .recharts-tooltip-wrapper[style*="visibility: visible"] .text-sm {
+    font-size: 0.75rem !important;
+    line-height: 1rem !important;
+  }
+
+  .recharts-tooltip-wrapper[style*="visibility: visible"] .text-xs {
+    font-size: 0.6875rem !important;
+    line-height: 0.95rem !important;
+  }
+}
