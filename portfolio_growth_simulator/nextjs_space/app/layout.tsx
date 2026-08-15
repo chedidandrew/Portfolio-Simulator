@@ -10,6 +10,7 @@ import { PwaInstallPrompt } from '@/components/pwa-install-prompt'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
 import { SimulationProgressHost } from '@/components/monte-carlo/simulation-progress-overlay'
+import { MobileChartTooltipLayout } from '@/components/mobile-chart-tooltip-layout'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -109,6 +110,7 @@ const jsonLd = {
         <Toaster />
         <PwaInstallPrompt />
         <SimulationProgressHost />
+        <MobileChartTooltipLayout />
       </ThemeProvider>
         <Script
           id="register-sw"

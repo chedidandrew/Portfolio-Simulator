@@ -1,13 +1,15 @@
 @media (max-width: 639px) {
   /*
    * Recharts normally positions tooltips over the plot. On narrow screens that
-   * can hide most of the chart, so move an active tooltip into normal document
-   * flow directly beneath its chart. The chart host expands only while the
-   * tooltip is visible, which keeps the card compact when nothing is selected.
+   * can hide most of the chart, so move an active tooltip visually beneath its
+   * chart. A tiny client-side layout helper measures the active tooltip and
+   * reserves the same amount of space on the chart host. This keeps the order
+   * chart -> active tooltip -> graph description without overlap.
    */
   div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"]) {
     height: auto !important;
     min-height: 0 !important;
+    margin-bottom: calc(var(--mobile-chart-tooltip-height, 0px) + 0.5rem) !important;
   }
 
   div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"])
