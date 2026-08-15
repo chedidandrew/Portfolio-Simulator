@@ -8,6 +8,7 @@ import Image from 'next/image'
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
+import { SimulationProgressHost } from '@/components/monte-carlo/simulation-progress-overlay'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -106,6 +107,7 @@ const jsonLd = {
         {children}
         <Toaster />
         <PwaInstallPrompt />
+        <SimulationProgressHost />
       </ThemeProvider>
         <Script
           id="register-sw"
