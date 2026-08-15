@@ -290,7 +290,7 @@ test('excessive workloads are rejected before simulation begins', () => {
     cashflowAmount: 100,
     cashflowFrequency: 'weekly',
     inflationAdjustment: 0,
-    numPaths: 100_000,
+    numPaths: 110_000,
   }, 'growth', 'too-large'), /path-period calculations/)
 })
 

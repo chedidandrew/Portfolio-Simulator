@@ -3,7 +3,7 @@ import type { GrowthState, SimulationParams, WithdrawalState } from '../types'
 export type CashflowFrequency = GrowthState['frequency'] | WithdrawalState['frequency'] | SimulationParams['cashflowFrequency']
 export type TaxType = NonNullable<GrowthState['taxType']>
 
-export const MAX_MONTE_CARLO_WORK = 20_000_000
+export const MAX_MONTE_CARLO_WORK = 1_100_000_000
 export const MAX_RECORDED_VALUES = 600_000
 export const MAX_CHART_POINTS = 300
 

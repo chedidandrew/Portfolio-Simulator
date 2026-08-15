@@ -115,10 +115,10 @@ test('share validation rejects malformed, unsupported, non-finite, invalid-frequ
       initialValue: 10_000,
       expectedReturn: 8,
       volatility: 15,
-      duration: 100,
+      duration: 200,
       cashflowAmount: 0,
       cashflowFrequency: 'weekly',
-      numPaths: 100_000,
+      numPaths: 110_000,
     },
   }), null)
 })
