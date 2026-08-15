@@ -1,40 +1,28 @@
 @media (max-width: 639px) {
   /*
    * Recharts normally positions tooltips over the plot. On narrow screens that
-   * can hide most of the chart, so move an active tooltip into normal document
-   * flow directly beneath its chart. The chart host becomes a real flex column
-   * while a tooltip is active so the tooltip's height pushes the graph
-   * description and the following card down instead of overlapping them.
+   * can hide most of the chart, so move an active tooltip visually beneath its
+   * chart. A tiny client-side layout helper measures the active tooltip and
+   * reserves the same amount of space on the chart host. This keeps the order
+   * chart -> active tooltip -> graph description without overlap.
    */
   div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"]) {
     height: auto !important;
     min-height: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: visible !important;
+    margin-bottom: calc(var(--mobile-chart-tooltip-height, 0px) + 0.5rem) !important;
   }
 
   div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"])
     > .recharts-responsive-container {
     height: auto !important;
     min-height: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
     overflow: visible !important;
   }
 
   div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"])
     .recharts-wrapper {
     height: auto !important;
-    min-height: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
     overflow: visible !important;
-  }
-
-  div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"])
-    .recharts-surface {
-    flex: 0 0 auto !important;
   }
 
   div:has(> .recharts-responsive-container .recharts-tooltip-wrapper[style*="visibility: visible"])
@@ -42,7 +30,6 @@
     position: static !important;
     inset: auto !important;
     transform: none !important;
-    flex: 0 0 auto !important;
     width: 100% !important;
     max-width: 100% !important;
     margin-top: 0.5rem !important;
