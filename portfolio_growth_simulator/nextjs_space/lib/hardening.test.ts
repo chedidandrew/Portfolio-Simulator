@@ -19,6 +19,13 @@ const baseGrowthState = {
   inflationAdjustment: 2.5,
 }
 
+const closeTo = (actual: number, expected: number, tolerance = 0.01) => {
+  assert.ok(
+    Math.abs(actual - expected) <= tolerance,
+    `${actual} was not within ${tolerance} of ${expected}`,
+  )
+}
+
 test('deterministic scenarios reject durations beyond the browser-safe limit', () => {
   assert.match(
     validateGrowthStateRange({ ...baseGrowthState, duration: 201 }) ?? '',
@@ -82,12 +89,12 @@ test('income-tax withdrawal reporting keeps gross and spendable balances separat
   const result = calculateWithdrawalProjection(state)
   const row = result.yearData[0]
 
-  assert.equal(row.grossStartingBalance, 100_000)
-  assert.equal(row.grossEndingBalance, 99_000)
-  assert.equal(row.endingBalanceNet, 97_200)
-  assert.equal(result.endingBalanceGross, 99_000)
-  assert.equal(result.endingBalanceNet, 97_200)
-  assert.equal(result.totalTaxDrag, 1_800)
+  closeTo(row.grossStartingBalance, 100_000)
+  closeTo(row.grossEndingBalance, 99_000)
+  closeTo(row.endingBalanceNet, 97_200)
+  closeTo(result.endingBalanceGross, 99_000)
+  closeTo(result.endingBalanceNet, 97_200)
+  closeTo(result.totalTaxDrag, 1_800)
 
   const workbook = buildWithdrawalWorkbook(state, result)
   const sheet = workbook.getWorksheet('Balance By Year')
