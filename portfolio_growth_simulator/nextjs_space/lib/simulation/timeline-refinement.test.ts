@@ -78,10 +78,11 @@ test('timeline merge preserves full-run headline statistics and exact checkpoint
   } as any
 
   const merged = mergeTimelineRefinement(full, refined)
+  const terminalPoint = merged.chartData[merged.chartData.length - 1]
   assert.equal(merged.median, 123)
   assert.equal(merged.numPathsUsed, 100_000)
   assert.deepEqual(merged.chartData.map((point: any) => point.year), [0, 0.5, 1])
-  assert.equal(merged.chartData.at(-1)?.p50, 123, 'full-run terminal checkpoint must win')
+  assert.equal(terminalPoint?.p50, 123, 'full-run terminal checkpoint must win')
   assert.equal(merged.chartData[1]?.p50, 50, 'refinement fills the gap between exact checkpoints')
   assert.equal(merged.timelineScenarioCount, 1_250)
   assert.equal(merged.timelinePointCount, 3)
