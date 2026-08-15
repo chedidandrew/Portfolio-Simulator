@@ -55,6 +55,50 @@ try {
     dimensions.page <= dimensions.viewport + 2,
     `Unexpected page-level horizontal overflow: ${dimensions.page}px > ${dimensions.viewport}px`,
   )
+
+  await mobilePage.evaluate(() => {
+    window.dispatchEvent(new CustomEvent('portfolio-simulator:simulation-progress', {
+      detail: {
+        runId: 'mobile-smoke-run',
+        mode: 'growth',
+        phase: 'running_scenarios',
+        fraction: 0.16,
+        detail: 'Calculating 100,000 independent portfolio paths...',
+        scenarios: 100_000,
+        duration: 200,
+        frequency: 'weekly',
+        periodsPerScenario: 10_400,
+        totalPathPeriods: 1_040_000_000,
+        timelineScenarioCount: 1_923,
+        timelinePointCount: 299,
+        timelineUsesSample: true,
+        executionMode: 'Web Worker',
+        seed: 'monte-carlo-mobile-smoke-seed-1234567890',
+        startedAt: Date.now() - 32_000,
+      },
+    }))
+  })
+
+  const progressOverlay = mobilePage.getByTestId('simulation-progress-overlay')
+  await progressOverlay.waitFor()
+  const progressCard = progressOverlay.locator(':scope > div')
+  const cancelButton = mobilePage.getByRole('button', { name: 'Cancel simulation' })
+  const [cardBox, cancelBox] = await Promise.all([
+    progressCard.boundingBox(),
+    cancelButton.boundingBox(),
+  ])
+  assert.ok(cardBox, 'Expected mobile simulation progress card to be measurable.')
+  assert.ok(cancelBox, 'Expected mobile simulation cancel button to be visible.')
+  assert.ok(cardBox.y >= -1, `Progress card starts above viewport: y=${cardBox.y}`)
+  assert.ok(
+    cardBox.y + cardBox.height <= 845,
+    `Progress card extends below mobile viewport: ${cardBox.y + cardBox.height}px`,
+  )
+  assert.ok(cancelBox.y >= 0 && cancelBox.y + cancelBox.height <= 844, 'Cancel button must remain inside the mobile viewport.')
+
+  await mobilePage.evaluate(() => {
+    window.dispatchEvent(new CustomEvent('portfolio-simulator:simulation-progress-clear', { detail: 'mobile-smoke-run' }))
+  })
   await mobileContext.close()
 
   console.log('Browser smoke tests passed.')
