@@ -121,37 +121,42 @@ export function SimulationProgressHost() {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm print:hidden"
+      className="fixed inset-0 z-[200] flex items-end justify-center bg-black/65 p-0 backdrop-blur-sm print:hidden sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="simulation-progress-title"
       aria-describedby="simulation-progress-detail"
       data-testid="simulation-progress-overlay"
+      style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
     >
-      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-        <div className="border-b border-border bg-gradient-to-br from-primary/15 via-card to-violet-500/10 px-5 py-5 sm:px-6">
-          <div className="flex items-start gap-3">
-            <div className="rounded-xl border border-primary/30 bg-primary/15 p-2.5 text-primary">
-              <Dices className="h-6 w-6 animate-pulse motion-reduce:animate-none" aria-hidden="true" />
+      <div className="flex max-h-[calc(100dvh-0.5rem)] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl">
+        <div className="shrink-0 border-b border-border bg-gradient-to-br from-primary/15 via-card to-violet-500/10 px-4 py-3 sm:px-6 sm:py-5">
+          <div className="flex items-start gap-2.5 sm:gap-3">
+            <div className="rounded-xl border border-primary/30 bg-primary/15 p-2 text-primary sm:p-2.5">
+              <Dices className="h-5 w-5 animate-pulse motion-reduce:animate-none sm:h-6 sm:w-6" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 id="simulation-progress-title" className="text-xl font-bold tracking-tight sm:text-2xl">
+              <h2 id="simulation-progress-title" className="text-lg font-bold tracking-tight sm:text-2xl">
                 Running simulation...
               </h2>
-              <p className="mt-1 text-sm font-medium text-muted-foreground">
+              <p className="mt-0.5 text-xs font-medium text-muted-foreground sm:mt-1 sm:text-sm">
                 {integerFormatter.format(snapshot.scenarios)} scenarios across {integerFormatter.format(snapshot.duration)} years
               </p>
-              <p id="simulation-progress-detail" className="mt-2 text-sm text-muted-foreground" aria-live="polite">
+              <p
+                id="simulation-progress-detail"
+                className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground sm:mt-2 sm:text-sm"
+                aria-live="polite"
+              >
                 {snapshot.detail}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="space-y-5 px-5 py-5 sm:px-6">
-          <div className="space-y-2.5">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-3 sm:space-y-5 sm:px-6 sm:py-5">
+          <div className="space-y-2 sm:space-y-2.5">
             <div
-              className="h-3 overflow-hidden rounded-full bg-muted"
+              className="h-2.5 overflow-hidden rounded-full bg-muted sm:h-3"
               role="progressbar"
               aria-label="Estimated simulation progress"
               aria-valuemin={0}
@@ -165,24 +170,24 @@ export function SimulationProgressHost() {
                 <div className="absolute inset-0 animate-pulse bg-gradient-to-r motion-reduce:animate-none from-transparent via-white/30 to-transparent" />
               </div>
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs sm:text-sm">
               <span className="font-bold text-foreground">Estimated {percent}% complete</span>
               <span className="font-medium text-muted-foreground">{phaseLabels[snapshot.phase]}</span>
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-muted/30 p-4">
-            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Current phase</p>
-            <div className="flex items-center gap-3">
-              <Gauge className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+          <div className="rounded-xl border border-border bg-muted/30 p-3 sm:p-4">
+            <p className="mb-2 hidden text-xs font-bold uppercase tracking-wide text-muted-foreground sm:block">Current phase</p>
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <Gauge className="h-4 w-4 shrink-0 text-primary sm:h-5 sm:w-5" aria-hidden="true" />
               <div className="min-w-0">
-                <p className="font-semibold">{phaseLabels[snapshot.phase]}</p>
-                <p className="text-xs text-muted-foreground">Progress is estimated while the worker calculates locally.</p>
+                <p className="text-sm font-semibold sm:text-base">{phaseLabels[snapshot.phase]}</p>
+                <p className="text-[11px] leading-relaxed text-muted-foreground sm:text-xs">Progress is estimated while the worker calculates locally.</p>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 text-sm sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3 sm:gap-2.5 sm:text-sm">
             <InfoTile icon={<Clock3 />} label="Elapsed" value={formatElapsed(elapsedMs)} />
             <InfoTile icon={<Gauge />} label="Est. remaining" value={estimatedRemaining(snapshot, elapsedMs)} />
             <InfoTile icon={<Cpu />} label="Execution" value={snapshot.executionMode} />
@@ -204,9 +209,9 @@ export function SimulationProgressHost() {
             />
           </div>
 
-          <div className="rounded-xl border border-blue-500/25 bg-blue-500/10 p-3 text-xs text-blue-800 dark:text-blue-200">
+          <div className="rounded-xl border border-blue-500/25 bg-blue-500/10 p-3 text-[11px] leading-relaxed text-blue-800 dark:text-blue-200 sm:text-xs">
             <p className="font-semibold">Calculation detail</p>
-            <p className="mt-1 leading-relaxed">
+            <p className="mt-1">
               Headline statistics use all {integerFormatter.format(snapshot.scenarios)} scenarios.{' '}
               {snapshot.timelineUsesSample
                 ? `Time-series charts use a seeded ${integerFormatter.format(snapshot.timelineScenarioCount)}-scenario refinement pass for dense, responsive tooltips.`
@@ -216,25 +221,31 @@ export function SimulationProgressHost() {
           </div>
 
           {warning && (
-            <div className="flex items-start gap-2.5 rounded-xl border border-orange-500/30 bg-orange-500/10 p-3 text-xs text-orange-800 dark:text-orange-200">
+            <div className="flex items-start gap-2.5 rounded-xl border border-orange-500/30 bg-orange-500/10 p-3 text-[11px] text-orange-800 dark:text-orange-200 sm:text-xs">
               <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               <p className="leading-relaxed">{warning}</p>
             </div>
           )}
 
-          <div className="rounded-lg bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
-            Seed: <span className="font-mono" title={snapshot.seed}>{snapshot.seed.length > 48 ? `${snapshot.seed.slice(0, 45)}...` : snapshot.seed}</span>
+          <div className="rounded-lg bg-muted/40 px-3 py-2 text-[10px] text-muted-foreground sm:text-[11px]">
+            <span className="mr-1">Seed:</span>
+            <span className="block truncate font-mono sm:inline" title={snapshot.seed}>{snapshot.seed}</span>
           </div>
+        </div>
 
+        <div
+          className="shrink-0 border-t border-border bg-card/95 px-4 pt-3 backdrop-blur sm:px-6"
+          style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}
+        >
           <Button
             ref={cancelButtonRef}
             type="button"
             variant="outline"
             disabled={isCancelling || snapshot.phase === 'complete'}
-            className="min-h-12 w-full border-red-500/45 bg-red-500/10 text-base font-semibold text-red-700 hover:bg-red-500/20 dark:text-red-300"
+            className="min-h-11 w-full border-red-500/45 bg-red-500/10 text-sm font-semibold text-red-700 hover:bg-red-500/20 dark:text-red-300 sm:min-h-12 sm:text-base"
             onClick={() => requestSimulationCancel(snapshot.runId)}
           >
-            <OctagonX className="mr-2 h-5 w-5" aria-hidden="true" />
+            <OctagonX className="mr-2 h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
             {isCancelling ? 'Stopping worker...' : 'Cancel simulation'}
           </Button>
         </div>
@@ -255,12 +266,12 @@ function InfoTile({
   title?: string
 }) {
   return (
-    <div className="min-w-0 rounded-xl border border-border bg-muted/30 p-3" title={title}>
-      <div className="mb-1.5 flex items-center gap-1.5 text-muted-foreground">
+    <div className="min-w-0 rounded-xl border border-border bg-muted/30 p-2.5 sm:p-3" title={title}>
+      <div className="mb-1 flex items-center gap-1.5 text-muted-foreground sm:mb-1.5">
         <span className="[&>svg]:h-3.5 [&>svg]:w-3.5" aria-hidden="true">{icon}</span>
-        <span className="truncate text-[10px] font-semibold uppercase tracking-wide">{label}</span>
+        <span className="truncate text-[9px] font-semibold uppercase tracking-wide sm:text-[10px]">{label}</span>
       </div>
-      <p className="truncate font-semibold text-foreground">{value}</p>
+      <p className="truncate text-sm font-semibold text-foreground sm:text-base">{value}</p>
     </div>
   )
 }
