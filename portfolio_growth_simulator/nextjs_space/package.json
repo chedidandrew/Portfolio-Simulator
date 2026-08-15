@@ -12,7 +12,7 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx --max-warnings=0",
     "pwa:icons": "node scripts/generate-pwa-icons.mjs",
     "currencies:update": "node scripts/update-currencies.mjs",
-    "test": "tsx --tsconfig tsconfig.test.json --test lib/simulation/financial.test.ts lib/regression.test.ts && npm run test:components",
+    "test": "tsx --tsconfig tsconfig.test.json --test lib/simulation/financial.test.ts lib/regression.test.ts lib/hardening.test.ts && npm run test:components",
     "test:components": "node scripts/run-component-tests.mjs",
     "typecheck": "tsc --noEmit",
     "verify": "npm run lint && npm run test && npm run typecheck && npm run build"

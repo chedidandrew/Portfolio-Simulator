@@ -1,6 +1,12 @@
 # Portfolio Simulator
 
-A responsive financial planning website for modeling portfolio growth and retirement withdrawals with deterministic and Monte Carlo simulations.
+[![Website CI](https://github.com/chedidandrew/Portfolio-Simulator/actions/workflows/web-ci.yml/badge.svg)](https://github.com/chedidandrew/Portfolio-Simulator/actions/workflows/web-ci.yml)
+
+**Live site:** [portfoliosimulator.org](https://portfoliosimulator.org)
+
+A responsive financial planning website for modeling portfolio growth and retirement withdrawals with deterministic and seeded Monte Carlo simulations.
+
+![Portfolio Simulator preview](portfolio_growth_simulator/nextjs_space/public/og-image.png)
 
 ## Features
 
@@ -9,10 +15,11 @@ A responsive financial planning website for modeling portfolio growth and retire
 - Annual, quarterly, monthly, and weekly cash flows
 - Inflation, contribution growth, withdrawals, goals, and multiple tax treatments
 - Gross, spendable, tax-drag, and real-dollar reporting
-- Shareable, validated scenario links
+- Shareable, versioned, validated scenario links
 - Excel exports and print/PDF-ready results
 - Dark and light themes, responsive layouts, keyboard support, and PWA installation
-- Local browser storage with safe recovery from malformed saved data
+- Local browser storage with validation and safe recovery from malformed saved data
+- Browser-safety limits for deterministic and Monte Carlo workloads
 - Vercel Web Analytics
 
 > Display Currency changes symbols and number formatting only. The simulator does not perform foreign-exchange conversion.
@@ -29,43 +36,34 @@ A responsive financial planning website for modeling portfolio growth and retire
 
 ## Run locally
 
-Install [Node.js 24](https://nodejs.org/) and then run:
+Install Node.js 24 and run:
 
 ```powershell
-cd portfolio_growth_simulator\nextjs_space
+cd portfolio_growth_simulator/nextjs_space
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open `http://localhost:3000`.
 
 ## Validate the website
 
-From `portfolio_growth_simulator\nextjs_space`:
-
-```powershell
-npm run lint
-npm test
-npm run typecheck
-npm run build
-```
-
-Or run the complete validation sequence:
+From `portfolio_growth_simulator/nextjs_space`:
 
 ```powershell
 npm run verify
 ```
 
-## Production
+The verification command runs linting, financial and regression tests, rendered component tests, TypeScript checking, and the production build. GitHub Actions runs the same checks after website changes are pushed to `main`, for pull requests, and on manual dispatch. A separate browser smoke workflow exercises downloads, Monte Carlo Web Workers, shared links, and a mobile viewport in Chromium.
 
-Create the optimized production build:
+## Production
 
 ```powershell
 npm run build
 npm start
 ```
 
-The project is configured for Node.js `24.x`. A GitHub Actions workflow runs installation, linting, tests, type checking, and the production build for pull requests that change the website.
+The production website is deployed through Vercel from the `main` branch.
 
 ## Project structure
 
@@ -80,19 +78,21 @@ Portfolio-Simulator/
 │       ├── lib/                       # Financial engines, validation, and exports
 │       ├── public/                    # Icons, manifest, and service worker
 │       ├── scripts/                   # Project maintenance/test scripts
-│       ├── LICENSE                    # BSD 3-Clause license
 │       ├── package.json
 │       └── package-lock.json
+├── LICENSE
 └── README.md
 ```
 
-## Important notes
+## Model boundaries
 
 - Results are educational estimates, not financial, tax, or investment advice.
 - Monte Carlo results describe modeled scenarios and are not forecasts or guarantees.
+- Tax calculations are simplified and do not represent a complete tax return.
 - Shared links contain the selected scenario inputs in the URL fragment. Review a link before sharing it publicly.
 - Calculator data is stored locally in the browser unless the user deliberately creates a share link.
+- Detailed formulas, timing rules, and limitations are documented on the website's Methodology page.
 
 ## License
 
-This project is licensed under the [BSD 3-Clause License](portfolio_growth_simulator/nextjs_space/LICENSE).
+This project is licensed under the BSD 3-Clause License.

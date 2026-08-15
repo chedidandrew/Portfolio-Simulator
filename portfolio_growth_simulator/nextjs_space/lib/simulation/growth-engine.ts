@@ -10,6 +10,15 @@ import {
   stepsPerYear,
   toTodaysDollars,
 } from './financial-utils'
+import {
+  MAX_DETERMINISTIC_STEPS,
+  MAX_SCENARIO_AMOUNT,
+  MAX_SCENARIO_DURATION_YEARS,
+  MAX_SCENARIO_INFLATION_PERCENT,
+  MAX_SCENARIO_RETURN_PERCENT,
+  MAX_SCENARIO_TAX_PERCENT,
+  MIN_SCENARIO_INFLATION_PERCENT,
+} from './deterministic-validation'
 
 export interface GrowthProjectionYear {
   year: number
@@ -72,17 +81,41 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     calculationMode = 'effective',
   } = state
 
-  if (!Number.isFinite(startingBalance) || startingBalance < 0) throw new Error('Starting balance cannot be negative.')
-  if (!Number.isFinite(duration) || duration <= 0) throw new Error('Duration must be greater than zero.')
-  if (!Number.isFinite(periodicAddition) || periodicAddition < 0) throw new Error('Contribution cannot be negative.')
+  if (!Number.isFinite(startingBalance) || startingBalance < 0 || startingBalance > MAX_SCENARIO_AMOUNT) {
+    throw new Error('Starting balance is outside the supported range.')
+  }
+  if (!Number.isFinite(duration) || duration <= 0 || duration > MAX_SCENARIO_DURATION_YEARS) {
+    throw new Error(`Duration must be greater than zero and no more than ${MAX_SCENARIO_DURATION_YEARS} years.`)
+  }
+  if (!Number.isFinite(periodicAddition) || periodicAddition < 0 || periodicAddition > MAX_SCENARIO_AMOUNT) {
+    throw new Error('Contribution is outside the supported range.')
+  }
+  if (!Number.isFinite(annualReturn) || annualReturn < -100 || annualReturn > MAX_SCENARIO_RETURN_PERCENT) {
+    throw new Error(`Expected return must be between -100% and ${MAX_SCENARIO_RETURN_PERCENT.toLocaleString()}%.`)
+  }
+  if (!Number.isFinite(inflationAdjustment) || inflationAdjustment < MIN_SCENARIO_INFLATION_PERCENT || inflationAdjustment > MAX_SCENARIO_INFLATION_PERCENT) {
+    throw new Error(`Inflation must be between ${MIN_SCENARIO_INFLATION_PERCENT}% and ${MAX_SCENARIO_INFLATION_PERCENT}%.`)
+  }
+  if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > MAX_SCENARIO_TAX_PERCENT) {
+    throw new Error(`Tax rate must be between 0% and ${MAX_SCENARIO_TAX_PERCENT}%.`)
+  }
+  if (startingCostBasis !== undefined && (!Number.isFinite(startingCostBasis) || startingCostBasis < 0 || startingCostBasis > MAX_SCENARIO_AMOUNT)) {
+    throw new Error('Starting cost basis is outside the supported range.')
+  }
+  if (targetValue !== undefined && (!Number.isFinite(targetValue) || targetValue < 0 || targetValue > MAX_SCENARIO_AMOUNT)) {
+    throw new Error('Target value is outside the supported range.')
+  }
 
   const periods = stepsPerYear(frequency)
   const totalSteps = Math.max(1, Math.round(duration * periods))
+  if (!Number.isSafeInteger(totalSteps) || totalSteps > MAX_DETERMINISTIC_STEPS) {
+    throw new Error(`This scenario exceeds the ${MAX_DETERMINISTIC_STEPS.toLocaleString()}-period deterministic limit.`)
+  }
+
   const afterTaxAnnualReturn = annualReturnAfterIncomeTaxDrag(annualReturn, taxEnabled, taxType, taxRate)
   const netStepRate = periodicRate(afterTaxAnnualReturn, periods, calculationMode)
   const grossStepRate = periodicRate(annualReturn, periods, calculationMode)
   const inflator = inflationFactor(inflationAdjustment)
-  const taxRateFraction = normalizeTaxRate(taxRate)
 
   let netBalance = startingBalance
   let grossBalance = startingBalance
@@ -140,7 +173,7 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     const isYearEnd = step % periods === 0 || step === totalSteps
     if (isYearEnd) {
       const endingNet = netLiquidationValue({ balance: netBalance, basis, taxEnabled, taxType, taxRate })
-      const hasDeferredTax = !!taxEnabled && (taxType === 'capital_gains' || taxType === 'tax_deferred')
+      const hasDeferredTax = Boolean(taxEnabled && (taxType === 'capital_gains' || taxType === 'tax_deferred'))
       const startingEmbeddedTax = hasDeferredTax ? Math.max(0, yearStartGross - yearStartNet) : 0
       const endingEmbeddedTax = hasDeferredTax ? Math.max(0, grossBalance - endingNet) : 0
       yearData.push({
@@ -194,7 +227,7 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
       let targetGross = startingBalance
       let targetBasis = Math.max(0, startingCostBasis ?? startingBalance)
       let targetContribution = periodicAddition
-      const maxSteps = 1_000 * periods
+      const maxSteps = Math.min(MAX_DETERMINISTIC_STEPS, MAX_SCENARIO_DURATION_YEARS * periods)
 
       for (let step = 1; step <= maxSteps; step += 1) {
         targetGross *= 1 + grossStepRate
@@ -217,7 +250,6 @@ export function calculateGrowthProjection(state: GrowthState): GrowthProjectionR
     }
   }
 
-  // Preserve compatibility: finalValue is the modeled account balance before deferred liquidation tax.
   return {
     finalValue,
     finalValueNet,

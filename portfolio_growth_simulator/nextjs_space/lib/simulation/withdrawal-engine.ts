@@ -12,6 +12,15 @@ import {
   stepsPerYear,
   toTodaysDollars,
 } from './financial-utils'
+import {
+  MAX_DETERMINISTIC_STEPS,
+  MAX_SCENARIO_AMOUNT,
+  MAX_SCENARIO_DURATION_YEARS,
+  MAX_SCENARIO_INFLATION_PERCENT,
+  MAX_SCENARIO_RETURN_PERCENT,
+  MAX_SCENARIO_TAX_PERCENT,
+  MIN_SCENARIO_INFLATION_PERCENT,
+} from './deterministic-validation'
 
 export interface WithdrawalProjectionYear {
   year: number
@@ -76,17 +85,40 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
     calculationMode = 'effective',
   } = state
 
-  if (!Number.isFinite(startingBalance) || startingBalance < 0) throw new Error('Starting balance cannot be negative.')
-  if (!Number.isFinite(duration) || duration <= 0) throw new Error('Duration must be greater than zero.')
-  if (!Number.isFinite(periodicWithdrawal) || periodicWithdrawal < 0) throw new Error('Withdrawal cannot be negative.')
+  if (!Number.isFinite(startingBalance) || startingBalance < 0 || startingBalance > MAX_SCENARIO_AMOUNT) {
+    throw new Error('Starting balance is outside the supported range.')
+  }
+  if (!Number.isFinite(duration) || duration <= 0 || duration > MAX_SCENARIO_DURATION_YEARS) {
+    throw new Error(`Duration must be greater than zero and no more than ${MAX_SCENARIO_DURATION_YEARS} years.`)
+  }
+  if (!Number.isFinite(periodicWithdrawal) || periodicWithdrawal < 0 || periodicWithdrawal > MAX_SCENARIO_AMOUNT) {
+    throw new Error('Withdrawal is outside the supported range.')
+  }
+  if (!Number.isFinite(annualReturn) || annualReturn < -100 || annualReturn > MAX_SCENARIO_RETURN_PERCENT) {
+    throw new Error(`Expected return must be between -100% and ${MAX_SCENARIO_RETURN_PERCENT.toLocaleString()}%.`)
+  }
+  if (!Number.isFinite(inflationAdjustment) || inflationAdjustment < MIN_SCENARIO_INFLATION_PERCENT || inflationAdjustment > MAX_SCENARIO_INFLATION_PERCENT) {
+    throw new Error(`Inflation must be between ${MIN_SCENARIO_INFLATION_PERCENT}% and ${MAX_SCENARIO_INFLATION_PERCENT}%.`)
+  }
+  if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > MAX_SCENARIO_TAX_PERCENT) {
+    throw new Error(`Tax rate must be between 0% and ${MAX_SCENARIO_TAX_PERCENT}%.`)
+  }
+  if (startingCostBasis !== undefined && (!Number.isFinite(startingCostBasis) || startingCostBasis < 0 || startingCostBasis > MAX_SCENARIO_AMOUNT)) {
+    throw new Error('Starting cost basis is outside the supported range.')
+  }
 
   const periods = stepsPerYear(frequency)
   const totalSteps = Math.max(1, Math.round(duration * periods))
+  if (!Number.isSafeInteger(totalSteps) || totalSteps > MAX_DETERMINISTIC_STEPS) {
+    throw new Error(`This scenario exceeds the ${MAX_DETERMINISTIC_STEPS.toLocaleString()}-period deterministic limit.`)
+  }
+
   const afterTaxAnnualReturn = annualReturnAfterIncomeTaxDrag(annualReturn, taxEnabled, taxType, taxRate)
   const netStepRate = periodicRate(afterTaxAnnualReturn, periods, calculationMode)
   const grossStepRate = periodicRate(annualReturn, periods, calculationMode)
   const inflator = inflationFactor(inflationAdjustment)
   const taxRateFraction = normalizeTaxRate(taxRate)
+  const isIncomeTax = Boolean(taxEnabled && taxType === 'income')
 
   let balance = startingBalance
   let noDragBalance = startingBalance
@@ -107,7 +139,8 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
   let totalGrossReal = 0
 
   const yearData: WithdrawalProjectionYear[] = []
-  let yearStartGross = balance
+  let yearStartBalance = balance
+  let yearStartGross = isIncomeTax ? noDragBalance : balance
   let yearStartBasis = basis
   let yearWithdrawals = 0
   let yearWithdrawalsReal = 0
@@ -176,7 +209,7 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
       yearMarketGrowth += grossMarketGrowth
       totalMarketGrowth += grossMarketGrowth
 
-      if (taxEnabled && taxType === 'income') {
+      if (isIncomeTax) {
         const taxDrag = Math.max(0, (noDragBalance - beforeGrossGrowth) - (balance - beforeNetGrowth))
         totalTaxDrag += taxDrag
         totalTaxPaid += taxDrag
@@ -194,8 +227,6 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
     if (balance <= 0.01) {
       balance = 0
       noDragBalance = Math.max(0, noDragBalance)
-      // Ending exactly at zero on the final requested payment still means the
-      // plan fulfilled its complete horizon. Only report early depletion.
       if (step < totalSteps && yearsUntilZero === null) {
         yearsUntilZero = yearsElapsed
         depletionStep = step
@@ -205,13 +236,14 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
     const isYearEnd = step % periods === 0 || step === totalSteps
     if (isYearEnd) {
       const startingNet = netLiquidationValue({
-        balance: yearStartGross,
+        balance: yearStartBalance,
         basis: yearStartBasis,
         taxEnabled,
         taxType,
         taxRate,
       })
       const endingNet = netLiquidationValue({ balance, basis, taxEnabled, taxType, taxRate })
+      const grossEndingBalance = isIncomeTax ? noDragBalance : balance
 
       yearData.push({
         year: yearsElapsed,
@@ -230,11 +262,12 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
         endingCostBasis: basis,
         endingBalance: endingNet,
         endingBalanceNet: endingNet,
-        grossEndingBalance: balance,
+        grossEndingBalance,
         isSustainable: allScheduledWithdrawalsFulfilled,
       })
 
-      yearStartGross = balance
+      yearStartBalance = balance
+      yearStartGross = grossEndingBalance
       yearStartBasis = basis
       yearWithdrawals = 0
       yearWithdrawalsReal = 0
@@ -250,9 +283,15 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
     }
   }
 
-  const endingBalanceGross = Math.max(0, balance)
-  const endingBalanceNet = netLiquidationValue({ balance: endingBalanceGross, basis, taxEnabled, taxType, taxRate })
-  const remainingEmbeddedTax = embeddedTaxLiability({ balance: endingBalanceGross, basis, taxEnabled, taxType, taxRate })
+  const endingBalanceGross = Math.max(0, isIncomeTax ? noDragBalance : balance)
+  const endingBalanceNet = netLiquidationValue({ balance: Math.max(0, balance), basis, taxEnabled, taxType, taxRate })
+  const remainingEmbeddedTax = embeddedTaxLiability({
+    balance: Math.max(0, balance),
+    basis,
+    taxEnabled,
+    taxType,
+    taxRate,
+  })
 
   return {
     endingBalance: endingBalanceNet,

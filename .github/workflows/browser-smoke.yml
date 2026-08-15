@@ -1,0 +1,56 @@
+name: Browser Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'portfolio_growth_simulator/nextjs_space/**'
+      - '.github/workflows/browser-smoke.yml'
+  schedule:
+    - cron: '37 7 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: portfolio_growth_simulator/nextjs_space
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: portfolio_growth_simulator/nextjs_space/package-lock.json
+      - run: npm ci
+      - name: Install browser test runtime without changing the lockfile
+        run: npm install --no-save --package-lock=false playwright@1.62.0
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Start application
+        run: |
+          npm start > /tmp/portfolio-simulator.log 2>&1 &
+          echo $! > /tmp/portfolio-simulator.pid
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000 > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/portfolio-simulator.log
+          exit 1
+      - name: Run browser smoke tests
+        run: node scripts/browser-smoke.mjs
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/portfolio-simulator.log || true

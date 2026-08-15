@@ -26,6 +26,7 @@ import { clearPortfolioStorage } from '@/lib/owned-storage'
 import { cleanShareDataFromUrl, readSharePayload } from '@/lib/share-links'
 import { toast } from 'sonner'
 import type { SharePayload } from '@/lib/types'
+import { persistSharedMonteCarloPreferences } from '@/lib/shared-preferences'
 
 export default function Home() {
   const { theme, setTheme } = useTheme()
@@ -40,19 +41,16 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true)
-    setAppCurrency(currency) // Initialize currency on mount
+    setAppCurrency(currency)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update currency global state when it changes
   useEffect(() => {
     setAppCurrency(currency)
   }, [currency])
 
-  // Decide which tab to show on first load and on return
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // A valid shared scenario takes precedence over the saved tab.
     try {
       const shared = readSharePayload(window.location)
       if (shared.hadShareData && !shared.payload) {
@@ -60,6 +58,7 @@ export default function Home() {
         window.history.replaceState(null, '', cleanShareDataFromUrl(window.location.href))
       } else if (shared.payload) {
         const mode = shared.payload.mode
+        persistSharedMonteCarloPreferences(shared.payload, window.localStorage)
         if (shared.payload.displayCurrency) setCurrency(shared.payload.displayCurrency)
         setActiveTab(mode)
         setSharedPayload(shared.payload)
@@ -68,7 +67,7 @@ export default function Home() {
         return
       }
     } catch {
-      // ignore and fall back to normal behavior
+      // Fall back to normal startup behavior if browser storage is unavailable.
     }
 
     const visited = localStorage.getItem('visited')
@@ -79,45 +78,36 @@ export default function Home() {
       | null
 
     if (!visited) {
-      // First time: go to guide
       localStorage.setItem('visited', 'true')
       localStorage.setItem('lastTab', 'guide')
       setActiveTab('guide')
     } else if (lastTab) {
-      // Return: go to last used tab
       setActiveTab(lastTab)
     }
   }, [setCurrency])
 
-  // When a shared Monte Carlo link is opened, switch to the correct tab
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const handler = (event: any) => {
-      const mode =
-        event?.detail?.mode === 'withdrawal' ? 'withdrawal' : 'growth'
-
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<SharePayload>).detail
+      const mode = detail?.mode === 'withdrawal' ? 'withdrawal' : 'growth'
+      if (detail) persistSharedMonteCarloPreferences(detail, window.localStorage)
       setActiveTab(mode)
-
-      // Keep your localStorage behavior in sync
       localStorage.setItem('visited', 'true')
       localStorage.setItem('lastTab', mode)
     }
 
     window.addEventListener('openMonteCarloFromLink', handler)
-
-    return () => {
-      window.removeEventListener('openMonteCarloFromLink', handler)
-    }
+    return () => window.removeEventListener('openMonteCarloFromLink', handler)
   }, [])
 
-  // Save tab changes to localStorage
   const handleTabChange = (value: string) => {
-    const v = value as 'growth' | 'withdrawal' | 'guide'
-    setActiveTab(v)
+    const nextTab = value as 'growth' | 'withdrawal' | 'guide'
+    setActiveTab(nextTab)
     if (typeof window !== 'undefined') {
       localStorage.setItem('visited', 'true')
-      localStorage.setItem('lastTab', v)
+      localStorage.setItem('lastTab', nextTab)
     }
   }
 
@@ -125,9 +115,7 @@ export default function Home() {
     const handleScroll = () => {
       const currentScrollY = window.scrollY
 
-      if (Math.abs(currentScrollY - lastScrollY.current) < scrollThreshold) {
-        return
-      }
+      if (Math.abs(currentScrollY - lastScrollY.current) < scrollThreshold) return
 
       if (currentScrollY < 40) {
         setHeaderVisible(true)
@@ -151,7 +139,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
-      {/* Header - Hidden in Print*/}
       <header
         className={`fixed left-0 right-0 z-40 w-full transition-all duration-300 ease-in-out print:hidden ${
           headerVisible
@@ -207,11 +194,10 @@ export default function Home() {
                 </DropdownMenuSub>
 
                 <DropdownMenuSeparator />
-                
                 <DropdownMenuLabel>Preferences</DropdownMenuLabel>
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      <CreditCard className="mr-2 h-4 w-4" />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <CreditCard className="mr-2 h-4 w-4" />
                     <span>Display Currency</span>
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="max-h-[300px] overflow-y-auto">
@@ -219,22 +205,22 @@ export default function Home() {
                     <p className="px-2 pb-2 text-xs text-muted-foreground">
                       Changes symbols and formatting only. Values are not converted using exchange rates.
                     </p>
-                      {CURRENCIES.map((c) => (
-                        <DropdownMenuItem key={c.code} onClick={() => setCurrency(c.code)}>
-                          <span>{c.label}</span>
-                          {currency === c.code && <Check className="ml-auto h-4 w-4" />}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
+                    {CURRENCIES.map((candidate) => (
+                      <DropdownMenuItem key={candidate.code} onClick={() => setCurrency(candidate.code)}>
+                        <span>{candidate.label}</span>
+                        {currency === candidate.code && <Check className="ml-auto h-4 w-4" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
                 <DropdownMenuCheckboxItem
                   checked={showDonations}
                   onCheckedChange={setShowDonations}
                 >
-                   <span className="flex items-center">
+                  <span className="flex items-center">
                     <Heart className="mr-2 h-4 w-4" />
                     Show Donation Card
-                   </span>
+                  </span>
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleFactoryReset} className="text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-900/10">
@@ -247,24 +233,19 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Status bar background - Hidden in Print */}
       <div
         className="fixed top-0 left-0 right-0 z-50 bg-black pointer-events-none print:hidden"
         style={{ height: 'env(safe-area-inset-top, 0px)' }}
       />
 
-      {/* Spacer - Hidden in Print */}
       <div
         className="w-full print:hidden"
         style={{ height: 'calc(env(safe-area-inset-top, 0px) + 60px)' }}
       />
 
-      {/* Main */}
       <main className="container mx-auto max-w-6xl px-4 py-6 pb-20 print:p-0 print:max-w-none">
         <Tabs key={currency} value={activeTab} onValueChange={handleTabChange} className="w-full">
-          {/* Tabs List - Hidden in Print */}
           <TabsList className="grid w-full grid-cols-3 mb-6 h-auto print:hidden">
-            {/* Guide tab moved to the left */}
             <TabsTrigger value="guide" className="flex items-center gap-2 py-3">
               <BookOpen className="h-4 w-4" />
               <span className="hidden sm:inline">Guide</span>

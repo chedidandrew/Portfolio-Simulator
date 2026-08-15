@@ -1,4 +1,5 @@
-const CACHE_NAME = 'portfolio-simulator-shell-v4'
+const CACHE_NAME = 'portfolio-simulator-shell-v5'
+const CACHE_PREFIX = 'portfolio-simulator-'
 const SHELL_ASSETS = [
   '/',
   '/methodology',
@@ -29,7 +30,11 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(
+        keys
+          .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+          .map((key) => caches.delete(key))
+      ))
       .then(() => self.clients.claim())
   )
 })
@@ -40,13 +45,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
-
-  // API calls and React Server Component/data requests must always remain live.
-  // Caching these can serve stale application state or dynamic responses.
   if (url.pathname.startsWith('/api/') || url.searchParams.has('_rsc') || request.headers.get('RSC') === '1') return
 
-  // Network-first for pages so application code and calculations stay current.
-  // If offline, use the most recently cached page or the cached home shell.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -62,8 +62,6 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Only immutable/static same-origin assets use cache-first behavior. Dynamic
-  // Next.js data and arbitrary GET requests are deliberately left to the network.
   if (!isStaticAsset(url)) return
 
   event.respondWith(

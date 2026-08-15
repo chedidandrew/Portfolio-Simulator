@@ -6,6 +6,7 @@ import type { GrowthState, SimulationParams, WithdrawalState } from '@/lib/types
 import type { SimulationResults } from '@/lib/simulation/monte-carlo-engine'
 import { runMonteCarloOffMainThread } from '@/lib/simulation/monte-carlo-client'
 import { normalizeSimulationParams } from '@/lib/state-normalization'
+import { isValidSimulationParams } from '@/lib/simulation/deterministic-validation'
 
 export type CompletedSimulationResults = SimulationResults & {
   simulationParams: SimulationParams
@@ -46,6 +47,18 @@ export const PRESET_PROFILES = {
   },
 }
 
+const isPresetProfile = (value: unknown): value is keyof typeof PRESET_PROFILES => (
+  typeof value === 'string' && Object.prototype.hasOwnProperty.call(PRESET_PROFILES, value)
+)
+
+const isLogScaleSettings = (value: unknown): value is LogScaleSettings => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const candidate = value as Record<string, unknown>
+  return typeof candidate.chart === 'boolean'
+    && typeof candidate.histogram === 'boolean'
+    && typeof candidate.drawdown === 'boolean'
+}
+
 export function useMonteCarlo(
   mode: 'growth' | 'withdrawal',
   initialValues: GrowthState | WithdrawalState,
@@ -57,6 +70,7 @@ export function useMonteCarlo(
   const [profile, setProfile] = useLocalStorage<keyof typeof PRESET_PROFILES>(
     `mc-profile-${mode}`,
     'moderate',
+    { validatePersisted: isPresetProfile },
   )
 
   const [params, setParams] = useLocalStorage<SimulationParams>(
@@ -82,12 +96,16 @@ export function useMonteCarlo(
       taxType: initialValues?.taxType ?? 'capital_gains',
       calculationMode: initialValues?.calculationMode ?? 'effective',
     },
-    { normalize: normalizeSimulationParams },
+    {
+      normalize: normalizeSimulationParams,
+      validatePersisted: isValidSimulationParams,
+    },
   )
 
   const [logScales, setLogScales] = useLocalStorage<LogScaleSettings>(
     `mc-log-scales-${mode}`,
     { chart: false, histogram: false, drawdown: false },
+    { validatePersisted: isLogScaleSettings },
   )
   const [rngSeed, setRngSeed] = useLocalStorage<string | null>(`mc-seed-${mode}`, null)
   const [showFullPrecision, setShowFullPrecision] = useLocalStorage(
@@ -95,8 +113,6 @@ export function useMonteCarlo(
     false,
   )
 
-  // Raw Monte Carlo arrays can exceed browser localStorage limits. Keep results
-  // in memory and persist only compact inputs, seed, and display preferences.
   const [results, setSimulationResults] = useState<CompletedSimulationResults | null>(null)
   const [isSimulating, setIsSimulating] = useState(false)
   const [simulationError, setSimulationError] = useState<string | null>(null)

@@ -1,28 +1,39 @@
 'use client'
 
+import { useState } from 'react'
+import { Coins, Scale, Settings2, Zap } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
+import { NumericInput } from '@/components/ui/numeric-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { NumericInput } from '@/components/ui/numeric-input'
-import { Coins, Zap, Scale, Settings2 } from 'lucide-react'
-import { SimulationParams } from '@/lib/types'
-import { getAppCurrency, formatCurrency } from '@/lib/utils'
-import { useState } from 'react'
-import { MAX_MONTE_CARLO_WORK, stepsPerYear } from '@/lib/simulation/financial-utils'
 import { TaxSettingsPanel } from '@/components/tax-settings-panel'
+import type { SimulationParams } from '@/lib/types'
+import { formatCurrency, getAppCurrency } from '@/lib/utils'
+import { MAX_MONTE_CARLO_WORK, stepsPerYear } from '@/lib/simulation/financial-utils'
 import { markCostBasisUserEdited, updateInitialValueWithTrackedBasis } from '@/lib/state-normalization'
 
 interface MonteCarloParametersProps {
   mode: 'growth' | 'withdrawal'
   params: SimulationParams
-  setParams: (p: SimulationParams) => void
+  setParams: (params: SimulationParams) => void
   profile: string
-  setProfile: (p: any) => void
+  setProfile: (profile: any) => void
   isSimulating: boolean
   onRun: () => void
   presetProfiles: Record<string, { name: string; expectedReturn: number; volatility: number; description: string }>
+}
+
+const periodTitle = (frequency: SimulationParams['cashflowFrequency']) => (
+  frequency.charAt(0).toUpperCase() + frequency.slice(1)
+)
+
+const periodNoun = (frequency: SimulationParams['cashflowFrequency']) => {
+  if (frequency === 'weekly') return 'week'
+  if (frequency === 'monthly') return 'month'
+  if (frequency === 'quarterly') return 'quarter'
+  return 'year'
 }
 
 export function MonteCarloParameters({
@@ -33,168 +44,97 @@ export function MonteCarloParameters({
   setProfile,
   isSimulating,
   onRun,
-  presetProfiles
+  presetProfiles,
 }: MonteCarloParametersProps) {
-  
   const currencySymbol = getAppCurrency().symbol
   const [showAdvanced, setShowAdvanced] = useState(false)
   const estimatedWork = params.numPaths * Math.ceil(params.duration * stepsPerYear(params.cashflowFrequency))
   const workloadTooLarge = !Number.isSafeInteger(estimatedWork) || estimatedWork > MAX_MONTE_CARLO_WORK
-
-  const formatCurrencyFullUnder100m = (amount: number) => {
-    const n = Number(amount)
-    if (!isFinite(n)) return formatCurrency(0)
-    if (Math.abs(n) >= 100_000_000) return formatCurrency(n)
-    const appCurrency: any = getAppCurrency()
-    const code = appCurrency?.code || appCurrency?.currency || 'USD'
-    try {
-      return new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency: code,
-        currencyDisplay: 'symbol',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(n)
-    } catch {
-      const symbol = appCurrency?.symbol ?? ''
-      return `${symbol}${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    }
-  }
-
-  const getCashflowPeriodTitle = () => {
-    if (params.cashflowFrequency === 'weekly') return 'Weekly'
-    if (params.cashflowFrequency === 'monthly') return 'Monthly'
-    if (params.cashflowFrequency === 'quarterly') return 'Quarterly'
-    return 'Yearly'
-  }
-
-  const getCashflowPeriodNoun = () => {
-    if (params.cashflowFrequency === 'weekly') return 'week'
-    if (params.cashflowFrequency === 'monthly') return 'month'
-    if (params.cashflowFrequency === 'quarterly') return 'quarter'
-    return 'year'
-  }
-
-  const getCashflowLabel = () => {
-    const period = getCashflowPeriodTitle()
-    if (mode === 'growth') return `${period} Contribution`
-    if (params.taxEnabled) {
-       if (params.taxType === 'capital_gains') return `${period} Withdrawal (Gross)`
-       if (params.taxType === 'tax_deferred') return `${period} Withdrawal (Gross)`
-    }
-    return `${period} Withdrawal`
-  }
+  const selectedProfile = presetProfiles[profile] ?? presetProfiles.custom ?? Object.values(presetProfiles)[0]
+  const cashflowLabel = mode === 'growth'
+    ? `${periodTitle(params.cashflowFrequency)} Contribution`
+    : `${periodTitle(params.cashflowFrequency)} Withdrawal${params.taxEnabled && params.taxType !== 'income' ? ' (Gross)' : ''}`
 
   return (
     <div className="space-y-6">
       <Card>
-         {/* ... (Existing Profile Selection Card Code) ... */}
-         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Monte Carlo Simulation
-          </CardTitle>
+        <CardHeader>
+          <CardTitle>Monte Carlo Simulation</CardTitle>
           <CardDescription>
-            Run thousands of scenarios to test portfolio outcomes under market volatility
+            Run seeded scenarios to examine a range of outcomes under market volatility.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label className="print:hidden">Select Profile</Label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 print:hidden">
-              {Object.entries(presetProfiles).map(([key, preset]) => (
-                <Button
-                  key={key}
-                  variant={profile === key ? 'default' : 'outline'}
-                  onClick={() => setProfile(key)}
-                  className="flex flex-col h-auto py-3"
-                >
-                  <span className="font-semibold text-right break-all text-xs sm:text-sm leading-tight">{preset.name}</span>
-                  {key !== 'custom' && (
-                    <span className="text-xs opacity-80">
-                      {preset.expectedReturn}% / {preset.volatility}% vol
-                    </span>
-                  )}
-                </Button>
-              ))}
-            </div>
-
-            {/* Print-only view of selected profile */}
-            <div className="hidden print:block text-sm">
-              <span className="font-semibold">Selected Profile:</span> {presetProfiles[profile].name}
-              {profile !== 'custom' && ` (${presetProfiles[profile].expectedReturn}% Return, ${presetProfiles[profile].volatility}% Volatility)`}
-            </div>
-            
-            <p className="text-xs text-muted-foreground mt-2 print:hidden">
-              {presetProfiles[profile].description}
-            </p>
+        <CardContent className="space-y-3">
+          <Label className="print:hidden">Select Profile</Label>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 print:hidden">
+            {Object.entries(presetProfiles).map(([key, preset]) => (
+              <Button
+                key={key}
+                type="button"
+                variant={profile === key ? 'default' : 'outline'}
+                onClick={() => setProfile(key)}
+                className="h-auto flex-col py-3"
+              >
+                <span className="text-xs font-semibold leading-tight sm:text-sm">{preset.name}</span>
+                {key !== 'custom' && (
+                  <span className="text-xs opacity-80">{preset.expectedReturn}% / {preset.volatility}% vol</span>
+                )}
+              </Button>
+            ))}
           </div>
+          <p className="text-xs text-muted-foreground print:hidden">{selectedProfile?.description}</p>
+          <p className="hidden text-sm print:block">
+            <span className="font-semibold">Selected Profile:</span> {selectedProfile?.name}
+          </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2 shrink-0 -ml-1">
-              <Coins className="h-5 w-5 text-violet-500" />
-              <CardTitle>Simulation Parameters</CardTitle>
-            </div>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <Coins className="h-5 w-5 text-violet-500" aria-hidden="true" />
+            Simulation Parameters
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
-            {/* Initial Value */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="mc-initial">Initial Portfolio Value ({currencySymbol})</Label>
               <NumericInput
                 id="mc-initial"
                 value={params.initialValue}
                 onChange={(value) => {
-                  let n = Number(value)
-                  if (!isFinite(n)) {
-                    setParams(updateInitialValueWithTrackedBasis(params, 0))
-                    return
-                  }
-                  // Currency clamp
-                  if (n !== 0 && Math.abs(n) < 0.01) n = 0.01
-                  const limited = Number(n.toFixed(2))
-                  setParams(updateInitialValueWithTrackedBasis(params, limited))
+                  let amount = Number(value)
+                  if (!Number.isFinite(amount)) amount = 0
+                  if (amount !== 0 && Math.abs(amount) < 0.01) amount = 0.01
+                  setParams(updateInitialValueWithTrackedBasis(params, Number(amount.toFixed(2))))
                 }}
                 min={mode === 'growth' ? 0 : 0.01}
                 max={1e18}
-                maxErrorMessage="This number violates several economic laws :)"
+                maxErrorMessage="This value is outside the supported range."
               />
             </div>
 
-            {/* Expected Return */}
             <div className="space-y-2">
-              <Label htmlFor="mc-return">Expected Annual Growth Rate (%)</Label>
+              <Label htmlFor="mc-return">Median Geometric Return Assumption (%)</Label>
               <NumericInput
                 id="mc-return"
                 step={0.1}
                 value={params.expectedReturn}
                 onChange={(value) => {
-                  let n = Number(value)
-                  if (!isFinite(n)) {
-                    setParams({ ...params, expectedReturn: 0 })
-                    return
-                  }
-                  // Rate clamp
-                  const MIN_ABS = 0.000001
-                  if (n !== 0 && Math.abs(n) < MIN_ABS) {
-                    n = MIN_ABS * Math.sign(n)
-                  }
-                  const limited = Number(n.toFixed(6))
-                  setParams({ ...params, expectedReturn: limited })
+                  const rate = Number.isFinite(Number(value)) ? Number(value) : 0
+                  setParams({ ...params, expectedReturn: Number(rate.toFixed(6)) })
                 }}
                 disabled={profile !== 'custom'}
-                min={-100}
+                min={-99.999999}
                 max={100000}
-                maxErrorMessage="Easy there, Jeff Bezos :)"
+                maxErrorMessage="This return is outside the supported range."
               />
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                With stress events off, this centers the median geometric path. It is not an arithmetic-mean forecast.
+              </p>
             </div>
 
-            {/* Volatility */}
             <div className="space-y-2">
               <Label htmlFor="mc-volatility">Volatility / Std Dev (%)</Label>
               <NumericInput
@@ -202,27 +142,16 @@ export function MonteCarloParameters({
                 step={0.1}
                 value={params.volatility}
                 onChange={(value) => {
-                  let n = Number(value)
-                  if (!isFinite(n)) {
-                    setParams({ ...params, volatility: 0 })
-                    return
-                  }
-                  // Volatility should be positive. Clamp tiny positive.
-                  const MIN_ABS = 0.000001
-                  if (n !== 0 && Math.abs(n) < MIN_ABS) {
-                    n = MIN_ABS
-                  }
-                  const limited = Number(n.toFixed(6))
-                  setParams({ ...params, volatility: limited })
+                  const volatility = Math.max(0, Number.isFinite(Number(value)) ? Number(value) : 0)
+                  setParams({ ...params, volatility: Number(volatility.toFixed(6)) })
                 }}
                 disabled={profile !== 'custom'}
                 min={0}
                 max={100}
-                maxErrorMessage="Even crypto thinks that's volatile :)"
+                maxErrorMessage="Volatility must be between 0% and 100%."
               />
             </div>
 
-            {/* Duration */}
             <div className="space-y-2">
               <Label htmlFor="mc-duration">Duration (Years)</Label>
               <NumericInput
@@ -231,41 +160,34 @@ export function MonteCarloParameters({
                 onChange={(value) => setParams({ ...params, duration: Math.max(1, Math.floor(value)) })}
                 min={1}
                 max={200}
-                maxErrorMessage="Even Michael Newman didn't live to 200 years :)"
+                maxErrorMessage="Duration is limited to 200 years."
               />
             </div>
 
-            {/* Cashflow (Contribution or Withdrawal) */}
             <div className="space-y-2">
-              <Label htmlFor="mc-cashflow">
-                {getCashflowLabel()} ({currencySymbol})
-              </Label>
+              <Label htmlFor="mc-cashflow">{cashflowLabel} ({currencySymbol})</Label>
               <NumericInput
                 id="mc-cashflow"
                 value={params.cashflowAmount}
                 onChange={(value) => {
-                  let n = Number(value)
-                  if (!isFinite(n)) n = 0
-                  if (n < 0) n = 0
-                  // Currency clamp
-                  if (n !== 0 && n < 0.01) n = 0.01
-                  const limited = Number(n.toFixed(2))
-                  setParams({ ...params, cashflowAmount: limited })
+                  let amount = Number(value)
+                  if (!Number.isFinite(amount) || amount < 0) amount = 0
+                  if (amount !== 0 && amount < 0.01) amount = 0.01
+                  setParams({ ...params, cashflowAmount: Number(amount.toFixed(2)) })
                 }}
                 min={0}
                 max={1e18}
-                maxErrorMessage="I admire your confidence, but no :)"
+                maxErrorMessage="This cashflow is outside the supported range."
               />
             </div>
 
-            {/* Cashflow Frequency */}
             <div className="space-y-2">
               <Label htmlFor="mc-frequency">Cashflow Frequency</Label>
               <Select
                 value={params.cashflowFrequency}
-                onValueChange={(value: any) => setParams({ ...params, cashflowFrequency: value })}
+                onValueChange={(value) => setParams({ ...params, cashflowFrequency: value as SimulationParams['cashflowFrequency'] })}
               >
-                <SelectTrigger id="mc-frequency" className="h-10">
+                <SelectTrigger id="mc-frequency" className="h-10 print:hidden">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -275,73 +197,81 @@ export function MonteCarloParameters({
                   <SelectItem value="yearly">Yearly</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="hidden text-xs capitalize text-muted-foreground print:block">Selected: {params.cashflowFrequency}</p>
             </div>
-            
-            {/* Inflation */}
+
             <div className="space-y-2">
-              <Label htmlFor="mc-inflation">
-                Annual Inflation (%)
-              </Label>
+              <Label htmlFor="mc-inflation">Annual Inflation (%)</Label>
               <NumericInput
                 id="mc-inflation"
                 step={0.1}
                 value={params.inflationAdjustment ?? 0}
                 onChange={(value) => {
-                  let n = Number(value)
-                  if (!isFinite(n)) {
-                    setParams({ ...params, inflationAdjustment: 0 })
-                    return
-                  }
-                  const MIN_ABS = 0.000001
-                  if (n !== 0 && Math.abs(n) < MIN_ABS) {
-                    n = MIN_ABS * Math.sign(n)
-                  }
-                  const limited = Number(n.toFixed(6))
-                  setParams({ ...params, inflationAdjustment: limited })
+                  const inflation = Number.isFinite(Number(value)) ? Number(value) : 0
+                  setParams({ ...params, inflationAdjustment: Number(inflation.toFixed(6)) })
                 }}
                 min={-50}
                 max={100}
-                maxErrorMessage="Easy there, Zimbabwe :)"
+                maxErrorMessage="Inflation must be between -50% and 100%."
               />
             </div>
 
-            {/* Number of Scenarios */}
             <div className="space-y-2">
               <Label htmlFor="mc-paths">Number of Scenarios</Label>
               <Select
-                value={params.numPaths?.toString() ?? '500'}
+                value={params.numPaths.toString()}
                 onValueChange={(value) => setParams({ ...params, numPaths: Number(value) })}
               >
                 <SelectTrigger id="mc-paths" className="print:hidden">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">1 scenario - sample path</SelectItem>
+                  <SelectItem value="1">1 scenario, sample path</SelectItem>
                   <SelectItem value="100">100 scenarios</SelectItem>
                   <SelectItem value="500">500 scenarios</SelectItem>
                   <SelectItem value="1000">1,000 scenarios</SelectItem>
                   <SelectItem value="5000">5,000 scenarios</SelectItem>
                   <SelectItem value="10000">10,000 scenarios</SelectItem>
                   <SelectItem value="50000">50,000 scenarios</SelectItem>
-                  <SelectItem value="100000">100,000 scenarios (Slow)</SelectItem>
+                  <SelectItem value="100000">100,000 scenarios</SelectItem>
                 </SelectContent>
               </Select>
               {workloadTooLarge ? (
-                <p className="text-[10px] text-destructive font-medium pt-1 print:hidden">
+                <p role="alert" className="text-[10px] font-medium text-destructive print:hidden">
                   This request contains {estimatedWork.toLocaleString()} path-period calculations. Reduce scenarios, duration, or frequency to {MAX_MONTE_CARLO_WORK.toLocaleString()} or less.
                 </p>
               ) : params.numPaths >= 50_000 ? (
-                <p className="text-[10px] text-orange-500 font-medium pt-1 print:hidden">
-                  Large simulations can take noticeable time. More scenarios reduce sampling noise but do not improve the assumptions themselves.
+                <p className="text-[10px] font-medium text-orange-600 dark:text-orange-400 print:hidden">
+                  Large runs reduce sampling noise but can take noticeably longer.
                 </p>
               ) : null}
-
-              <p className="hidden print:block text-xs text-muted-foreground">
-                Selected: {(params.numPaths ?? 500).toLocaleString()}
-              </p>
+              <p className="hidden text-xs text-muted-foreground print:block">Selected: {params.numPaths.toLocaleString()}</p>
             </div>
 
-            {/* Portfolio Goal (Growth Mode Only) */}
+            <div className={`space-y-2 self-start sm:pt-1 ${mode === 'withdrawal' ? 'sm:col-span-2' : ''}`}>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="mc-tax-enabled" className="flex items-center gap-2">
+                  <Scale className="h-4 w-4" aria-hidden="true" />
+                  Enable Taxes
+                  <span className="hidden font-normal text-muted-foreground print:inline">
+                    {params.taxEnabled ? '(Enabled)' : '(Disabled)'}
+                  </span>
+                </Label>
+                <Switch
+                  id="mc-tax-enabled"
+                  className="print:hidden"
+                  checked={params.taxEnabled ?? false}
+                  onCheckedChange={(checked) => {
+                    let taxRate = params.taxRate ?? 0
+                    if (checked && taxRate === 0) {
+                      taxRate = mode === 'withdrawal' ? 20 : params.taxType === 'income' ? 25 : 15
+                    }
+                    setParams({ ...params, taxEnabled: checked, taxRate })
+                  }}
+                />
+              </div>
+            </div>
+
             {mode === 'growth' && (
               <div className="space-y-2">
                 <Label htmlFor="mc-goal">Portfolio Goal (Optional)</Label>
@@ -354,44 +284,15 @@ export function MonteCarloParameters({
                       setParams({ ...params, portfolioGoal: undefined })
                       return
                     }
-                    let n = Number(value)
-                    if (!isFinite(n)) return
-                    if (n < 0) n = 0
-                    if (n !== 0 && n < 0.01) n = 0.01
-                    const limited = Number(n.toFixed(2))
-                    setParams({ ...params, portfolioGoal: limited })
+                    const goal = Math.max(0, Number(value))
+                    setParams({ ...params, portfolioGoal: Number(goal.toFixed(2)) })
                   }}
                   min={0}
                   max={1e18}
-                  maxErrorMessage="Sir, this is a Wendy's :)"
+                  maxErrorMessage="This goal is outside the supported range."
                 />
               </div>
             )}
-
-            {/* Tax Options */}
-            <div className={`space-y-2 self-start sm:pt-1 ${mode === 'withdrawal' ? 'sm:col-span-2' : ''}`}>
-              <div className="flex items-center justify-left gap-2">
-                <Label htmlFor="mc-tax-enabled" className="flex items-center gap-2">
-                  <Scale className="h-4 w-4" />
-                  Enable Taxes
-                  <span className="hidden print:inline font-normal text-muted-foreground">
-                    {params.taxEnabled ? '(Enabled)' : '(Disabled)'}
-                  </span>
-                </Label>
-                <Switch
-                  id="mc-tax-enabled"
-                  className="print:hidden"
-                  checked={params.taxEnabled ?? false}
-                  onCheckedChange={(checked) => {
-                    let newRate = params.taxRate ?? 0
-                    if (checked && newRate === 0) {
-                      newRate = mode === 'withdrawal' ? 20 : params.taxType === 'income' ? 25 : 15
-                    }
-                    setParams({ ...params, taxEnabled: checked, taxRate: newRate })
-                  }}
-                />
-              </div>
-            </div>
 
             {params.taxEnabled && (
               <TaxSettingsPanel
@@ -403,66 +304,48 @@ export function MonteCarloParameters({
                 taxType={params.taxType ?? 'capital_gains'}
                 currentCostBasis={params.startingCostBasis ?? params.initialValue}
                 currencySymbol={currencySymbol}
-                basisHelp="Automatically follows Initial Portfolio Value until you edit it. Tax basis is then tracked separately for the taxable-account calculation."
-                taxRateErrorMessage="At 100% you are officially working for free :)"
+                basisHelp="Automatically follows Initial Portfolio Value until you edit it. Tax basis is then tracked separately."
+                taxRateErrorMessage="Tax rate is limited to 99%."
                 onTaxRateChange={(value) => setParams({ ...params, taxRate: Math.max(0, Math.min(99, value)) })}
                 onTaxTypeChange={(value) => setParams({ ...params, taxType: value })}
                 onCostBasisChange={(value) => setParams(markCostBasisUserEdited(params, value))}
                 description={mode === 'growth'
                   ? params.taxType === 'income'
-                    ? 'Taxes reduce the annual return rate.'
+                    ? 'Positive expected growth is reduced by the selected annual income-tax drag.'
                     : params.taxType === 'tax_deferred'
-                      ? 'The full balance is valued after the assumed effective tax rate.'
-                      : 'Capital gains tax is deducted from final profit.'
+                      ? 'The full ending balance is valued after the selected effective tax rate.'
+                      : 'Capital-gains tax is estimated from gains above the tracked cost basis.'
                   : params.taxType === 'tax_deferred'
-                    ? <>
-                        Withdrawing <span className="font-semibold text-primary">{formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}</span> per {getCashflowPeriodNoun()}, you will net{' '}
-                        <span className="font-semibold text-primary">
-                          {formatCurrency((params.cashflowAmount ?? 0) * (1 - Math.min(params.taxRate ?? 0, 99) / 100), true, 2, false)}
-                        </span>{' '}after taxes.
-                      </>
+                    ? <>A gross {periodNoun(params.cashflowFrequency)}ly withdrawal of <strong>{formatCurrency(params.cashflowAmount, true, 0, false)}</strong> produces after-tax spending based on the selected rate.</>
                     : params.taxType === 'income'
-                      ? <>Taxes are paid annually on interest and slow portfolio growth. Your withdrawal remains {formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}.</>
-                      : <>Withdrawing <span className="font-semibold">{formatCurrencyFullUnder100m(params.cashflowAmount ?? 0)}</span> gross, capital gains tax is deducted from this amount. Net spending varies as cost basis changes.</>}
+                      ? <>Taxes reduce positive portfolio growth. The requested withdrawal remains gross spending.</>
+                      : <>Capital-gains tax is estimated proportionally from unrealized gains, so net spending changes as cost basis changes.</>}
               />
             )}
-
           </div>
 
-          {/* Advanced Settings */}
-          <div className="pt-4 border-t">
+          <div className="border-t pt-4">
             <Button
+              type="button"
               variant="ghost"
               size="sm"
-              className="flex items-center gap-2 p-0 h-auto font-medium hover:bg-transparent hover:text-primary print:hidden"
-              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="h-auto gap-2 p-0 font-medium hover:bg-transparent hover:text-primary print:hidden"
+              onClick={() => setShowAdvanced((current) => !current)}
+              aria-expanded={showAdvanced}
             >
-              <Settings2 className="h-4 w-4" />
+              <Settings2 className="h-4 w-4" aria-hidden="true" />
               Advanced Settings
             </Button>
 
-            <div className="hidden print:block pt-1">
-               <div className="flex items-center gap-2 font-medium text-sm">
-                  <Settings2 className="h-4 w-4" />
-                  Advanced Settings
-               </div>
-               <p className="text-xs text-muted-foreground pt-1">
-                  Interest Rate Calculation: {(params.calculationMode ?? 'effective') === 'nominal' ? 'Nominal Rate (APR)' : 'Effective Rate (APY)'}
-               </p>
-               <p className="text-xs text-muted-foreground pt-1">
-                  Extreme crash cycles: {params.enableCrashRisk ? 'Enabled' : 'Disabled'}
-               </p>
-            </div>
-            
             {showAdvanced && (
-              <div className="pt-4 animate-in fade-in slide-in-from-top-2 duration-200 space-y-4 print:hidden">
-                 <div className="space-y-2">
+              <div className="space-y-4 pt-4 print:hidden">
+                <div className="space-y-2">
                   <Label htmlFor="mc-calc-mode">Interest Rate Calculation</Label>
                   <Select
                     value={params.calculationMode ?? 'effective'}
-                    onValueChange={(value: any) => setParams({ ...params, calculationMode: value })}
+                    onValueChange={(value) => setParams({ ...params, calculationMode: value as 'effective' | 'nominal' })}
                   >
-                    <SelectTrigger id="mc-calc-mode" className="w-full sm:w-[50%]">
+                    <SelectTrigger id="mc-calc-mode" className="w-full sm:w-1/2">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -472,12 +355,13 @@ export function MonteCarloParameters({
                   </Select>
                   <p className="text-xs text-muted-foreground">
                     {params.calculationMode === 'nominal'
-                      ? "Input is Nominal (APR). We convert this to a higher Effective Annual Rate for the simulation to account for monthly compounding."
-                      : "Input is Effective (APY). With stress events off, the model centers its median geometric path around this assumption."}
+                      ? 'The entered APR is divided across the selected periods, producing a compounded effective annual rate.'
+                      : 'The entered effective annual assumption is converted to an equivalent per-period rate.'}
                   </p>
                 </div>
+
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-3">
                     <Label htmlFor="mc-crash-risk">Market crash and recovery stress events</Label>
                     <Switch
                       id="mc-crash-risk"
@@ -486,7 +370,7 @@ export function MonteCarloParameters({
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Adds optional horizon-scaled market declines followed by partial recoveries. Short simulations may have no stress event.
+                    Adds seeded, horizon-scaled declines followed by partial recoveries. These are heuristic stress events, not forecasts.
                   </p>
                 </div>
               </div>
@@ -494,11 +378,12 @@ export function MonteCarloParameters({
           </div>
 
           <Button
+            type="button"
             onClick={onRun}
             disabled={isSimulating || workloadTooLarge}
-            className="w-full sm:w-auto print:hidden" 
+            className="w-full sm:w-auto print:hidden"
           >
-            <Zap className="h-4 w-4 mr-2" />
+            <Zap className="mr-2 h-4 w-4" aria-hidden="true" />
             {isSimulating ? 'Simulating...' : 'Run New Simulation'}
           </Button>
         </CardContent>

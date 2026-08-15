@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { isValidGrowthState, isValidWithdrawalState } from '@/lib/simulation/deterministic-validation'
 
 interface LocalStorageOptions<T> {
   normalize?: (value: T, persistedValue: unknown | null) => T
   shouldPersist?: (value: T) => boolean
+  validatePersisted?: (value: unknown) => value is T
 }
 
 export function useLocalStorage<T>(
@@ -16,14 +18,23 @@ export function useLocalStorage<T>(
   normalizeRef.current = options.normalize
   const shouldPersistRef = useRef(options.shouldPersist)
   shouldPersistRef.current = options.shouldPersist
+  const initialRecord = typeof initialValue === 'object' && initialValue !== null && !Array.isArray(initialValue)
+    ? initialValue as Record<string, unknown>
+    : null
+  const defaultValidator = key === 'growth-mode-state' && initialRecord && 'periodicAddition' in initialRecord
+    ? isValidGrowthState
+    : key === 'withdrawal-mode-state' && initialRecord && 'periodicWithdrawal' in initialRecord
+      ? isValidWithdrawalState
+      : undefined
+  const validatePersistedRef = useRef(options.validatePersisted ?? defaultValidator)
+  validatePersistedRef.current = options.validatePersisted ?? defaultValidator
+
   const normalizeValue = useCallback(
     (value: T, persistedValue: unknown | null) =>
       normalizeRef.current ? normalizeRef.current(value, persistedValue) : value,
     [],
   )
   const [storedValue, setStoredValue] = useState<T>(() => normalizeValue(initialValue, null))
-  
-  // Use a ref to hold initialValue to avoid dependency loops in useEffect
   const initialValueRef = useRef(initialValue)
 
   useEffect(() => {
@@ -72,6 +83,17 @@ export function useLocalStorage<T>(
         && !Array.isArray(parsed)
       ) ? { ...initVal, ...parsed } as T : parsed as T
       const normalized = normalizeValue(merged, parsed)
+
+      if (validatePersistedRef.current && !validatePersistedRef.current(normalized)) {
+        try {
+          window.localStorage.removeItem(key)
+        } catch {
+          // Keep the safe default in memory when storage cannot be changed.
+        }
+        setStoredValue(normalizedDefault)
+        return
+      }
+
       setStoredValue(normalized)
       if (JSON.stringify(normalized) !== JSON.stringify(parsed)) {
         try {
@@ -82,12 +104,10 @@ export function useLocalStorage<T>(
       }
     }
 
-    // Initial load
     loadValue()
 
-    // Listen for changes
-    const handleStorageChange = (e: StorageEvent | CustomEvent) => {
-      if ((e as StorageEvent).key === key || (e as CustomEvent).detail?.key === key) {
+    const handleStorageChange = (event: StorageEvent | CustomEvent) => {
+      if ((event as StorageEvent).key === key || (event as CustomEvent).detail?.key === key) {
         loadValue()
       }
     }
@@ -101,8 +121,6 @@ export function useLocalStorage<T>(
     }
   }, [key, normalizeValue])
 
-  // FIX: Wrap setValue in useCallback to ensure the function reference remains stable.
-  // This prevents infinite render loops in child components that depend on 'setState'.
   const setValue = useCallback((value: T | ((val: T) => T)) => {
     setStoredValue((currentStoredValue) => {
       const nextValue = value instanceof Function ? value(currentStoredValue) : value

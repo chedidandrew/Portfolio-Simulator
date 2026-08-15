@@ -1,39 +1,35 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { X, ArrowDownToLine } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+}
+
 export function PwaInstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
-    const handler = (e: any) => {
-      // Prevent the mini-infobar from appearing on mobile
-      e.preventDefault()
-      // Stash the event so it can be triggered later.
-      setDeferredPrompt(e)
-      // Update UI notify the user they can install the PWA
+    const handler = (event: Event) => {
+      const installEvent = event as BeforeInstallPromptEvent
+      installEvent.preventDefault()
+      setDeferredPrompt(installEvent)
       setIsVisible(true)
     }
 
     window.addEventListener('beforeinstallprompt', handler)
-
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return
-
-    // Show the install prompt
-    deferredPrompt.prompt()
-
-    // Wait for the user to respond to the prompt
-    const { outcome } = await deferredPrompt.userChoice
-    
-    // We've used the prompt, and can't use it again, discard it
+    await deferredPrompt.prompt()
+    await deferredPrompt.userChoice
     setDeferredPrompt(null)
     setIsVisible(false)
   }
@@ -54,10 +50,16 @@ export function PwaInstallPrompt() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => setIsVisible(false)}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              aria-label="Dismiss install prompt"
+              onClick={() => setIsVisible(false)}
+            >
               <X className="h-4 w-4" />
             </Button>
-            <Button size="sm" onClick={handleInstallClick}>
+            <Button type="button" size="sm" onClick={handleInstallClick}>
               <ArrowDownToLine className="h-4 w-4 mr-2" />
               Install
             </Button>

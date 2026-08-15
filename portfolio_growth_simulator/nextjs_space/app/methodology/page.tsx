@@ -1,115 +1,77 @@
 'use client'
 
-import React, { useState } from 'react'
+import { useState, type ElementType, type ReactNode } from 'react'
 import Link from 'next/link'
-import { 
-  ArrowLeft, 
-  Calculator, 
-  TrendingUp, 
-  TrendingDown, 
-  Activity, 
-  DollarSign, 
-  Dices,
-  BookOpen,
-  ChevronDown,
-  Percent,
-  Scale,
-  HelpCircle,
+import {
+  Activity,
   AlertTriangle,
-  FileText
+  ArrowLeft,
+  Calculator,
+  ChevronDown,
+  Clock3,
+  Dices,
+  DollarSign,
+  FileText,
+  Scale,
+  ShieldCheck,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { cn } from '@/lib/utils'
-import { motion } from 'framer-motion'
 import { BlockMath } from 'react-katex'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { DonationSection } from '@/components/donation-section'
+import { cn } from '@/lib/utils'
+import {
+  MAX_DETERMINISTIC_STEPS,
+  MAX_SCENARIO_DURATION_YEARS,
+} from '@/lib/simulation/deterministic-validation'
+import { MAX_CHART_POINTS, MAX_MONTE_CARLO_WORK } from '@/lib/simulation/financial-utils'
 
-// --- 1. Reusing Animation Variants from GuideTab ---
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
+interface MethodologySectionProps {
+  title: string
+  description: string
+  icon: ElementType
+  children: ReactNode
+  defaultOpen?: boolean
+  accentClass?: string
 }
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: { type: "spring", stiffness: 300, damping: 24 }
-  }
-}
-
-// --- 2. Reusing the GuideSection Component for consistency ---
-function MethodologySection({ 
-  title, 
-  icon: Icon, 
-  description, 
-  children, 
+function MethodologySection({
+  title,
+  description,
+  icon: Icon,
+  children,
   defaultOpen = false,
-  className,
-  headerClassName,
-  iconColorClass = "text-foreground", 
-  iconWrapperClass = "bg-muted text-muted-foreground group-hover:bg-muted/80" 
-}: { 
-  title: string, 
-  icon: any, 
-  description?: string, 
-  children: React.ReactNode, 
-  defaultOpen?: boolean,
-  className?: string,
-  headerClassName?: string,
-  iconColorClass?: string,
-  iconWrapperClass?: string
-}) {
+  accentClass = 'border-l-primary/60',
+}: MethodologySectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className={cn("group", className)}>
-      <Card className={cn(
-        "border-l-4 transition-all duration-300 shadow-sm",
-        "bg-gradient-to-br from-card to-muted/5", // Subtle gradient for depth
-        isOpen 
-          ? "border-l-primary/50 shadow-md ring-1 ring-primary/5" 
-          : "border-l-transparent hover:border-l-muted/30 hover:shadow-md",
-        className
-      )}>
-        <CollapsibleTrigger
-          className={cn("w-full cursor-pointer px-6 py-5 text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", headerClassName)}
-        >
-            <span className="flex items-center justify-between">
-              <span className="flex items-center gap-3">
-                <span className={cn(
-                  "p-2 rounded-lg transition-colors duration-300 shadow-sm", 
-                  iconWrapperClass
-                )}>
-                  <Icon className={cn("h-5 w-5", iconColorClass)} />
-                </span>
-                <span className="block space-y-1 text-left">
-                  <span className="block text-lg font-semibold leading-none tracking-tight text-foreground">{title}</span>
-                  {description && <span className="block text-sm text-muted-foreground">{description}</span>}
-                </span>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className={cn('overflow-hidden border-l-4', accentClass)}>
+        <CollapsibleTrigger className="w-full px-5 py-5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+          <span className="flex items-start justify-between gap-4">
+            <span className="flex items-start gap-3">
+              <span className="mt-0.5 rounded-lg bg-muted p-2">
+                <Icon className="h-5 w-5" aria-hidden="true" />
               </span>
-              <span className={cn(
-                "p-1 rounded-full border transition-all duration-300",
-                isOpen ? "bg-muted text-foreground rotate-180 shadow-inner" : "bg-transparent text-muted-foreground border-transparent group-hover:border-border"
-              )}>
-                <ChevronDown className="h-4 w-4" />
+              <span className="space-y-1">
+                <span className="block text-lg font-semibold text-foreground">{title}</span>
+                <span className="block text-sm font-normal text-muted-foreground">{description}</span>
               </span>
             </span>
+            <ChevronDown
+              className={cn('mt-1 h-5 w-5 shrink-0 transition-transform', isOpen && 'rotate-180')}
+              aria-hidden="true"
+            />
+          </span>
         </CollapsibleTrigger>
-        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
-          <CardContent className="pt-0 pb-6 text-sm text-muted-foreground">
-            <div className="pl-0 sm:pl-[3.25rem]"> 
-              {children}
-            </div>
+        <CollapsibleContent>
+          <CardContent className="border-t pt-5 text-sm leading-relaxed text-muted-foreground">
+            {children}
           </CardContent>
         </CollapsibleContent>
       </Card>
@@ -117,487 +79,290 @@ function MethodologySection({
   )
 }
 
+function FormulaCard({ title, formula, children }: { title: string; formula: string; children?: ReactNode }) {
+  return (
+    <div className="space-y-2 rounded-lg border bg-background/50 p-4">
+      <p className="font-semibold text-foreground">{title}</p>
+      <div className="overflow-x-auto rounded-md bg-muted/40 px-3 py-2">
+        <BlockMath math={formula} />
+      </div>
+      {children}
+    </div>
+  )
+}
+
 export default function MethodologyPage() {
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <motion.div 
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="mx-auto max-w-4xl space-y-6 pb-8"
-      >
-        
-        {/* Header Section */}
-        <motion.div variants={itemVariants} className="space-y-4">
-          <Button asChild variant="ghost" className="pl-0 hover:pl-2 transition-all gap-2 text-muted-foreground hover:text-foreground">
-            <Link href="/">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Simulator
-            </Link>
-          </Button>
-          
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent sm:text-4xl">
-              Methodology & Logic
-            </h1>
-            <p className="text-xl text-muted-foreground">
-              A transparent look at the math, formulas, and assumptions driving your simulation.
+    <div className="min-h-screen bg-background px-4 py-6 md:px-8 md:py-10">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <Button asChild variant="ghost" className="-ml-3 gap-2">
+          <Link href="/">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back to Simulator
+          </Link>
+        </Button>
+
+        <header className="space-y-3">
+          <Badge variant="outline">Model documentation</Badge>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Methodology &amp; Model Assumptions</h1>
+          <p className="max-w-3xl text-lg text-muted-foreground">
+            How deterministic projections, Monte Carlo scenarios, inflation, withdrawals, and simplified taxes are calculated.
+          </p>
+        </header>
+
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-3">
+            <h2 className="flex items-center gap-2 text-xl font-semibold text-foreground">
+              <ShieldCheck className="h-5 w-5 text-primary" aria-hidden="true" />
+              What this tool is
+            </h2>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              Portfolio Simulator is an educational scenario model. It applies the assumptions you enter consistently and exposes both deterministic and randomized outcomes. It does not predict markets, provide individualized advice, or reproduce a complete tax return.
+            </p>
+            <p>
+              The selected display currency changes symbols and number formatting only. No foreign-exchange conversion is performed.
+            </p>
+          </CardContent>
+        </Card>
+
+        <MethodologySection
+          title="Growth Phase"
+          description="Deterministic accumulation with recurring contributions"
+          icon={TrendingUp}
+          defaultOpen
+          accentClass="border-l-emerald-500/70"
+        >
+          <div className="space-y-5">
+            <p>
+              The growth engine advances one period at a time using the frequency you select: yearly, quarterly, monthly, or weekly. Market growth is applied first, then the contribution is added at the end of that period. A newly added contribution therefore begins earning returns in the following period.
+            </p>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormulaCard
+                title="Effective annual return"
+                formula={String.raw`r_p=(1+r_{annual})^{1/n}-1`}
+              >
+                <p>
+                  Effective mode converts the annual assumption into an equivalent periodic rate, so a full year compounds back to the entered annual rate.
+                </p>
+              </FormulaCard>
+              <FormulaCard
+                title="Nominal annual rate"
+                formula={String.raw`r_p=\frac{r_{annual}}{n}`}
+              >
+                <p>
+                  Nominal mode divides the entered APR by the number of periods. Periodic compounding can therefore produce an effective annual result above the entered nominal rate.
+                </p>
+              </FormulaCard>
+            </div>
+
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <p className="font-semibold text-foreground">Contribution growth</p>
+              <p className="mt-1">
+                Contributions can increase once per year using the inflation input. This option is off in the default Growth scenario, but can be enabled beside the inflation field.
+              </p>
+            </div>
+          </div>
+        </MethodologySection>
+
+        <MethodologySection
+          title="Withdrawal Phase"
+          description="Deterministic retirement spending and depletion timing"
+          icon={TrendingDown}
+          accentClass="border-l-blue-500/70"
+        >
+          <div className="space-y-5">
+            <p>
+              Withdrawals occur at the start of each selected period, before that period&apos;s market growth. This is deliberately conservative because money removed for spending does not receive the period&apos;s return.
+            </p>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <p className="flex items-center gap-2 font-semibold text-foreground">
+                  <Clock3 className="h-4 w-4" aria-hidden="true" />
+                  Sustainability
+                </p>
+                <p className="mt-2">
+                  A plan succeeds only when every requested withdrawal is fully funded. Ending exactly at zero after the final scheduled payment still counts as success because the complete requested horizon was funded.
+                </p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <p className="flex items-center gap-2 font-semibold text-foreground">
+                  <DollarSign className="h-4 w-4" aria-hidden="true" />
+                  Withdrawal growth
+                </p>
+                <p className="mt-2">
+                  The default Withdrawal scenario increases spending annually by the inflation rate. The adjustment can be disabled when modeling a fixed nominal withdrawal.
+                </p>
+              </div>
+            </div>
+
+            <p>
+              The yearly table reports realized withdrawals, not merely scheduled withdrawals. Once the portfolio is depleted, unfunded amounts are not counted as money received.
             </p>
           </div>
-        </motion.div>
+        </MethodologySection>
 
-        {/* Core Philosophy Card */}
-        <motion.div variants={itemVariants}>
-          <Card className="border-l-4 border-l-primary bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
-            <CardHeader>
-              <h2 className="flex items-center gap-2 text-2xl font-semibold leading-none tracking-tight text-primary">
-                <Scale className="h-5 w-5 shrink-0" />
-                Core Philosophy
-              </h2>
-            </CardHeader>
-            <CardContent>
-              <p className="leading-relaxed text-foreground/80">
-                Portfolio Simulator uses industry standard growth math while you are building wealth. 
-                Once withdrawals begin, it shifts to a more conservative modeling approach designed 
-                to test sustainability under adverse conditions rather than maximize projections.
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <MethodologySection
+          title="Monte Carlo Simulation"
+          description="Seeded lognormal return paths at the user-selected frequency"
+          icon={Dices}
+          accentClass="border-l-violet-500/70"
+        >
+          <div className="space-y-5">
+            <p>
+              Monte Carlo mode runs many possible paths using JavaScript&apos;s double-precision number format. The work normally runs in a Web Worker so the interface remains responsive. The same inputs and random seed reproduce the same paths.
+            </p>
 
-        {/* 1. Growth Phase */}
-        <motion.div variants={itemVariants}>
-          <MethodologySection 
-            title="Growth Phase (Accumulation)" 
-            icon={TrendingUp} 
-            description="How Portfolio Simulator calculates wealth building"
-            defaultOpen={true}
-            iconColorClass="text-emerald-500"
-            iconWrapperClass="bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20"
-            className="border-emerald-500/20"
-          >
-            {/* CHANGED: Removed md:grid-cols-2 to force vertical stacking */}
-            <div className="grid gap-6">
-              <div className="space-y-3 p-4 rounded-lg bg-muted/40">
-                <div className="flex items-center gap-2 font-semibold text-foreground">
-                  <Calculator className="h-4 w-4 text-emerald-500" />
-                  The Math: Nominal vs. Effective
-                </div>
-                <p className="text-sm leading-relaxed">
-                  The simulator supports two calculation modes. <strong>Effective (APY)</strong> ensures your annual result matches your input exactly. <strong>Nominal (APR)</strong> simply divides the rate by 12, which results in slightly higher returns due to monthly compounding.
-                </p>
-
-                <div className="p-3 bg-background/50 rounded-md border border-border/50">
-                  <p className="text-xs font-semibold text-foreground mb-1">Which should I use?</p>
-                  <p className="text-xs text-muted-foreground overflow-x-auto">
-                    Stick with <strong>Effective (Default)</strong>. This matches how investment returns (CAGR) are typically quoted. Only use Nominal if you are modeling a debt payoff (like a mortgage) calculated as APR.
-                  </p>
-                </div>
-
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-md border bg-background/40 px-3 py-2">
-                    <p className="text-xs text-center text-muted-foreground mb-1">Effective (Default)</p>
-                    <BlockMath math={String.raw`r_m = (1 + r_{\text{annual}})^{\tfrac{1}{12}} - 1`} />
-                  </div>
-                  
-                  <div className="rounded-md border bg-background/40 px-3 py-2">
-                    <p className="text-xs text-center text-muted-foreground mb-1 overflow-x-auto">Nominal (Advanced Settings)</p>
-                    <BlockMath math={String.raw`r_m = \frac{r_{\text{annual}}}{12}`} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3 p-4 rounded-lg bg-muted/40">
-                <div className="flex items-center gap-2 font-semibold text-foreground">
-                  <Activity className="h-4 w-4 text-emerald-500" />
-                  Timing: End-of-Month
-                </div>
-                <p className="text-sm leading-relaxed">
-                  Growth assumes you contribute money at the <strong>end</strong> of the month. This means your new contributions don’t earn interest in the very first month they are added.
-                </p>
-                <Badge variant="outline" className="mt-1 text-emerald-600 border-emerald-500/30">
-                  Prevents Over-Estimation
-                </Badge>
-              </div>
-            </div>
-          </MethodologySection>
-        </motion.div>
-
-        {/* 2. Withdrawal Phase */}
-        <motion.div variants={itemVariants}>
-          <MethodologySection 
-            title="Withdrawal Phase (Decumulation)" 
-            icon={TrendingDown} 
-            description="How Portfolio Simulator helps your money last"
-            defaultOpen={false}
-            iconColorClass="text-blue-500"
-            iconWrapperClass="bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20"
-            className="border-blue-500/20"
-          >
-            {/* CHANGED: Removed md:grid-cols-2 to force vertical stacking */}
-            <div className="grid gap-6">
-              <div className="space-y-3 p-4 rounded-lg bg-muted/40">
-                <div className="flex items-center gap-2 font-semibold text-foreground">
-                  <Calculator className="h-4 w-4 text-blue-500" />
-                  The Math: Nominal vs. Effective
-                </div>
-                <p className="text-sm leading-relaxed">
-                  Just like growth, withdrawals support two modes. <strong>Effective (APY)</strong> pays out interest based on strict annual equivalence. <strong>Nominal (APR)</strong> uses a simple division by 12, often resulting in slightly different monthly interest credits.
-                </p>
-
-                <div className="p-3 bg-background/50 rounded-md border border-border/50">
-                  <p className="text-xs font-semibold text-foreground mb-1">Which should I use?</p>
-                  <p className="text-xs text-muted-foreground">
-                    Stick with <strong>Effective (Default)</strong>. This matches how investment returns (CAGR) are typically quoted. Only use Nominal if you are modeling a debt payoff (like a mortgage) calculated as APR.
-                  </p>
-                </div>
-
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-md border bg-background/40 px-3 py-2">
-                    <p className="text-xs text-center text-muted-foreground mb-1 overflow-x-auto">Effective (Default)</p>
-                    <BlockMath math={String.raw`r_m = (1 + r_{\text{annual}})^{\tfrac{1}{12}} - 1`} />
-                  </div>
-                  
-                  <div className="rounded-md border bg-background/40 px-3 py-2">
-                    <p className="text-xs text-center text-muted-foreground mb-1 overflow-x-auto">Nominal (Advanced Settings)</p>
-                    <BlockMath math={String.raw`r_m = \frac{r_{\text{annual}}}{12}`} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3 p-4 rounded-lg bg-muted/40">
-                <div className="flex items-center gap-2 font-semibold text-foreground">
-                  <Activity className="h-4 w-4 text-blue-500" />
-                  Timing: Start-of-Month
-                </div>
-                <p className="text-sm leading-relaxed">
-                  Withdrawals happen at the <strong>start</strong> of the month (like rent/mortgage). This money leaves your account <em>before</em> it earns interest for that month.
-                </p>
-                <Badge variant="outline" className="mt-1 text-blue-600 border-blue-500/30">
-                  Conservative Stress Test
-                </Badge>
-              </div>
-            </div>
-          </MethodologySection>
-        </motion.div>
-
-        {/* 3. Inflation */}
-        <motion.div variants={itemVariants}>
-          <MethodologySection 
-            title="Inflation & Real Value" 
-            icon={DollarSign} 
-            description="Calculating purchasing power in today's dollars"
-            defaultOpen={false}
-            iconColorClass="text-pink-500"
-            iconWrapperClass="bg-pink-500/10 text-pink-500 group-hover:bg-pink-500/20"
-            className="border-pink-500/20"
-          >
-            <div className="space-y-4">
-              <p className="text-sm leading-relaxed">
-                $1 million in 30 years won’t buy what $1 million buys today. Portfolio Simulator calculates two values simultaneously:
-              </p>
-              
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="p-3 bg-muted/40 rounded-lg border border-border/50">
-                  <span className="font-semibold block mb-1 text-foreground">Nominal Value</span>
-                  <span className="text-xs">The actual number written on the check in the future.</span>
-                </div>
-                <div className="p-3 bg-muted/40 rounded-lg border border-border/50">
-                  <span className="font-semibold block mb-1 text-foreground">Real Value (Adjusted)</span>
-                  <span className="text-xs">What that check can actually buy in terms of today’s goods.</span>
-                </div>
-              </div>
-
-              <div className="mt-2 rounded-md border bg-background/40 px-4 py-3 flex justify-center overflow-x-auto">
-                  <BlockMath math={String.raw`\text{Real Value} = \frac{\text{Future Value}}{(1 + \text{Inflation Rate})^{\text{Years}}}`} />
-              </div>
-
-              <div className="rounded-md bg-pink-500/10 p-3 border border-pink-500/20">
-                <p className="text-xs text-foreground/90">
-                  <strong>Note on Contributions:</strong> By default, the simulator assumes your monthly contributions (or withdrawals) increase annually to match the inflation rate. 
-                  This models the real-world scenario where your salary (and savings capacity) tends to rise with the cost of living.
-                </p>
-              </div>
-            </div>
-          </MethodologySection>
-        </motion.div>
-
-        {/* 4. Monte Carlo */}
-        <motion.div variants={itemVariants}>
-          <MethodologySection 
-            title="Monte Carlo Simulation" 
-            icon={Dices} 
-            description="Understanding volatility and risk"
-            defaultOpen={false}
-            iconColorClass="text-violet-500"
-            iconWrapperClass="bg-violet-500/10 text-violet-500 group-hover:bg-violet-500/20"
-            className="border-violet-500/20"
-          >
-              <div className="space-y-4">
-              <p className="text-sm leading-relaxed">
-                Standard calculators assume returns follow a straight line (e.g., 8% every year), which is not how the real world works. 
-                The Monte Carlo simulation models this uncertainty by introducing <strong>volatility (Risk)</strong> and generating many possible return paths.
-              </p>
-
-              {/* Nominal vs Effective Explanation */}
-              <div className="space-y-3 p-4 rounded-lg bg-muted/40">
-                <div className="flex items-center gap-2 font-semibold text-foreground">
-                  <Calculator className="h-4 w-4 text-violet-500" />
-                  The Math: Nominal vs. Effective
-                </div>
-                <p className="text-sm leading-relaxed">
-                  The simulation relies on “Drift” μ to generate returns. <strong>Effective (Default)</strong> derives drift directly from your input, ensuring the median result matches your target. <strong>Nominal (APR)</strong> converts the rate to an Effective Annual Rate first.
-                </p>
-
-                <div className="p-3 bg-background/50 rounded-md border border-border/50">
-                  <p className="text-xs font-semibold text-foreground mb-1">Which should I use?</p>
-                  <p className="text-xs text-muted-foreground">
-                    Stick with <strong>Effective (Default)</strong>. With stress events off, this centers the median geometric path around the return assumption you entered.
-                  </p>
-                </div>
-              </div>
-
-              {/* The Formula Title and Block */}
-              <div className="space-y-2 mt-4">
-                <h4 className="text-sm font-semibold flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-violet-500" />
-                    The Core Formula: Geometric Brownian Motion
-                </h4>
-                <div className="rounded-md border bg-background/40 px-4 py-3 flex justify-center overflow-x-auto">
-                    <BlockMath
-                        math={String.raw`V_{t+\Delta t}=V_t \cdot e^{\mu \Delta t + \sigma \sqrt{\Delta t}\, Z}`}
-                    />
-                </div>
-              </div>
-
-              {/* Translation for Retail Investors */}
-                <div className="rounded-lg border bg-violet-500/5 border-violet-500/20 p-4">
-                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-3 text-violet-700 dark:text-violet-300">
-                        <HelpCircle className="h-4 w-4" />
-                        Plain English Translation
-                    </h4>
-                    <ul className="space-y-3 text-sm text-muted-foreground">
-                    <li className="flex gap-3">
-                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Vₜ</span>
-                        <span>
-                        Your portfolio value at the start of the period (for example, this step).
-                        </span>
-                    </li>
-                    <li className="flex gap-3">
-                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Goal</span>
-                        <span>
-                        Probability of Ending At or Above Goal checks only each scenario&apos;s terminal value. It is not the probability that a path touched the goal at any earlier time.
-                        </span>
-                    </li>
-
-                    <li className="flex gap-3">
-                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Vₜ₊Δₜ</span>
-                        <span>
-                        Your portfolio value at the end of the period after growth and volatility are applied.
-                        </span>
-                    </li>
-
-                    <li className="flex gap-3">
-                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">μ</span>
-                        <span>
-                        Your expected average annual return. <span className="text-muted-foreground italic">(Technically derived as the natural log of your input return: ln(1+r)).</span>
-                        </span>
-                    </li>
-
-                    <li className="flex gap-3">
-                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">σ</span>
-                        <span>
-                        Volatility. This measures how wild the ups and downs are. Higher values mean bigger swings.
-                        </span>
-                    </li>
-
-                    <li className="flex gap-3">
-                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Δₜ</span>
-                        <span>
-                        Time step. In the simulator this is one calculation step (weekly, monthly, or annual), expressed as a fraction of a year.
-                        </span>
-                    </li>
-
-                    <li className="flex gap-3">
-                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Z</span>
-                        <span>
-                        A random number drawn from a normal distribution. This is what makes each step unpredictable.
-                        </span>
-                    </li>
-
-                    <li className="flex gap-3">
-                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Logic</span>
-                        <span>
-                        Each step starts with your expected growth, then randomness is added to simulate real market behavior.
-                        </span>
-                    </li>
-
-                    <li className="flex gap-3">
-                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Result</span>
-                        <span>
-                        Running this thousands of times shows upside, downside, and median modeled outcomes instead of a single straight-line forecast.
-                        </span>
-                    </li>
-                    </ul>
-                </div>
-              <div className="grid gap-3">
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
-                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-violet-500/10 text-violet-500 text-xs font-bold shrink-0 mt-0.5">1</div>
-                  <div>
-                    <span className="font-medium text-foreground block text-sm">Random Walk</span>
-                    <span className="text-xs mt-1">Portfolio Simulator runs 1,000+ different timelines. In some, the market crashes early; in others, it booms late.</span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
-                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-violet-500/10 text-violet-500 text-xs font-bold shrink-0 mt-0.5">2</div>
-                  <div>
-                    <span className="font-medium text-foreground block text-sm">Sequence of Returns Risk</span>
-                    <span className="text-xs mt-1">This reveals if your portfolio survives a market crash right when you retire, something a simple calculator cannot predict.</span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
-                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-violet-500/10 text-violet-500 text-xs font-bold shrink-0 mt-0.5">3</div>
-                  <div>
-                    <span className="font-medium text-foreground block text-sm">Gaussian Distribution</span>
-                    <p className="text-xs mt-1">
-                        Portfolio Simulator uses a statistical model (Geometric Brownian Motion) to generate random step returns based on your inputs.{` `}
-                        <a
-                            href="https://en.wikipedia.org/wiki/Geometric_Brownian_motion"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline underline-offset-4 hover:opacity-80"
-                        >
-                            Learn more here.
-                        </a>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
-                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-violet-500/10 text-violet-500 text-xs font-bold shrink-0 mt-0.5">4</div>
-                  <div>
-                    <span className="font-medium text-foreground block text-sm">Dynamic Fidelity</span>
-                    <span className="text-xs mt-1">To ensure instant results, the engine intelligently switches between weekly, monthly, or annual calculation steps based on your simulation duration (Dynamic Time-Stepping).</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </MethodologySection>
-        </motion.div>
-
-        {/* 5. Taxes & Efficiency */}
-        <motion.div variants={itemVariants}>
-          <MethodologySection 
-            title="Taxes & Efficiency" 
-            icon={FileText} 
-            description="How the simulator handles different tax environments"
-            defaultOpen={false}
-            iconColorClass="text-slate-500"
-            iconWrapperClass="bg-slate-500/10 text-slate-500 group-hover:bg-slate-500/20"
-            className="border-slate-500/20"
-          >
-            <div className="space-y-6">
-              <p className="text-sm leading-relaxed">
-                Taxes are calculated differently depending on the &quot;Tax Type&quot; you select in settings. 
-                The simulator adapts its math to model how money leaves your account in each scenario.
-              </p>
-
-              {/* 1. Income Tax */}
-              <div className="space-y-3 p-4 rounded-lg bg-muted/40">
-                <div className="flex items-center gap-2 font-semibold text-foreground">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Type 1:</span>
-                  Income Tax (Tax Drag)
-                </div>
-                <p className="text-sm leading-relaxed">
-                  Best for High Yield Savings Accounts (HYSA) or Bonds. Taxes are paid <strong>annually</strong> on the growth, which reduces the compounding effect.
-                </p>
-                
-                <div className="p-3 bg-background/50 rounded-md border border-border/50 overflow-x-auto">
-                  <p className="text-xs text-muted-foreground mb-2">
-                    The simulator reduces your annual return rate effectively:
-                  </p>
-                  <BlockMath math={String.raw`r_{\text{after-tax}} = r_{\text{annual}} \times (1 - \text{Tax Rate})`} />
-                </div>
-              </div>
-
-              {/* 2. Capital Gains */}
-              <div className="space-y-3 p-4 rounded-lg bg-muted/40">
-                <div className="flex items-center gap-2 font-semibold text-foreground">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Type 2:</span>
-                  Capital Gains (Brokerage)
-                </div>
-                <p className="text-sm leading-relaxed">
-                  Best for Stock Portfolios. You only pay taxes when you <strong>sell</strong> (withdraw). 
-                  The simulator tracks your &quot;Cost Basis&quot; (the money you already paid taxes on) vs. your &quot;Gains&quot;.
-                </p>
-                
-                <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="p-3 bg-background/50 rounded-md border border-border/50 overflow-x-auto">
-                        <p className="text-xs font-semibold text-foreground mb-1">During Growth</p>
-                        <p className="text-xs text-muted-foreground">
-                            The simplified model assumes no capital-gains realization during growth and estimates tax when value is liquidated or withdrawn.
-                        </p>
-                    </div>
-                    <div className="p-3 bg-background/50 rounded-md border border-border/50 overflow-x-auto">
-                        <p className="text-xs font-semibold text-foreground mb-1">During Withdrawal</p>
-                        <p className="text-xs text-muted-foreground">
-                            Taxes are calculated <em>pro-rata</em> based on the ratio of profit to balance.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="mt-2 rounded-md border bg-background/40 px-3 py-3 overflow-x-auto">
-                   <p className="text-xs text-center text-muted-foreground mb-2">The Pro-Rata Formula used in withdrawals</p>
-                   <BlockMath math={String.raw`\text{Tax} = \text{Withdrawal} \times \text{Tax Rate} \times \left( \frac{\text{Current Balance} - \text{Total Basis}}{\text{Current Balance}} \right)`} />
-                </div>
-              </div>
-
-              {/* 3. Tax Deferred */}
-              <div className="space-y-3 p-4 rounded-lg bg-muted/40">
-                <div className="flex items-center gap-2 font-semibold text-foreground">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Type 3:</span>
-                  Tax Deferred (401k / Traditional IRA)
-                </div>
-                <p className="text-sm leading-relaxed">
-                  You pay 0% tax while growing, but every dollar withdrawn (both principal and interest) is taxed as income.
-                </p>
-                <div className="p-3 bg-background/50 rounded-md border border-border/50 overflow-x-auto">
-                  <BlockMath math={String.raw`\text{Net Withdrawal} = \text{Gross Withdrawal} \times (1 - \text{Tax Rate})`} />
-                </div>
-              </div>
-
-            </div>
-          </MethodologySection>
-        </motion.div>
-
-        {/* 6. Limitations */}
-        <motion.div variants={itemVariants}>
-            <MethodologySection 
-                title="Assumptions & Limitations" 
-                icon={AlertTriangle} 
-                description="Important constraints to keep in mind"
-                defaultOpen={false}
-                iconColorClass="text-amber-500"
-                iconWrapperClass="bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/20"
-                className="border-amber-500/20"
+            <FormulaCard
+              title="Per-period market step"
+              formula={String.raw`V_{t+\Delta t}=V_t\,e^{\ln(1+r)\Delta t+\sigma\sqrt{\Delta t}\,Z}`}
             >
-                <ul className="list-disc pl-5 space-y-2 text-foreground/80">
-                <li>
-                    <strong>Taxes:</strong> Simulations can optionally include tax modeling, but they are simplified and may not match your exact real-world tax situation.
-                </li>
-                <li>
-                    <strong>Inflation on Cashflows:</strong> The simulator assumes your monthly contributions/withdrawals grow annually by the inflation rate to maintain purchasing power, unless disabled in settings.
-                </li>
-                <li>
-                    <strong>Rebalancing:</strong> The model assumes your portfolio maintains its target allocation and volatility profile constantly without rebalancing fees.
-                </li>
-                </ul>
-            </MethodologySection>
-        </motion.div>
+              <div className="space-y-2">
+                <p><strong className="text-foreground">r</strong> is the entered effective annual geometric-return assumption after any modeled annual income-tax drag.</p>
+                <p><strong className="text-foreground">σ</strong> is annual volatility, <strong className="text-foreground">Z</strong> is a standard-normal random draw, and <strong className="text-foreground">Δt</strong> is one selected cashflow period expressed as a fraction of a year.</p>
+              </div>
+            </FormulaCard>
+
+            <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4">
+              <p className="font-semibold text-foreground">How to interpret the return input</p>
+              <p className="mt-2">
+                With optional stress events disabled, the entered effective return centers the median geometric path. It is not an arithmetic-mean forecast. Because lognormal outcomes are asymmetric, higher volatility can raise the arithmetic mean even when the median path assumption is unchanged.
+              </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <p className="font-semibold text-foreground">Frequency</p>
+                <p className="mt-2">
+                  The engine uses the frequency selected by the user for the entire run. It does not silently switch frequencies based on duration. Charts may be downsampled for display, but the underlying calculation frequency remains unchanged.
+                </p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <p className="font-semibold text-foreground">Scenario count</p>
+                <p className="mt-2">
+                  The interface supports small sample runs through large simulations, subject to a maximum of {MAX_MONTE_CARLO_WORK.toLocaleString()} path-period calculations. More paths reduce sampling noise but do not improve the assumptions themselves.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <p className="font-semibold text-foreground">Optional crash and recovery stress events</p>
+              <p className="mt-2">
+                When enabled, the model adds seeded, horizon-scaled declines followed by partial recoveries. These are heuristic stress events designed to test path sensitivity. They are not a calibrated forecast of crash frequency, severity, or recovery timing.
+              </p>
+            </div>
+
+            <p>
+              “Probability of Ending At or Above Goal” evaluates only the value at the end of each path. A path that crosses the goal earlier and later falls below it is not counted as a terminal success.
+            </p>
+          </div>
+        </MethodologySection>
+
+        <MethodologySection
+          title="Inflation and Real Dollars"
+          description="Cashflow escalation and purchasing-power reporting"
+          icon={Activity}
+          accentClass="border-l-pink-500/70"
+        >
+          <div className="space-y-5">
+            <FormulaCard
+              title="Present purchasing power"
+              formula={String.raw`Real\ Value=\frac{Nominal\ Value}{(1+i)^t}`}
+            >
+              <p>
+                Future balances and each individual cashflow can be discounted using the annual inflation assumption. Cashflows are discounted at the time they occur, rather than discounting one cumulative total only at the end.
+              </p>
+            </FormulaCard>
+
+            <p>
+              The inflation field has two separate effects: it supports real-dollar reporting, and it can optionally increase contributions or withdrawals once per year. Disabling cashflow escalation does not disable real-dollar reporting.
+            </p>
+          </div>
+        </MethodologySection>
+
+        <MethodologySection
+          title="Taxes"
+          description="Three simplified tax treatments"
+          icon={Scale}
+          accentClass="border-l-slate-500/70"
+        >
+          <div className="space-y-4">
+            <div className="rounded-lg border p-4">
+              <p className="font-semibold text-foreground">Taxable account, capital gains on liquidation</p>
+              <p className="mt-2">
+                The model tracks current cost basis. During withdrawals, the taxable share is estimated proportionally from unrealized gain divided by account value. During growth, embedded capital-gains tax is shown as an estimated liquidation liability rather than an annual realization schedule.
+              </p>
+              <div className="mt-3 overflow-x-auto rounded-md bg-muted/40 px-3 py-2">
+                <BlockMath math={String.raw`Tax=Withdrawal\times Tax\ Rate\times\frac{Balance-Basis}{Balance}`} />
+              </div>
+            </div>
+
+            <div className="rounded-lg border p-4">
+              <p className="font-semibold text-foreground">Fully pre-tax retirement account</p>
+              <p className="mt-2">
+                The entire modeled balance is treated as taxable. Withdrawals are reported as gross distributions and after-tax spending using the entered effective tax rate.
+              </p>
+            </div>
+
+            <div className="rounded-lg border p-4">
+              <p className="font-semibold text-foreground">Annual income-tax drag</p>
+              <p className="mt-2">
+                Positive expected growth is reduced by the entered tax rate before compounding. Negative expected returns are not improved by the tax adjustment. The simulator also keeps a no-tax comparison path so gross and spendable balances remain distinguishable.
+              </p>
+            </div>
+          </div>
+        </MethodologySection>
+
+        <MethodologySection
+          title="Validation and Performance Limits"
+          description="Browser-safety limits applied to typed, saved, and shared scenarios"
+          icon={Calculator}
+          accentClass="border-l-cyan-500/70"
+        >
+          <div className="space-y-4">
+            <p>
+              The same scenario rules are applied to calculator inputs, saved browser state, and shared links. Invalid or malformed saved data is discarded and replaced with safe defaults.
+            </p>
+            <ul className="list-disc space-y-2 pl-5">
+              <li>Maximum modeled duration: {MAX_SCENARIO_DURATION_YEARS} years.</li>
+              <li>Maximum deterministic workload: {MAX_DETERMINISTIC_STEPS.toLocaleString()} calculation periods.</li>
+              <li>Maximum Monte Carlo workload: {MAX_MONTE_CARLO_WORK.toLocaleString()} path-period calculations.</li>
+              <li>Displayed Monte Carlo time-series data is limited to roughly {MAX_CHART_POINTS} chart points while calculations continue at the selected period frequency.</li>
+              <li>Shared links are size-limited and validated before their scenario data is accepted.</li>
+            </ul>
+          </div>
+        </MethodologySection>
+
+        <MethodologySection
+          title="Assumptions and Limitations"
+          description="Important boundaries when interpreting results"
+          icon={AlertTriangle}
+          accentClass="border-l-amber-500/70"
+        >
+          <ul className="list-disc space-y-3 pl-5">
+            <li><strong className="text-foreground">Returns:</strong> Lognormal independent steps do not fully reproduce fat tails, volatility clustering, regime changes, or changing asset correlations.</li>
+            <li><strong className="text-foreground">Allocation:</strong> The model assumes the entered return and volatility profile remain applicable. It does not model rebalancing costs or allocation drift.</li>
+            <li><strong className="text-foreground">Taxes:</strong> Tax calculations are simplified estimates. They do not include brackets, filing status, state rules, wash sales, required minimum distributions, or individualized realization strategies.</li>
+            <li><strong className="text-foreground">Cashflows:</strong> Contributions and withdrawals occur at fixed modeled points within each period and change annually only when escalation is enabled.</li>
+            <li><strong className="text-foreground">Other income:</strong> Social Security, pensions, fees, advisory costs, and external income are not modeled unless represented through the entered cashflows.</li>
+            <li><strong className="text-foreground">Outcomes:</strong> Percentiles and success rates describe the selected model and assumptions. They are not guarantees or forecasts.</li>
+          </ul>
+        </MethodologySection>
+
+        <Card>
+          <CardContent className="flex items-start gap-3 pt-6 text-sm text-muted-foreground">
+            <FileText className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+            <p>
+              Results should be used to compare scenarios and understand sensitivity, not as a substitute for professional financial or tax advice.
+            </p>
+          </CardContent>
+        </Card>
+
         <DonationSection />
-      </motion.div>
+      </div>
     </div>
   )
 }

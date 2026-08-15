@@ -1,92 +1,24 @@
 import LZString from 'lz-string'
-import type {
-  CalculationMode,
-  CashflowFrequency,
-  GrowthState,
-  SharePayload,
-  SimulationParams,
-  TaxType,
-  WithdrawalState,
-} from '@/lib/types'
+import type { GrowthState, SharePayload, SimulationParams, WithdrawalState } from '@/lib/types'
 import { CURRENCIES } from '@/lib/utils'
-import { validateGrowthStateRange, validateWithdrawalStateRange } from '@/lib/simulation/deterministic-validation'
-import { assertMonteCarloWorkload, stepsPerYear } from '@/lib/simulation/financial-utils'
+import {
+  MAX_RNG_SEED_LENGTH,
+  MAX_SHARE_JSON_LENGTH,
+  MAX_SHARE_PAYLOAD_LENGTH,
+  isValidGrowthState,
+  isValidSimulationParams,
+  isValidWithdrawalState,
+} from '@/lib/simulation/deterministic-validation'
 
 export const SHARE_PAYLOAD_VERSION = 1
-const FREQUENCIES: CashflowFrequency[] = ['yearly', 'quarterly', 'monthly', 'weekly']
-const TAX_TYPES: TaxType[] = ['capital_gains', 'income', 'tax_deferred']
-const CALCULATION_MODES: CalculationMode[] = ['effective', 'nominal']
 const CURRENCY_CODES = new Set(CURRENCIES.map((currency) => currency.code))
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   typeof value === 'object' && value !== null && !Array.isArray(value)
 )
-const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
-const optionalFinite = (value: unknown) => value === undefined || isFiniteNumber(value)
-const optionalBoolean = (value: unknown) => value === undefined || typeof value === 'boolean'
-const isFrequency = (value: unknown): value is CashflowFrequency => FREQUENCIES.includes(value as CashflowFrequency)
-const isTaxType = (value: unknown): value is TaxType => TAX_TYPES.includes(value as TaxType)
-const isCalculationMode = (value: unknown): value is CalculationMode => CALCULATION_MODES.includes(value as CalculationMode)
-
-function hasValidTaxSettings(value: Record<string, unknown>): boolean {
-  return optionalBoolean(value.taxEnabled)
-    && optionalFinite(value.taxRate)
-    && (value.taxRate === undefined || (value.taxRate >= 0 && value.taxRate <= 100))
-    && (value.taxType === undefined || isTaxType(value.taxType))
-    && (value.calculationMode === undefined || isCalculationMode(value.calculationMode))
-    && optionalFinite(value.startingCostBasis)
-    && (value.startingCostBasis === undefined || value.startingCostBasis >= 0)
-    && optionalBoolean(value.costBasisIsUserEdited)
-}
-
-function isGrowthState(value: unknown): value is GrowthState {
-  if (!isRecord(value) || !isFiniteNumber(value.startingBalance) || value.startingBalance < 0) return false
-  if (!isFiniteNumber(value.annualReturn) || value.annualReturn <= -100) return false
-  if (!isFiniteNumber(value.duration) || value.duration <= 0) return false
-  if (!isFiniteNumber(value.periodicAddition) || value.periodicAddition < 0) return false
-  if (!isFrequency(value.frequency) || !isFiniteNumber(value.inflationAdjustment)) return false
-  if (!optionalFinite(value.targetValue) || (value.targetValue !== undefined && value.targetValue < 0)) return false
-  if (!optionalBoolean(value.excludeInflationAdjustment) || !hasValidTaxSettings(value)) return false
-  try {
-    return validateGrowthStateRange(value as unknown as GrowthState) === null
-  } catch {
-    return false
-  }
-}
-
-function isWithdrawalState(value: unknown): value is WithdrawalState {
-  if (!isRecord(value) || !isFiniteNumber(value.startingBalance) || value.startingBalance < 0) return false
-  if (!isFiniteNumber(value.annualReturn) || value.annualReturn <= -100) return false
-  if (!isFiniteNumber(value.duration) || value.duration <= 0) return false
-  if (!isFiniteNumber(value.periodicWithdrawal) || value.periodicWithdrawal < 0) return false
-  if (!isFrequency(value.frequency) || !isFiniteNumber(value.inflationAdjustment)) return false
-  if (!optionalBoolean(value.excludeInflationAdjustment) || !hasValidTaxSettings(value)) return false
-  try {
-    return validateWithdrawalStateRange(value as unknown as WithdrawalState) === null
-  } catch {
-    return false
-  }
-}
-
-function isSimulationParams(value: unknown): value is SimulationParams {
-  if (!isRecord(value) || !isFiniteNumber(value.initialValue) || value.initialValue < 0) return false
-  if (!isFiniteNumber(value.expectedReturn) || value.expectedReturn <= -100) return false
-  if (!isFiniteNumber(value.volatility) || value.volatility < 0) return false
-  if (!isFiniteNumber(value.duration) || value.duration <= 0) return false
-  if (!isFiniteNumber(value.cashflowAmount) || value.cashflowAmount < 0) return false
-  if (!isFrequency(value.cashflowFrequency)) return false
-  if (typeof value.numPaths !== 'number' || !Number.isInteger(value.numPaths) || value.numPaths < 1) return false
-  if (!optionalFinite(value.inflationAdjustment) || !optionalFinite(value.portfolioGoal)) return false
-  if (value.portfolioGoal !== undefined && value.portfolioGoal < 0) return false
-  if (!optionalBoolean(value.excludeInflationAdjustment) || !optionalBoolean(value.enableCrashRisk)) return false
-  if (!hasValidTaxSettings(value)) return false
-  try {
-    assertMonteCarloWorkload(value.numPaths as number, value.duration as number, stepsPerYear(value.cashflowFrequency as CashflowFrequency))
-    return true
-  } catch {
-    return false
-  }
-}
+const optionalBoolean = (value: unknown): value is boolean | undefined => (
+  value === undefined || typeof value === 'boolean'
+)
 
 export function validateSharePayload(value: unknown): SharePayload | null {
   if (!isRecord(value)) return null
@@ -96,18 +28,24 @@ export function validateSharePayload(value: unknown): SharePayload | null {
 
   const deterministicParams = value.deterministicParams ?? value.params
   const validDeterministic = value.mode === 'growth'
-    ? isGrowthState(deterministicParams)
-    : isWithdrawalState(deterministicParams)
+    ? isValidGrowthState(deterministicParams)
+    : isValidWithdrawalState(deterministicParams)
   if (!validDeterministic) return null
-  if (value.type === 'monte-carlo' && !isSimulationParams(value.mcParams)) return null
-  if (value.rngSeed !== undefined && value.rngSeed !== null && (typeof value.rngSeed !== 'string' || value.rngSeed.length > 500)) return null
+  if (value.type === 'monte-carlo' && !isValidSimulationParams(value.mcParams)) return null
+  if (
+    value.rngSeed !== undefined
+    && value.rngSeed !== null
+    && (typeof value.rngSeed !== 'string' || value.rngSeed.length > MAX_RNG_SEED_LENGTH)
+  ) return null
   if (!optionalBoolean(value.showFullPrecision)) return null
 
   if (value.logScales !== undefined) {
-    if (!isRecord(value.logScales)
+    if (
+      !isRecord(value.logScales)
       || typeof value.logScales.chart !== 'boolean'
       || typeof value.logScales.histogram !== 'boolean'
-      || typeof value.logScales.drawdown !== 'boolean') return null
+      || typeof value.logScales.drawdown !== 'boolean'
+    ) return null
   }
 
   const displayCurrency = typeof value.displayCurrency === 'string' && CURRENCY_CODES.has(value.displayCurrency)
@@ -129,7 +67,7 @@ export function validateSharePayload(value: unknown): SharePayload | null {
 }
 
 function parsePayloadText(text: string | null): SharePayload | null {
-  if (!text) return null
+  if (!text || text.length > MAX_SHARE_JSON_LENGTH) return null
   try {
     return validateSharePayload(JSON.parse(text))
   } catch {
@@ -138,6 +76,8 @@ function parsePayloadText(text: string | null): SharePayload | null {
 }
 
 export function decodeSharePayload(encoded: string): SharePayload | null {
+  if (!encoded || encoded.length > MAX_SHARE_PAYLOAD_LENGTH) return null
+
   const compressed = parsePayloadText(LZString.decompressFromEncodedURIComponent(encoded))
   if (compressed) return compressed
 
@@ -164,6 +104,9 @@ export function buildShareUrl(href: string, payload: SharePayload, displayCurren
     displayCurrency: CURRENCY_CODES.has(displayCurrency) ? displayCurrency : 'USD',
   }
   const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(versionedPayload))
+  if (compressed.length > MAX_SHARE_PAYLOAD_LENGTH) {
+    throw new Error('This scenario is too large to share in a browser link.')
+  }
   url.searchParams.delete('mc')
   url.hash = new URLSearchParams({ mc: compressed }).toString()
   return url.toString()

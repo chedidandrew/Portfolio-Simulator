@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 interface NumericInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
   value: number | string
   onChange: (value: number) => void
+  onEmpty?: () => void
+  allowEmpty?: boolean
   min?: number
   max?: number
   step?: number
@@ -14,105 +16,114 @@ interface NumericInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
   className?: string
 }
 
+const displayFromValue = (value: number | string) => {
+  if (value === '') return ''
+  const numeric = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(numeric) ? String(numeric) : ''
+}
+
 export const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps>(
-  ({ value, onChange, min = 0, max, step = 1, maxErrorMessage, className, ...props }, ref) => {
-    const [displayValue, setDisplayValue] = React.useState('')
+  ({
+    value,
+    onChange,
+    onEmpty,
+    allowEmpty = false,
+    min = 0,
+    max,
+    step = 1,
+    maxErrorMessage,
+    className,
+    id,
+    'aria-describedby': ariaDescribedBy,
+    ...props
+  }, ref) => {
+    const [displayValue, setDisplayValue] = React.useState(() => displayFromValue(value))
     const [isFocused, setIsFocused] = React.useState(false)
     const [showError, setShowError] = React.useState(false)
-    const [lastValidValue, setLastValidValue] = React.useState<number>(0)
+    const [lastValidValue, setLastValidValue] = React.useState<number>(() => {
+      const numeric = typeof value === 'number' ? value : Number(value)
+      return Number.isFinite(numeric) ? numeric : 0
+    })
+    const permitsEmpty = allowEmpty || Boolean(props.placeholder)
+    const errorId = id && maxErrorMessage ? `${id}-error` : undefined
+    const describedBy = [ariaDescribedBy, showError ? errorId : undefined].filter(Boolean).join(' ') || undefined
 
-    // Initialize display value from prop value
     React.useEffect(() => {
-      if (!isFocused) {
-        const numValue = typeof value === 'number' ? value : parseFloat(value) || 0
-        setDisplayValue(numValue.toString())
-        setLastValidValue(numValue)
+      if (isFocused) return
+      const nextDisplay = displayFromValue(value)
+      setDisplayValue(nextDisplay)
+      if (nextDisplay !== '') {
+        const numeric = Number(nextDisplay)
+        if (Number.isFinite(numeric)) setLastValidValue(numeric)
       }
     }, [value, isFocused])
 
     const handleFocus = () => {
       setIsFocused(true)
       setShowError(false)
-      // Show raw number without formatting when focused
-      const numValue = typeof value === 'number' ? value : parseFloat(value) || 0
-      setDisplayValue(numValue.toString())
+      setDisplayValue(displayFromValue(value))
     }
 
     const handleBlur = () => {
       setIsFocused(false)
       setShowError(false)
-      
-      // Parse and validate on blur
-      let numValue = parseFloat(displayValue)
-      
-      // Handle empty or invalid input
-      if (displayValue === '' || isNaN(numValue)) {
-        numValue = lastValidValue
+
+      if (displayValue === '') {
+        if (permitsEmpty) {
+          if (onEmpty) onEmpty()
+          else onChange(Number.NaN)
+          return
+        }
         setDisplayValue(lastValidValue.toString())
         onChange(lastValidValue)
         return
       }
-      
-      // Clamp to min/max
-      if (min !== undefined && numValue < min) {
-        numValue = min
-      }
-      if (max !== undefined && numValue > max) {
-        numValue = lastValidValue // Revert to last valid value
+
+      let numericValue = Number(displayValue)
+      if (!Number.isFinite(numericValue)) {
         setDisplayValue(lastValidValue.toString())
         onChange(lastValidValue)
         return
       }
-      
-      setLastValidValue(numValue)
-      setDisplayValue(numValue.toString())
-      onChange(numValue)
+
+      if (min !== undefined && numericValue < min) numericValue = min
+      if (max !== undefined && numericValue > max) {
+        setDisplayValue(lastValidValue.toString())
+        onChange(lastValidValue)
+        return
+      }
+
+      setLastValidValue(numericValue)
+      setDisplayValue(numericValue.toString())
+      onChange(numericValue)
     }
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      let inputValue = e.target.value
-      
-      // Ignore comma inputs - preserve existing value
-      if (inputValue.includes(',')) {
-        return
-      }
-      
-      // Allow empty string (for clearing)
+    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const inputValue = event.target.value
+      if (inputValue.includes(',')) return
       if (inputValue === '') {
         setDisplayValue('')
-        return
-      }
-      
-      // Allow valid numeric input including decimals and negative sign
-      // Only allow digits, one decimal point, and leading minus sign
-      const validPattern = /^-?\d*\.?\d*$/
-      if (!validPattern.test(inputValue)) {
-        return
-      }
-      
-      setDisplayValue(inputValue)
-      
-      // Try to parse and validate against max
-      const numValue = parseFloat(inputValue)
-      if (!isNaN(numValue) && max !== undefined && numValue > max) {
-        setShowError(true)
-      } else {
         setShowError(false)
+        return
       }
+
+      const validPattern = /^-?\d*\.?\d*$/
+      if (!validPattern.test(inputValue)) return
+
+      setDisplayValue(inputValue)
+      const numericValue = Number(inputValue)
+      setShowError(Number.isFinite(numericValue) && max !== undefined && numericValue > max)
     }
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      // Prevent comma key
-      if (e.key === ',') {
-        e.preventDefault()
-        return
-      }
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === ',') event.preventDefault()
     }
 
     return (
       <div className="relative">
         <Input
           ref={ref}
+          id={id}
           type="text"
           inputMode="decimal"
           value={displayValue}
@@ -120,20 +131,27 @@ export const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps
           onFocus={handleFocus}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
+          aria-invalid={showError || undefined}
+          aria-describedby={describedBy}
           className={cn(
             showError && 'border-amber-500 focus-visible:ring-amber-500',
-            className
+            className,
           )}
           {...props}
         />
         {showError && maxErrorMessage && (
-          <p className="absolute -bottom-5 left-0 text-xs text-amber-600 dark:text-amber-500 animate-in fade-in slide-in-from-top-1">
+          <p
+            id={errorId}
+            role="alert"
+            aria-live="polite"
+            className="absolute -bottom-5 left-0 text-xs text-amber-600 dark:text-amber-500 animate-in fade-in slide-in-from-top-1"
+          >
             {maxErrorMessage}
           </p>
         )}
       </div>
     )
-  }
+  },
 )
 
 NumericInput.displayName = 'NumericInput'
