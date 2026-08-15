@@ -5,17 +5,19 @@ import { useMonteCarlo } from '@/hooks/use-monte-carlo'
 import { MonteCarloParameters } from '@/components/monte-carlo/parameters'
 import { MonteCarloResults, ExportState } from '@/components/monte-carlo/results'
 import { triggerHaptic } from '@/hooks/use-haptics'
-import ExcelJS from 'exceljs'
-import { roundToCents } from '@/lib/utils'
+import { getAppCurrency, roundToCents } from '@/lib/utils'
 import { toast } from 'sonner'
-import LZString from 'lz-string'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { AlertCircle } from 'lucide-react'
-import type { SimulationParams, SharePayload } from '@/lib/types'
+import type { GrowthState, SimulationParams, SharePayload, WithdrawalState } from '@/lib/types'
+import type { CompletedSimulationResults } from '@/hooks/use-monte-carlo'
+import type { ExportRow } from '@/lib/export/withdrawal-workbook'
+import { buildMonteCarloExportMetadata, buildMonteCarloSharePayload } from '@/lib/completed-run-metadata'
+import { buildShareUrl as buildVersionedShareUrl } from '@/lib/share-links'
 
 interface MonteCarloSimulatorProps {
   mode: 'growth' | 'withdrawal'
-  initialValues: any
+  initialValues: GrowthState | WithdrawalState
 
   // Props for restoring state from URL
   initialRngSeed?: string | null
@@ -39,6 +41,7 @@ export function MonteCarloSimulator({
     setParams,
     results,
     isSimulating,
+    simulationError,
     logScales,
     setLogScales,
     rngSeed,
@@ -49,16 +52,10 @@ export function MonteCarloSimulator({
   } = useMonteCarlo(mode, initialValues, initialRngSeed, initialMCParams, initialLogScales, initialShowFullPrecision)
 
   const [exportState, setExportState] = useState<ExportState>('idle')
-
-  // NEW: Track the parameters used for the last successful run to detect changes
-  const [lastRunParamsStr, setLastRunParamsStr] = useState<string>(() => JSON.stringify(params))
-
-  // NEW: Determine if current inputs differ from the results on screen
-  const isOutdated = results && JSON.stringify(params) !== lastRunParamsStr
+  const completedParams = results?.simulationParams as SimulationParams | undefined
+  const isOutdated = Boolean(results && completedParams && JSON.stringify(params) !== JSON.stringify(completedParams))
 
   const handleRunSimulation = () => {
-    // Sync the "Last Run" params with current params when user clicks Run
-    setLastRunParamsStr(JSON.stringify(params))
     runSimulation(undefined, `monte-carlo-${Date.now()}-${Math.random()}`)
   }
 
@@ -66,26 +63,18 @@ export function MonteCarloSimulator({
     if (typeof window === 'undefined') return ''
     const url = new URL(window.location.href)
 
-    let mcParamsToShare = params
-    if (isOutdated) {
-      try {
-        mcParamsToShare = JSON.parse(lastRunParamsStr)
-      } catch {}
-    }
-
-    const payload: SharePayload = {
+    const payload = buildMonteCarloSharePayload({
       mode,
-      type: 'monte-carlo',
-      deterministicParams: initialValues, // parent state
-      mcParams: mcParamsToShare, // child state
-      rngSeed,
+      deterministicParams: initialValues,
+      completedResult: results,
+      currentParams: params,
+      currentSeed: rngSeed,
       logScales,
       showFullPrecision,
-    }
+      displayCurrency: getAppCurrency().code,
+    })
 
-    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(payload))
-    if (compressed) url.searchParams.set('mc', compressed)
-    return url.toString()
+    return buildVersionedShareUrl(url.toString(), payload, getAppCurrency().code)
   }
 
   const handleShareLink = async () => {
@@ -95,31 +84,42 @@ export function MonteCarloSimulator({
     if (!url) return
 
     try {
-      if (typeof navigator !== 'undefined' && 'share' in navigator) {
+      const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+      if (canNativeShare) {
+        const shareParams = completedParams ?? params
+        const shareText = shareParams.portfolioGoal && results
+          ? `Probability of ending at or above ${getAppCurrency().symbol}${shareParams.portfolioGoal.toLocaleString()}: ${results.endingAtOrAboveGoalProbability.toFixed(1)}% (terminal value).`
+          : 'Take a look at my portfolio simulation results.'
         await navigator.share({
           title: 'Portfolio Simulator',
-          text: 'Take a look at my portfolio results',
+          text: shareText,
           url,
         })
         return
       }
 
-      if ((navigator as any)?.clipboard?.writeText) {
-        await (navigator as any).clipboard.writeText(url)
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url)
         toast('Link copied')
         return
       }
 
       toast('Copy not supported on this browser')
-    } catch (err: any) {
-      const name = err?.name
+    } catch (error: unknown) {
+      const name = error instanceof DOMException || error instanceof Error ? error.name : undefined
       if (name === 'AbortError' || name === 'NotAllowedError') return
       toast('Could not share or copy link')
     }
   }
 
-  const generateExcel = async (simResults: any) => {
+  const generateExcel = async (simResults: CompletedSimulationResults) => {
     if (!simResults) return
+    const [{ default: ExcelJS }, { formatFinancialWorkbook }] = await Promise.all([
+      import('exceljs'),
+      import('@/lib/export/excel-formatting'),
+    ])
+    const exportMetadata = buildMonteCarloExportMetadata(simResults, params, rngSeed)
+    const exportParams = exportMetadata.params
 
     const {
       mean,
@@ -158,10 +158,10 @@ export function MonteCarloSimulator({
     const totalInvested =
       investmentData && investmentData.length > 0
         ? investmentData[investmentData.length - 1].total
-        : params.initialValue
+        : exportParams.initialValue
 
     const investedLabel = mode === 'withdrawal' ? 'Starting Balance' : 'Total Invested'
-    const showGrossSummary = !!params.taxEnabled && mode === 'growth' && (params.taxType === 'capital_gains' || params.taxType === 'tax_deferred')
+    const showGrossSummary = !!exportParams.taxEnabled && mode === 'growth' && (exportParams.taxType === 'capital_gains' || exportParams.taxType === 'tax_deferred')
 
     const workbook = new ExcelJS.Workbook()
 
@@ -171,15 +171,17 @@ export function MonteCarloSimulator({
       { header: 'Key', key: 'Key', width: 26 },
       { header: 'Value', key: 'Value', width: 20 },
     ]
-    const summaryRows = [
+    const summaryRows: ExportRow[] = [
       { Key: 'Mode', Value: mode },
-      { Key: 'Initial Value', Value: roundToCents(params.initialValue) },
+      { Key: 'Display Currency', Value: getAppCurrency().code },
+      { Key: 'Initial Value', Value: roundToCents(exportParams.initialValue) },
       { Key: investedLabel, Value: roundToCents(totalInvested) },
-      { Key: 'Expected Return %', Value: params.expectedReturn },
-      { Key: 'Volatility %', Value: params.volatility },
-      { Key: 'Duration Years', Value: params.duration },
-      { Key: 'Monthly Cashflow', Value: roundToCents(params.cashflowAmount) },
-      { Key: 'Inflation Adjustment %', Value: params.inflationAdjustment ?? 0 },
+      { Key: 'Expected Return %', Value: exportParams.expectedReturn },
+      { Key: 'Volatility %', Value: exportParams.volatility },
+      { Key: 'Duration Years', Value: exportParams.duration },
+      { Key: 'Cashflow Amount', Value: roundToCents(exportParams.cashflowAmount) },
+      { Key: 'Cashflow Frequency', Value: exportParams.cashflowFrequency },
+      { Key: 'Inflation Adjustment %', Value: exportParams.inflationAdjustment ?? 0 },
       { Key: 'Number Of Scenarios', Value: numPathsUsed },
       { Key: showGrossSummary ? 'Mean Ending Value (Net)' : 'Mean Ending Value', Value: roundToCents(mean) },
       { Key: showGrossSummary ? 'Median Ending Value (Net)' : 'Median Ending Value', Value: roundToCents(median) },
@@ -189,15 +191,15 @@ export function MonteCarloSimulator({
       ] : []),
     ]
 
-    if (params.taxEnabled) {
+    if (exportParams.taxEnabled) {
       const taxTypeLabel =
-        params.taxType === 'income'
+        exportParams.taxType === 'income'
           ? 'Annual income tax drag'
-          : (params.taxType === 'tax_deferred'
+          : (exportParams.taxType === 'tax_deferred'
             ? 'Tax deferred (401k/IRA), taxed on withdrawal'
             : 'Taxable Account (capital gains on liquidation)')
       summaryRows.push({ Key: 'Tax Type', Value: taxTypeLabel })
-      if (mode === 'growth' && (params.taxType === 'capital_gains' || params.taxType === 'tax_deferred') && (totalTaxCost ?? taxDragAmount)) {
+      if (mode === 'growth' && (exportParams.taxType === 'capital_gains' || exportParams.taxType === 'tax_deferred') && (totalTaxCost ?? taxDragAmount)) {
         summaryRows.push({ Key: 'Est. Tax Cost', Value: roundToCents(totalTaxCost ?? taxDragAmount) })
       }
     }
@@ -209,10 +211,19 @@ export function MonteCarloSimulator({
       { Key: 'P75 Ending Value', Value: roundToCents(p75) },
       { Key: 'P90 Ending Value', Value: roundToCents(p90) },
       { Key: 'P95 Ending Value', Value: roundToCents(p95) },
-      { Key: 'Best Ending Value', Value: roundToCents(best) },
-      { Key: 'Worst Ending Value', Value: roundToCents(worst) },
-      { Key: 'Random Seed', Value: rngSeed ?? '' }
+      { Key: 'Sample Maximum Ending Value', Value: roundToCents(best) },
+      { Key: 'Sample Minimum Ending Value', Value: roundToCents(worst) },
+      exportMetadata.randomSeedRow,
     )
+
+    if (exportParams.portfolioGoal) {
+      summaryRows.push(
+        { Key: 'Portfolio Goal', Value: roundToCents(exportParams.portfolioGoal) },
+        { Key: 'Probability of Ending At or Above Goal %', Value: simResults.endingAtOrAboveGoalProbability },
+        { Key: 'Scenarios Ended At or Above Goal', Value: simResults.pathsEndingAtOrAboveGoal },
+        { Key: 'Goal Probability Definition', Value: 'Terminal value only; does not count scenarios that touched the goal earlier and later fell below it.' },
+      )
+    }
 
     if (showGrossSummary) {
       summaryRows.push(
@@ -222,8 +233,21 @@ export function MonteCarloSimulator({
         { Key: 'P75 Ending Value (Gross)', Value: roundToCents(p75Gross) },
         { Key: 'P90 Ending Value (Gross)', Value: roundToCents(p90Gross) },
         { Key: 'P95 Ending Value (Gross)', Value: roundToCents(p95Gross) },
-        { Key: 'Best Ending Value (Gross)', Value: roundToCents(bestGross) },
-        { Key: 'Worst Ending Value (Gross)', Value: roundToCents(worstGross) },
+        { Key: 'Sample Maximum Ending Value (Gross)', Value: roundToCents(bestGross) },
+        { Key: 'Sample Minimum Ending Value (Gross)', Value: roundToCents(worstGross) },
+      )
+    }
+
+    if (mode === 'withdrawal' && simResults.representativeCashflowBreakdown) {
+      const cashflow = simResults.representativeCashflowBreakdown
+      summaryRows.push(
+        { Key: 'Representative Cashflow Basis', Value: 'Path closest to median ending spendable value' },
+        { Key: 'Representative Gross Withdrawn', Value: roundToCents(cashflow.grossWithdrawn) },
+        { Key: 'Representative After-Tax Spending', Value: roundToCents(cashflow.netSpending) },
+        { Key: 'Representative Withdrawal Taxes', Value: roundToCents(cashflow.withdrawalTaxes) },
+        { Key: 'Representative Return Tax Drag', Value: roundToCents(cashflow.incomeTaxDrag) },
+        { Key: "Representative Gross Withdrawn (Today's Dollars)", Value: roundToCents(cashflow.grossWithdrawnInTodaysDollars) },
+        { Key: "Representative After-Tax Spending (Today's Dollars)", Value: roundToCents(cashflow.netSpendingInTodaysDollars) },
       )
     }
 
@@ -239,7 +263,7 @@ export function MonteCarloSimulator({
       { header: 'P75', key: 'P75', width: 16 },
       { header: 'P90', key: 'P90', width: 16 },
     ]
-    const percentileRows = (chartData ?? []).map((row: any) => ({
+    const percentileRows = (chartData ?? []).map((row) => ({
       Year: Number(row.year.toFixed(2)),
       P10: roundToCents(row.p10),
       P25: roundToCents(row.p25),
@@ -267,7 +291,7 @@ export function MonteCarloSimulator({
       { header: 'Prob ≥ 25%', key: 'Prob ≥ 25%', width: 13 },
       { header: 'Prob ≥ 30%', key: 'Prob ≥ 30%', width: 13 },
     ]
-    const annualRows = (annualReturnsData ?? []).map((row: any) => ({
+    const annualRows = (annualReturnsData ?? []).map((row) => ({
       Year: row.year,
       'CAGR P10 %': roundToCents(row.p10),
       'CAGR P25 %': roundToCents(row.p25),
@@ -285,21 +309,39 @@ export function MonteCarloSimulator({
     }))
     wsAnnual.addRows(annualRows)
 
-    // 4. Investment Breakdown
-    const wsInvestment = workbook.addWorksheet('Investment Breakdown')
-    wsInvestment.columns = [
-      { header: 'Year', key: 'Year', width: 8 },
-      { header: 'Initial Principal', key: 'Initial Principal', width: 18 },
-      { header: 'Cumulative Contributions', key: 'Cumulative Contributions', width: 22 },
-      { header: 'Total Invested', key: 'Total Invested', width: 18 },
-    ]
-    const investmentRows = (investmentData ?? []).map((row: any) => ({
-      Year: row.year,
-      'Initial Principal': roundToCents(row.initial),
-      'Cumulative Contributions': roundToCents(row.contributions),
-      'Total Invested': roundToCents(row.total),
-    }))
-    wsInvestment.addRows(investmentRows)
+    // 4. Investment / Retirement Cashflows
+    const wsInvestment = workbook.addWorksheet(mode === 'withdrawal' ? 'Retirement Cashflows' : 'Investment Breakdown')
+    if (mode === 'withdrawal') {
+      wsInvestment.columns = [
+        { header: 'Year', key: 'Year', width: 8 },
+        { header: 'Starting Portfolio', key: 'Starting Portfolio', width: 20 },
+        { header: 'Cumulative Gross Withdrawals', key: 'Cumulative Gross Withdrawals', width: 28 },
+        { header: 'Cumulative After-Tax Spending', key: 'Cumulative After-Tax Spending', width: 30 },
+        { header: 'Cumulative Withdrawal Taxes', key: 'Cumulative Withdrawal Taxes', width: 28 },
+        { header: 'Cumulative Return Tax Drag', key: 'Cumulative Return Tax Drag', width: 28 },
+      ]
+      wsInvestment.addRows((investmentData ?? []).map((row) => ({
+        Year: Number(row.year.toFixed(2)),
+        'Starting Portfolio': roundToCents(row.initial),
+        'Cumulative Gross Withdrawals': roundToCents(row.withdrawals ?? 0),
+        'Cumulative After-Tax Spending': roundToCents(row.netSpending ?? row.withdrawals ?? 0),
+        'Cumulative Withdrawal Taxes': roundToCents(row.withdrawalTaxes ?? 0),
+        'Cumulative Return Tax Drag': roundToCents(row.incomeTaxDrag ?? 0),
+      })))
+    } else {
+      wsInvestment.columns = [
+        { header: 'Year', key: 'Year', width: 8 },
+        { header: 'Initial Principal', key: 'Initial Principal', width: 18 },
+        { header: 'Cumulative Contributions', key: 'Cumulative Contributions', width: 22 },
+        { header: 'Total Invested', key: 'Total Invested', width: 18 },
+      ]
+      wsInvestment.addRows((investmentData ?? []).map((row) => ({
+        Year: Number(row.year.toFixed(2)),
+        'Initial Principal': roundToCents(row.initial),
+        'Cumulative Contributions': roundToCents(row.contributions),
+        'Total Invested': roundToCents(row.total),
+      })))
+    }
 
     // 5. Ending Values
     const wsEnding = workbook.addWorksheet('Ending Values')
@@ -332,12 +374,14 @@ export function MonteCarloSimulator({
       { header: 'End of Period Loss %', key: 'End of Period Loss %', width: 20 },
       { header: 'Intra period Loss %', key: 'Intra period Loss %', width: 20 },
     ]
-    const lossRows = (lossProbData ?? []).map((row: any) => ({
+    const lossRows = (lossProbData ?? []).map((row) => ({
       'Loss Threshold': row.threshold,
       'End of Period Loss %': roundToCents(row.endPeriod),
       'Intra period Loss %': roundToCents(row.intraPeriod),
     }))
     wsLoss.addRows(lossRows)
+
+    formatFinancialWorkbook(workbook, getAppCurrency().symbol)
 
     // Download
     const buffer = await workbook.xlsx.writeBuffer()
@@ -352,46 +396,25 @@ export function MonteCarloSimulator({
     anchor.click()
     window.URL.revokeObjectURL(url)
   }
-
-  const isDirty = () => {
-    if (!results) return true
-    return true
-  }
-
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    if (!results) return
     triggerHaptic('light')
     setExportState('excel')
-    
-    // Sync params for the export run
-    setLastRunParamsStr(JSON.stringify(params))
-
-    setTimeout(() => {
-      runSimulation(undefined, undefined, undefined, (newResults) => {
-        setTimeout(() => {
-          generateExcel(newResults)
-          setExportState('idle')
-        }, 50)
-      })
-    }, 50)
+    try {
+      await generateExcel(results)
+    } finally {
+      setExportState('idle')
+    }
   }
 
   const handleExportPdf = () => {
+    if (!results || typeof window === 'undefined') return
     triggerHaptic('light')
-    if (typeof window !== 'undefined') {
-      setExportState('pdf')
-      
-      // Sync params for the pdf export run
-      setLastRunParamsStr(JSON.stringify(params))
-
-      setTimeout(() => {
-        runSimulation(undefined, undefined, undefined, () => {
-          setTimeout(() => {
-            window.print()
-            setExportState('idle')
-          }, 50)
-        })
-      }, 50)
-    }
+    setExportState('pdf')
+    window.setTimeout(() => {
+      window.print()
+      setExportState('idle')
+    }, 50)
   }
 
   return (
@@ -407,6 +430,14 @@ export function MonteCarloSimulator({
         presetProfiles={PRESET_PROFILES}
       />
       
+      {simulationError && !isSimulating && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Simulation Could Not Run</AlertTitle>
+          <AlertDescription>{simulationError}</AlertDescription>
+        </Alert>
+      )}
+
       {isOutdated && results && !isSimulating && (
         <Alert className="bg-yellow-500/10 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
            <AlertCircle className="h-4 w-4" />
@@ -421,7 +452,7 @@ export function MonteCarloSimulator({
         <MonteCarloResults
           mode={mode}
           results={results}
-          params={params}
+          params={completedParams ?? params}
           logScales={logScales}
           setLogScales={setLogScales}
           showFullPrecision={showFullPrecision}

@@ -11,6 +11,7 @@ import { formatCurrency, getLargeNumberName } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { GrowthMilestones } from './milestones'
 import { GrowthProjectionResult } from '@/lib/simulation/growth-engine'
+import { formatFinancialHorizon } from '@/lib/financial-horizon'
 
 interface GrowthResultsProps {
   data: GrowthProjectionResult
@@ -43,6 +44,7 @@ export function GrowthResults({
     endingBalanceNet,
     finalValueInTodaysDollars,
     totalContributions,
+    totalInvested,
     totalProfit,
     profitGross,
     profitNet,
@@ -52,6 +54,8 @@ export function GrowthResults({
     totalTaxDrag,
     totalTaxCost,
     yearsToTarget,
+    targetStep,
+    targetFrequency,
     yearData,
   } = data
 
@@ -64,8 +68,8 @@ export function GrowthResults({
 
   const isProfitNegative = netProfit < 0
   
-  const roi = totalContributions > 0 
-    ? (netProfit / totalContributions) * 100 
+  const roi = totalInvested > 0
+    ? (netProfit / totalInvested) * 100
     : 0
 
   const formatResult = (val: number) => {
@@ -148,8 +152,8 @@ export function GrowthResults({
             )}
 
             <MetricCard 
-              label="Total Contributions" 
-              value={formatResult(totalContributions)} 
+              label="Total Invested"
+              value={formatResult(totalInvested)}
               colorClass="text-blue-500" 
               bgClass="bg-gradient-to-br from-blue-500/10 to-blue-500/5"
             />
@@ -229,7 +233,7 @@ export function GrowthResults({
             </div>
           </div>
 
-          {targetValue && yearsToTarget ? (
+          {targetValue && yearsToTarget !== null ? (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
@@ -238,7 +242,7 @@ export function GrowthResults({
               <Target className="h-5 w-5 text-primary" />
               <p className="text-sm">
                 You&apos;ll reach your target of <span className="font-bold">{formatCurrency(targetValue)}</span> in
-                approximately <span className="font-bold text-primary">{yearsToTarget} years</span>
+                approximately <span className="font-bold text-primary">{formatFinancialHorizon({ years: yearsToTarget, periods: targetStep, frequency: targetFrequency })}</span>
               </p>
             </motion.div>
           ) : null}
@@ -285,7 +289,7 @@ function ActionButtons({
   onExportExcel: () => void
 }) {
   const btnClass =
-    'inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 font-medium shadow-sm transition-colors duration-150'
+    'inline-flex min-h-11 items-center gap-1 rounded-full border px-3 py-2 font-medium shadow-sm transition-colors duration-150'
 
   return (
     <>

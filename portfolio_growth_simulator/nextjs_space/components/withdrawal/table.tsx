@@ -14,6 +14,8 @@ interface WithdrawalTableProps {
     taxPaid: number
     taxWithheld?: number
     taxDrag?: number
+    marketGrowth: number
+    endingCostBasis?: number
     grossStartingBalance?: number
     grossEndingBalance?: number
     startingBalanceNet?: number
@@ -39,12 +41,7 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
       acc.taxPaid += row.taxPaid
       acc.taxWithheld += (row.taxWithheld ?? 0)
       acc.taxDrag += (row.taxDrag ?? 0)
-      // Net Growth = End - Start + GrossWithdrawal. (This is net of drag)
-      acc.growth += (row.endingBalance - row.startingBalance + row.withdrawals)
-      if (isIncomeMode) {
-        // If we want to show Gross Growth for income mode, add back the tax
-        acc.growth += (row.taxDrag ?? row.taxPaid)
-      }
+      acc.growth += row.marketGrowth
       return acc
     },
     { withdrawals: 0, netIncome: 0, taxPaid: 0, taxWithheld: 0, taxDrag: 0, growth: 0 }
@@ -99,9 +96,7 @@ export function WithdrawalTable({ data }: WithdrawalTableProps) {
                   const taxWithheldValue = row.taxWithheld ?? (row.withdrawals - row.netIncome)
                   const effectiveRate = !isIncomeMode && row.withdrawals > 0 ? (taxWithheldValue / row.withdrawals) * 100 : 0
                   
-                  // Calculate Growth for display
-                  let growthDisplay = row.endingBalance - row.startingBalance + row.withdrawals
-                  if (isIncomeMode) growthDisplay += (row.taxDrag ?? row.taxPaid)
+                  const growthDisplay = row.marketGrowth
 
                   return (
                     <motion.tr

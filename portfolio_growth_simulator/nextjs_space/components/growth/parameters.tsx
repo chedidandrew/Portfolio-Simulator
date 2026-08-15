@@ -10,6 +10,8 @@ import { GrowthState } from '@/lib/types'
 import { getAppCurrency } from '@/lib/utils'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { TaxSettingsPanel } from '@/components/tax-settings-panel'
+import { markCostBasisUserEdited, updateStartingBalanceWithTrackedBasis } from '@/lib/state-normalization'
 
 interface GrowthParametersProps {
   state: GrowthState
@@ -41,14 +43,14 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
               onChange={(value) => {
                 let n = Number(value)
                 if (!isFinite(n)) {
-                  setState({ ...state, startingBalance: 0 })
+                  setState(updateStartingBalanceWithTrackedBasis(state, 0))
                   return
                 }
 
                 if (n !== 0 && Math.abs(n) < 0.01) n = 0.01
 
                 const limited = Number(n.toFixed(2))
-                setState({ ...state, startingBalance: limited })
+                setState(updateStartingBalanceWithTrackedBasis(state, limited))
               }}
               min={0}
               max={1_000_000_000_000_000_000}
@@ -191,7 +193,7 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
           </div>
           
           {/* Tax Configuration */}
-          <div className="space-y-1">
+          <div className="space-y-1 self-start sm:pt-1">
             <div className="flex items-center justify-left gap-2">
               <Label htmlFor="tax-enabled" className="flex items-center gap-2">
                 <Scale className="h-4 w-4" />
@@ -215,48 +217,6 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
                 }}
               />
             </div>
-            
-            {state.taxEnabled && (
-               <div className="pt-2 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                 <div className="space-y-1">
-                   <Label htmlFor="tax-rate" className="text-xs">Tax Rate (%)</Label>
-                   <NumericInput
-                     id="tax-rate"
-                     value={state.taxRate ?? 0}
-                     onChange={(value) => setState({ ...state, taxRate: Math.max(0, Math.min(100, value)) })}
-                     min={0}
-                     max={100}
-                     maxErrorMessage="Congrats, you invented slavery. :)"
-                   />
-                 </div>
-                 <div className="space-y-1">
-                   <Label htmlFor="tax-type" className="text-xs">Tax Type</Label>
-                   <Select
-                      value={state.taxType ?? 'capital_gains'}
-                      onValueChange={(value: any) => setState({ ...state, taxType: value })}
-                    >
-                      <SelectTrigger id="tax-type" className="h-10 print:hidden">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="capital_gains">Taxable Account (capital gains on liquidation)</SelectItem>
-                        <SelectItem value="tax_deferred">Tax deferred (401k/IRA), taxed on withdrawal</SelectItem>
-                        <SelectItem value="income">Annual income tax drag</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="hidden print:block text-xs text-muted-foreground pt-1">
-                      Selected: {state.taxType === 'income' ? 'Annual income tax drag' : (state.taxType === 'tax_deferred' ? 'Tax deferred (401k/IRA), taxed on withdrawal' : 'Taxable Account (capital gains on liquidation)')}
-                    </p>
-                 </div>
-               </div>
-            )}
-            {state.taxEnabled && (
-                <p className="text-[10px] text-muted-foreground pt-4">
-                  {state.taxType === 'income' 
-                    ? 'Like a CD/Bond: Reduces annual return by tax rate.' 
-                    : (state.taxType === 'tax_deferred' ? 'Like a 401k: No annual tax, but 100% of final balance is taxed.' : 'Like a Brokerage: Deducts tax from total profit at end.')}
-                </p>
-            )}
           </div>
 
           {/* Target Value */}
@@ -286,6 +246,29 @@ export function GrowthParameters({ state, setState }: GrowthParametersProps) {
               maxErrorMessage="Trying to buy the moon? :)"
             />
           </div>
+
+          {state.taxEnabled && (
+            <TaxSettingsPanel
+              testId="growth-tax-details"
+              taxRateId="tax-rate"
+              taxTypeId="tax-type"
+              costBasisId="starting-cost-basis"
+              taxRate={state.taxRate ?? 0}
+              taxType={state.taxType ?? 'capital_gains'}
+              currentCostBasis={state.startingCostBasis ?? state.startingBalance}
+              currencySymbol={currencySymbol}
+              basisHelp="Automatically follows Starting Balance until you edit it. Enter the tax basis of the portfolio you already own, not its current market value."
+              taxRateErrorMessage="Enter a tax rate from 0% to 99%."
+              onTaxRateChange={(value) => setState({ ...state, taxRate: Math.max(0, Math.min(99, value)) })}
+              onTaxTypeChange={(value) => setState({ ...state, taxType: value })}
+              onCostBasisChange={(value) => setState(markCostBasisUserEdited(state, value))}
+              description={state.taxType === 'income'
+                ? 'Like a CD or bond: reduces the annual return by the tax rate.'
+                : state.taxType === 'tax_deferred'
+                  ? 'Simplified fully pre-tax account: no annual tax, with distributions and remaining balance valued after the assumed effective tax rate.'
+                  : 'Like a brokerage account: deducts capital gains tax from total profit at the end.'}
+            />
+          )}
         </div>
 
         {/* Advanced Settings */}

@@ -53,7 +53,7 @@ interface TooltipProps {
 /* ------------------------------------------------------------------ */
 
 const formatTooltipLabel = (label: number) => {
-  if (!label || label <= 0) return 'Month 1'
+  if (!label || label <= 0) return 'Start'
   
   const years = Math.floor(label)
   const fraction = label - years
@@ -64,7 +64,7 @@ const formatTooltipLabel = (label: number) => {
     if (months === 0) return `Year ${years}`
     
     // Shift display month by +1 so 0.08 -> Month 2
-    const displayMonth = months + 1
+    const displayMonth = Math.max(1, months)
     if (displayMonth > 12) return `Year ${years + 1}`
 
     if (years === 0) return `Month ${displayMonth}`
@@ -158,6 +158,11 @@ export function MonteCarloChart({
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
+  const containsDepletion = useMemo(() =>
+    data.some((point) => point.p10 <= 0 || point.p25 <= 0 || point.p50 <= 0 || point.p75 <= 0 || point.p90 <= 0),
+  [data])
+  const effectiveLogScale = logScale && !containsDepletion
+
   const maxYear = useMemo(() => {
     if (!data || data.length === 0) return 0
     return data[data.length - 1].year
@@ -203,7 +208,7 @@ export function MonteCarloChart({
   }, [maxYear])
 
   const formatXAxis = (value: number) => {
-    if (value === 0) return 'Month 1'
+    if (value === 0) return 'Start'
     const isInteger = Math.abs(value % 1) < 0.001
 
     if (maxYear <= 0.5) {
@@ -217,7 +222,7 @@ export function MonteCarloChart({
       const months = Math.round((value - years) * 12)
       
       // Shift month logic for axis labels too
-      const displayMonth = months + 1
+      const displayMonth = Math.max(1, months)
       if (displayMonth > 12) return `Year ${years + 1}`
 
       if (years === 0) return `Month ${displayMonth}`
@@ -255,7 +260,7 @@ export function MonteCarloChart({
           deterministicGross: detGrossValue ? detGrossValue / factor : undefined
        }
 
-       return logScale
+       return effectiveLogScale
         ? {
             ...raw,
             p90: logSafe(raw.p90),
@@ -269,7 +274,7 @@ export function MonteCarloChart({
           }
         : raw
     })
-  }, [data, grossData, logScale, isRealDollars, inflationAdjustment, deterministicData, deterministicGrossData])
+  }, [data, grossData, effectiveLogScale, isRealDollars, inflationAdjustment, deterministicData, deterministicGrossData])
 
   const handleLogScaleChange = (checked: boolean) => { 
     triggerHaptic('light'); 
@@ -288,13 +293,14 @@ export function MonteCarloChart({
           <div className="flex items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
               <ChartSpline className="h-5 w-5" style={{ color: 'hsl(165, 65%, 48%)' }} />
-              Scenario Paths
+              Portfolio Value Percentiles
             </CardTitle>
 
             <div className="flex items-center gap-2">
               <Switch
                 id="log-scale-montecarlo"
-                checked={logScale}
+                checked={effectiveLogScale}
+                disabled={containsDepletion}
                 onCheckedChange={handleLogScaleChange}
                 className="print:hidden"
               />
@@ -346,22 +352,25 @@ export function MonteCarloChart({
                   tickLine={false}
                   axisLine={{ stroke: isDark ? 'hsl(240, 3.7%, 15.9%)' : 'hsl(214, 32%, 91%)' }}
                   tick={{ fontSize: 11, fill: isDark ? 'hsl(240, 5%, 64.9%)' : 'hsl(240, 3.8%, 46.1%)' }}
-                  scale={logScale ? 'log' : 'linear'}
-                  domain={logScale ? ['auto', 'auto'] : [0, 'auto']}
+                  scale={effectiveLogScale ? 'log' : 'linear'}
+                  domain={effectiveLogScale ? ['auto', 'auto'] : [0, 'auto']}
                   tickFormatter={(val) => formatCurrency(val, true, 1)}
                 />
                 <Tooltip content={(props) => <CustomTooltip {...props} mode={mode} />} />
                 <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} formatter={(value: string) => PERCENTILE_LABELS[value] ?? value} />
 
-                <Line type="monotone" dataKey="p90" stroke={PERCENTILE_COLORS.p90} strokeWidth={2} dot={false} name="p90" animationDuration={enableAnimation ? 500 : 0} />
-                <Line type="monotone" dataKey="p75" stroke={PERCENTILE_COLORS.p75} strokeWidth={2} dot={false} name="p75" animationDuration={enableAnimation ? 400 : 0} /><Line type="monotone" dataKey="p50" stroke={PERCENTILE_COLORS.p50} strokeWidth={3} dot={false} name="p50" animationDuration={enableAnimation ? 300 : 0} />
-                <Line type="monotone" dataKey="p25" stroke={PERCENTILE_COLORS.p25} strokeWidth={2} dot={false} name="p25" animationDuration={enableAnimation ? 200 : 0} />
-                <Line type="monotone" dataKey="p10" stroke={PERCENTILE_COLORS.p10} strokeWidth={2} dot={false} name="p10" animationDuration={enableAnimation ? 100 : 0} />
+                <Line type="linear" dataKey="p90" stroke={PERCENTILE_COLORS.p90} strokeWidth={2} dot={false} name="p90" animationDuration={enableAnimation ? 500 : 0} />
+                <Line type="linear" dataKey="p75" stroke={PERCENTILE_COLORS.p75} strokeWidth={2} dot={false} name="p75" animationDuration={enableAnimation ? 400 : 0} /><Line type="linear" dataKey="p50" stroke={PERCENTILE_COLORS.p50} strokeWidth={3} dot={false} name="p50" animationDuration={enableAnimation ? 300 : 0} />
+                <Line type="linear" dataKey="p25" stroke={PERCENTILE_COLORS.p25} strokeWidth={2} dot={false} name="p25" animationDuration={enableAnimation ? 200 : 0} />
+                <Line type="linear" dataKey="p10" stroke={PERCENTILE_COLORS.p10} strokeWidth={2} dot={false} name="p10" animationDuration={enableAnimation ? 100 : 0} />
               </LineChart>
             </ResponsiveContainer>
           </div>
+          {containsDepletion && (
+            <p className="text-xs text-amber-500 mt-3 text-center">Log scale is unavailable when a displayed percentile reaches zero.</p>
+          )}
           <p className="text-xs text-muted-foreground mt-3 text-center">
-             Shows the range of possible portfolio values using up to 100,000 simulated market outcomes, from optimistic to pessimistic scenarios. </p>
+             Shows point-in-time portfolio value percentiles. Each percentile curve is not one persistent simulation path. </p>
         </CardContent>
       </Card>
     </motion.div>

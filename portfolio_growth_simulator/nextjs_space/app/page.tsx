@@ -20,9 +20,12 @@ import {
 import { GrowthMode } from '@/components/growth-mode'
 import { WithdrawalMode } from '@/components/withdrawal-mode'
 import { GuideTab } from '@/components/guide-tab'
-import LZString from 'lz-string'
 import { setAppCurrency, CURRENCIES } from '@/lib/utils'
 import { useLocalStorage } from '@/hooks/use-local-storage'
+import { clearPortfolioStorage } from '@/lib/owned-storage'
+import { cleanShareDataFromUrl, readSharePayload } from '@/lib/share-links'
+import { toast } from 'sonner'
+import type { SharePayload } from '@/lib/types'
 
 export default function Home() {
   const { theme, setTheme } = useTheme()
@@ -31,6 +34,7 @@ export default function Home() {
   const [headerVisible, setHeaderVisible] = useState(true)
   const [currency, setCurrency] = useLocalStorage<string>('portfolio-sim-currency', 'USD')
   const [showDonations, setShowDonations] = useLocalStorage<boolean>('portfolio-sim-show-donations', true)
+  const [sharedPayload, setSharedPayload] = useState<SharePayload | null>(null)
   const lastScrollY = useRef(0)
   const scrollThreshold = 10
 
@@ -48,58 +52,20 @@ export default function Home() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // If URL has a Monte Carlo payload, honor that first
+    // A valid shared scenario takes precedence over the saved tab.
     try {
-      const search = new URLSearchParams(window.location.search)
-      const mcParam = search.get('mc')
-
-      if (mcParam) {
-        // FIX: Explicitly type 'decoded' as 'any' to resolve the TypeScript error
-        let decoded: any = null
-
-        // 1. Try decompressing with LZString (New Format)
-        const lzDecompressed = LZString.decompressFromEncodedURIComponent(mcParam)
-        if (lzDecompressed) {
-          try {
-            const parsed = JSON.parse(lzDecompressed)
-            // valid JSON? use it.
-            if (parsed && typeof parsed === 'object') {
-              decoded = parsed
-            }
-          } catch {
-            // LZString returned a string, but it wasn't valid JSON.
-            // This happens when LZString tries to decode a simple Base64 string.
-            // Ignore and fall through to legacy.
-          }
-        }
-
-        // 2. Fallback to atob (Legacy Format) if LZString failed to produce valid JSON
-        if (!decoded) {
-          try {
-             const raw = decodeURIComponent(atob(mcParam))
-             decoded = JSON.parse(raw)
-          } catch {
-             // Not a valid legacy link either
-          }
-        }
-
-        if (decoded) {
-          const mode = decoded?.mode === 'withdrawal' ? 'withdrawal' : 'growth'
-
-          setActiveTab(mode)
-          localStorage.setItem('visited', 'true')
-          localStorage.setItem('lastTab', mode)
-          
-          // Dispatch event with the FULL decoded object (including results)
-          // This allows the child components to catch it and hydrate their state
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('openMonteCarloFromLink', { 
-              detail: decoded 
-            }))
-          }, 100) // Small delay to ensure components are mounted
-          
-          return
-        }
+      const shared = readSharePayload(window.location)
+      if (shared.hadShareData && !shared.payload) {
+        window.setTimeout(() => toast('This shared scenario could not be loaded.'), 50)
+        window.history.replaceState(null, '', cleanShareDataFromUrl(window.location.href))
+      } else if (shared.payload) {
+        const mode = shared.payload.mode
+        if (shared.payload.displayCurrency) setCurrency(shared.payload.displayCurrency)
+        setActiveTab(mode)
+        setSharedPayload(shared.payload)
+        localStorage.setItem('visited', 'true')
+        localStorage.setItem('lastTab', mode)
+        return
       }
     } catch {
       // ignore and fall back to normal behavior
@@ -121,7 +87,7 @@ export default function Home() {
       // Return: go to last used tab
       setActiveTab(lastTab)
     }
-  }, [])
+  }, [setCurrency])
 
   // When a shared Monte Carlo link is opened, switch to the correct tab
   useEffect(() => {
@@ -165,8 +131,8 @@ export default function Home() {
 
       if (currentScrollY < 40) {
         setHeaderVisible(true)
-      } else if (currentScrollY >= 40) {
-        setHeaderVisible(false)
+      } else {
+        setHeaderVisible(currentScrollY < lastScrollY.current)
       }
 
       lastScrollY.current = currentScrollY
@@ -178,7 +144,7 @@ export default function Home() {
 
   const handleFactoryReset = () => {
     if (typeof window !== 'undefined' && window.confirm('Are you sure you want to reset all settings and data? This cannot be undone.')) {
-      localStorage.clear()
+      clearPortfolioStorage(localStorage)
       window.location.reload()
     }
   }
@@ -210,7 +176,7 @@ export default function Home() {
           {mounted && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full">
+                <Button variant="ghost" size="icon" className="h-11 w-11 rounded-full" aria-label="Open settings">
                   <Settings className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
@@ -246,9 +212,13 @@ export default function Home() {
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>
                       <CreditCard className="mr-2 h-4 w-4" />
-                      <span>Currency</span>
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="max-h-[300px] overflow-y-auto">
+                    <span>Display Currency</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="max-h-[300px] overflow-y-auto">
+                    <DropdownMenuLabel>Display Currency</DropdownMenuLabel>
+                    <p className="px-2 pb-2 text-xs text-muted-foreground">
+                      Changes symbols and formatting only. Values are not converted using exchange rates.
+                    </p>
                       {CURRENCIES.map((c) => (
                         <DropdownMenuItem key={c.code} onClick={() => setCurrency(c.code)}>
                           <span>{c.label}</span>
@@ -314,11 +284,11 @@ export default function Home() {
           </TabsContent>
 
           <TabsContent value="growth" className="mt-0">
-            <GrowthMode />
+            <GrowthMode sharedPayload={sharedPayload?.mode === 'growth' ? sharedPayload : null} />
           </TabsContent>
 
           <TabsContent value="withdrawal" className="mt-0">
-            <WithdrawalMode />
+            <WithdrawalMode sharedPayload={sharedPayload?.mode === 'withdrawal' ? sharedPayload : null} />
           </TabsContent>
         </Tabs>
       </main>

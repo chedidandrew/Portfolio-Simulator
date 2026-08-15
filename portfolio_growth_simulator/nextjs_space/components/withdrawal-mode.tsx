@@ -9,8 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Dices } from 'lucide-react'
 import { motion } from 'framer-motion'
-import ExcelJS from 'exceljs'
-import { roundToCents } from '@/lib/utils'
+import { getAppCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
 import { WithdrawalParameters } from '@/components/withdrawal/parameters'
 import { WithdrawalResults } from '@/components/withdrawal/results'
@@ -18,20 +17,25 @@ import { WithdrawalTable } from '@/components/withdrawal/table'
 import { MonteCarloSimulator } from '@/components/monte-carlo-simulator'
 import { DonationSection } from '@/components/donation-section'
 import { useWithdrawalCalculation } from '@/hooks/use-withdrawal-calculation'
-import LZString from 'lz-string'
+import { normalizeWithdrawalState } from '@/lib/state-normalization'
+import { CalculationErrorCard } from '@/components/calculation-error-card'
+import { clearSimulatorScenario } from '@/lib/owned-storage'
+import { validateWithdrawalStateRange } from '@/lib/simulation/deterministic-validation'
+import { MONTE_CARLO_SWITCH_LABELS } from '@/lib/accessibility-labels'
+import { DEFAULT_WITHDRAWAL_STATE } from '@/lib/default-states'
+import { buildShareUrl as buildVersionedShareUrl, cleanShareDataFromUrl } from '@/lib/share-links'
 
-export function WithdrawalMode() {
-  const [state, setState] = useLocalStorage<WithdrawalState>('withdrawal-mode-state', {
-    startingBalance: 1000000,
-    annualReturn: 7,
-    duration: 30,
-    periodicWithdrawal: 3000,
-    inflationAdjustment: 2.5,
-    frequency: 'monthly',
-    excludeInflationAdjustment: false,
-    taxEnabled: false,
-    taxRate: 15
-  })
+export { DEFAULT_WITHDRAWAL_STATE } from '@/lib/default-states'
+
+export function WithdrawalMode({ sharedPayload }: { sharedPayload?: SharePayload | null }) {
+  const [state, setState] = useLocalStorage<WithdrawalState>(
+    'withdrawal-mode-state',
+    DEFAULT_WITHDRAWAL_STATE,
+    {
+      normalize: normalizeWithdrawalState,
+      shouldPersist: (nextState) => validateWithdrawalStateRange(nextState) === null,
+    },
+  )
 
   const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('withdrawal-show-monte-carlo', false)
   const [showFullPrecision, setShowFullPrecision] = useLocalStorage('withdrawal-show-full-precision', false)
@@ -43,19 +47,19 @@ export function WithdrawalMode() {
   const [initialLogScales, setInitialLogScales] = useState<SharePayload['logScales'] | undefined>(undefined)
   const [initialMCShowFullPrecision, setInitialMCShowFullPrecision] = useState<boolean | undefined>(undefined)
 
-  const calculation = useWithdrawalCalculation(state)
+  const calculationState = useWithdrawalCalculation(state)
+  const calculation = calculationState.result
 
   // Listen for the event dispatched by app/page.tsx
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const handleOpenFromLink = (event: any) => {
-      const decoded = event.detail
+    const applySharedPayload = (decoded: SharePayload) => {
       if (decoded?.mode !== 'withdrawal') return
 
       // 1) Restore deterministic params (supports new and old keys)
       const loadedParams = decoded.deterministicParams || decoded.params
-      if (loadedParams) setState(loadedParams)
+      if (loadedParams && 'periodicWithdrawal' in loadedParams) setState(loadedParams)
 
       // Restore precision toggle if present
       if (typeof decoded.showFullPrecision === 'boolean') {
@@ -73,8 +77,14 @@ export function WithdrawalMode() {
       }
       
       // Clean URL
-      window.history.replaceState(null, '', window.location.pathname)
+      window.history.replaceState(null, '', cleanShareDataFromUrl(window.location.href))
     }
+
+    const handleOpenFromLink = (event: Event) => {
+      applySharedPayload((event as CustomEvent<SharePayload>).detail)
+    }
+
+    if (sharedPayload) applySharedPayload(sharedPayload)
 
     // Check on mount if we already have the payload in URL (direct load)
     try {
@@ -89,13 +99,13 @@ export function WithdrawalMode() {
     window.addEventListener('openMonteCarloFromLink', handleOpenFromLink)
     return () => window.removeEventListener('openMonteCarloFromLink', handleOpenFromLink)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [sharedPayload, setInitialMCParams, setInitialMCShowFullPrecision, setInitialRngSeed, setInitialLogScales, setShowFullPrecision, setState, setUseMonteCarloMode])
 
   const buildShareUrl = () => {
     if (typeof window === 'undefined') return ''
     const url = new URL(window.location.href)
 
-    const payload = {
+    const payload: SharePayload = {
       mode: 'withdrawal',
       type: useMonteCarloMode ? 'monte-carlo' : 'deterministic',
       deterministicParams: state,
@@ -103,11 +113,7 @@ export function WithdrawalMode() {
       showFullPrecision,
     }
 
-    // Legacy encoding method: encodeURIComponent -> btoa
-    const encoded = typeof btoa !== 'undefined' ? btoa(encodeURIComponent(JSON.stringify(payload))) : ''
-    
-    if (encoded) url.searchParams.set('mc', encoded)
-    return url.toString()
+    return buildVersionedShareUrl(url.toString(), payload, getAppCurrency().code)
   }
 
   const handleShareLink = async () => {
@@ -116,7 +122,8 @@ export function WithdrawalMode() {
     if (!url) return
 
     try {
-      if (typeof navigator !== 'undefined' && 'share' in navigator) {
+      const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+      if (canNativeShare) {
         await navigator.share({
           title: 'Portfolio Simulator',
           text: 'Take a look at my portfolio results',
@@ -125,15 +132,15 @@ export function WithdrawalMode() {
         return
       }
 
-      if ((navigator as any)?.clipboard?.writeText) {
-        await (navigator as any).clipboard.writeText(url)
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url)
         toast('Link copied')
         return
       }
 
       toast('Copy not supported on this browser')
-    } catch (err: any) {
-      const name = err?.name
+    } catch (error: unknown) {
+      const name = error instanceof DOMException || error instanceof Error ? error.name : undefined
       if (name === 'AbortError' || name === 'NotAllowedError') return
       toast('Could not share or copy link')
     }
@@ -146,129 +153,10 @@ export function WithdrawalMode() {
 
   const handleExportExcel = async () => {
     triggerHaptic('light')
-    if (!calculation.yearData.length) return
+    if (!calculation?.yearData.length) return
 
-    const workbook = new ExcelJS.Workbook()
-
-    // 1. Summary Sheet
-    const wsSummary = workbook.addWorksheet('Summary')
-    wsSummary.columns = [
-      { header: 'Key', key: 'Key', width: 25 },
-      { header: 'Value', key: 'Value', width: 20 },
-    ]
-
-    const summaryRows = [
-      { Key: 'Mode', Value: 'Withdrawal (Deterministic)' },
-      { Key: 'Starting Balance', Value: roundToCents(state.startingBalance) },
-      { Key: 'Annual Return %', Value: state.annualReturn },
-      { Key: 'Duration Years', Value: state.duration },
-      { Key: 'Withdrawal Amount (Gross)', Value: roundToCents(state.periodicWithdrawal) },
-      { Key: 'Inflation Adj %', Value: state.inflationAdjustment },
-      { Key: 'Frequency', Value: state.frequency },
-      { Key: 'Ending Balance', Value: roundToCents(calculation.endingBalance) },
-      { Key: 'Total Withdrawn (Gross)', Value: roundToCents(calculation.totalWithdrawn) },
-      { Key: 'Sustainable', Value: calculation.isSustainable ? 'Yes' : 'No' },
-    ]
-
-    if (state.taxEnabled) {
-      const taxTypeLabel =
-        state.taxType === 'income'
-          ? 'Annual income tax drag'
-          : (state.taxType === 'tax_deferred'
-            ? 'Tax deferred (401k/IRA), taxed on withdrawal'
-            : 'Taxable Account (capital gains on liquidation)')
-      summaryRows.push(
-        { Key: 'Tax Enabled', Value: 'Yes' },
-        { Key: 'Tax Rate', Value: `${state.taxRate}%` },
-        { Key: 'Tax Type', Value: taxTypeLabel },
-        { Key: 'Total Tax Withheld', Value: roundToCents(calculation.totalTaxWithheld) },
-        { Key: 'Total Tax Drag', Value: roundToCents(calculation.totalTaxDrag) },
-        { Key: 'Total Tax (Combined)', Value: roundToCents(calculation.totalTaxPaid) },
-        { Key: 'Total Withdrawn (Net)', Value: roundToCents(calculation.totalWithdrawnNet) }
-      )
-    }
-
-    wsSummary.addRows(summaryRows)
-
-    // 2. Data Sheet
-    const wsData = workbook.addWorksheet('Balance By Year')
-    
-    // Define columns
-    const columns = [
-      { header: 'Year', key: 'Year', width: 10 },
-      { header: 'Starting Balance', key: 'Starting Balance', width: 20 },
-      { header: 'Withdrawals (Gross)', key: 'Withdrawals', width: 20 },
-    ]
-
-    if (state.taxEnabled) {
-      columns.push({ header: 'Net Income', key: 'Net Income', width: 20 })
-      columns.push({ header: 'Tax Paid', key: 'Tax Paid', width: 20 })
-    }
-
-    columns.push(
-      { header: 'Growth Earned', key: 'Growth Earned', width: 20 },
-      { header: 'Ending Balance', key: 'Ending Balance', width: 20 },
-      { header: 'Sustainable', key: 'Sustainable', width: 15 }
-    )
-    
-    wsData.columns = columns
-
-    const totals = calculation.yearData.reduce(
-      (acc, row) => {
-        acc.withdrawals += row.withdrawals
-        acc.netIncome += row.netIncome
-        acc.taxPaid += (row as any).taxPaid ?? 0
-        acc.taxWithheld += (row as any).taxWithheld ?? (row.withdrawals - row.netIncome)
-        acc.taxDrag += (row as any).taxDrag ?? 0
-        acc.growth += (row.endingBalance - row.startingBalance + row.withdrawals)
-        return acc
-      },
-      { withdrawals: 0, netIncome: 0, taxPaid: 0, taxWithheld: 0, taxDrag: 0, growth: 0 }
-    )
-
-    const excelData = calculation.yearData.map((row) => {
-      const dataRow: any = {
-        Year: row.year,
-        'Starting Balance (Spendable)': roundToCents(row.startingBalanceNet ?? row.startingBalance),
-        'Withdrawals (Gross)': roundToCents(row.withdrawals),
-        'Net Income Received': roundToCents(row.netIncome),
-        'Ending Balance (Spendable)': roundToCents(row.endingBalanceNet ?? row.endingBalance),
-        Sustainable: row.isSustainable ? 'Yes' : 'No',
-      }
-
-      if (typeof (row as any).grossStartingBalance === 'number') {
-        dataRow['Starting Balance (Gross)'] = roundToCents((row as any).grossStartingBalance)
-      }
-      if (typeof (row as any).grossEndingBalance === 'number') {
-        dataRow['Ending Balance (Gross)'] = roundToCents((row as any).grossEndingBalance)
-      }
-
-      if (state.taxEnabled) {
-        dataRow['Tax Withheld'] = roundToCents((row as any).taxWithheld ?? (row.withdrawals - row.netIncome))
-        dataRow['Tax Drag'] = roundToCents((row as any).taxDrag ?? 0)
-        dataRow['Tax (Total)'] = roundToCents((row as any).taxPaid ?? 0)
-      }
-
-      return dataRow
-    })
-
-    const totalsRow: any = {
-      Year: 'Total',
-      'Starting Balance': '',
-      'Withdrawals': roundToCents(totals.withdrawals),
-      'Growth Earned': roundToCents(totals.growth),
-      'Ending Balance': '',
-      Sustainable: '',
-    }
-    if (state.taxEnabled) {
-      totalsRow['Net Income Received'] = roundToCents(totals.netIncome)
-      totalsRow['Tax Withheld'] = roundToCents(totals.taxWithheld)
-      totalsRow['Tax Drag'] = roundToCents(totals.taxDrag)
-      totalsRow['Tax (Total)'] = roundToCents(totals.taxPaid)
-    }
-    excelData.push(totalsRow)
-
-    wsData.addRows(excelData)
+    const { buildWithdrawalWorkbook } = await import('@/lib/export/withdrawal-workbook')
+    const workbook = buildWithdrawalWorkbook(state, calculation, getAppCurrency().symbol, getAppCurrency().code)
 
     // Generate and Download
     const buffer = await workbook.xlsx.writeBuffer()
@@ -282,6 +170,11 @@ export function WithdrawalMode() {
     anchor.download = fileName
     anchor.click()
     window.URL.revokeObjectURL(url)
+  }
+
+  const handleResetScenario = () => {
+    if (typeof window !== 'undefined') clearSimulatorScenario(window.localStorage, 'withdrawal')
+    setState(DEFAULT_WITHDRAWAL_STATE)
   }
 
   return (
@@ -310,7 +203,12 @@ export function WithdrawalMode() {
                   Model portfolio sustainability with randomized scenarios
                 </p>
               </div>
-              <Switch checked={useMonteCarloMode} onCheckedChange={setUseMonteCarloMode} />
+              <Switch
+                id="withdrawal-monte-carlo-mode"
+                aria-label={MONTE_CARLO_SWITCH_LABELS.withdrawal}
+                checked={useMonteCarloMode}
+                onCheckedChange={setUseMonteCarloMode}
+              />
             </div>
           </CardContent>
         </Card>
@@ -331,19 +229,25 @@ export function WithdrawalMode() {
             <WithdrawalParameters state={state} setState={setState} />
           </motion.div>
 
-          <WithdrawalResults
-            data={calculation}
-            duration={state.duration}
-            showFullPrecision={showFullPrecision}
-            setShowFullPrecision={setShowFullPrecision}
-            onShare={handleShareLink}
-            onExportPdf={handleExportPdf}
-            onExportExcel={handleExportExcel}
-          />
+          {calculationState.error ? (
+            <CalculationErrorCard message={calculationState.error} onReset={handleResetScenario} />
+          ) : calculation ? (
+            <>
+              <WithdrawalResults
+                data={calculation}
+                duration={state.duration}
+                showFullPrecision={showFullPrecision}
+                setShowFullPrecision={setShowFullPrecision}
+                onShare={handleShareLink}
+                onExportPdf={handleExportPdf}
+                onExportExcel={handleExportExcel}
+              />
 
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-            <WithdrawalTable data={calculation.yearData} />
-          </motion.div>
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+                <WithdrawalTable data={calculation.yearData} />
+              </motion.div>
+            </>
+          ) : null}
         </>
       )}
 

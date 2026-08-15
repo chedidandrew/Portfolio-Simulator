@@ -1,58 +1,104 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { performMonteCarloSimulationAsync } from '@/lib/simulation/monte-carlo-engine'
 import { SimulationParams } from '@/lib/types'
 import { formatCurrency } from '@/lib/utils'
 import { Loader2, Table2 } from 'lucide-react'
+import { runMonteCarloOffMainThread } from '@/lib/simulation/monte-carlo-client'
 
-interface SensitivityTableProps {
+export interface SensitivityResult {
+  amount: number
+  modifier: number
+  successRate: number
+  medianEndingValue: number
+}
+
+export const SENSITIVITY_SCENARIO_COUNT = 200
+
+export function cashflowFrequencyLabel(frequency: SimulationParams['cashflowFrequency']): string {
+  return frequency.charAt(0).toUpperCase() + frequency.slice(1)
+}
+
+export interface SensitivityTableProps {
   params: SimulationParams
   mode: 'growth' | 'withdrawal'
   rngSeed?: string | null
+  runSimulation?: typeof runMonteCarloOffMainThread
 }
 
-export function SensitivityTable({ params, mode, rngSeed }: SensitivityTableProps) {
-  const [data, setData] = useState<any[]>([])
+export function SensitivityTable({
+  params,
+  mode,
+  rngSeed,
+  runSimulation = runMonteCarloOffMainThread,
+}: SensitivityTableProps) {
+  const [data, setData] = useState<SensitivityResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const paramsRef = useRef(params)
+  paramsRef.current = params
 
-  const handleRunSensitivity = () => {
-    setIsLoading(true)
-    // Run in a timeout to unblock the UI
-    setTimeout(() => {
-      ;(async () => {
-      const baseCashflow = params.cashflowAmount
-      // Variations: -20%, -10%, Current, +10%, +20%
-      const variations = [0.8, 0.9, 1.0, 1.1, 1.2] 
+  useEffect(() => {
+    const controller = new AbortController()
+    const runSensitivity = async () => {
+      setIsLoading(true)
+      setError(null)
+      const currentParams = paramsRef.current
+      const baseCashflow = currentParams.cashflowAmount
+      const variations = [0.8, 0.9, 1.0, 1.1, 1.2]
+      const completedSeed = rngSeed || 'portfolio-simulator'
 
-      const results: any[] = []
+      const results: SensitivityResult[] = []
       for (const modifier of variations) {
         const testCashflow = baseCashflow * modifier
-        // Use fewer paths (200) for speed, it's just an estimate
-        const testParams = { ...params, cashflowAmount: testCashflow, numPaths: 200 } 
-        const sim = await performMonteCarloSimulationAsync(testParams, mode, rngSeed || undefined)
+        const testParams: SimulationParams = {
+          ...currentParams,
+          cashflowAmount: testCashflow,
+          numPaths: SENSITIVITY_SCENARIO_COUNT,
+        }
+        const sim = await runSimulation(testParams, mode, completedSeed, controller.signal)
 
         results.push({
-            amount: testCashflow,
-            modifier,
-            successRate: mode === 'withdrawal' ? sim.solventRate : sim.profitableRate,
-            finalMedian: sim.median,
+          amount: testCashflow,
+          modifier,
+          successRate: mode === 'withdrawal' ? sim.solventRate : sim.profitableRate,
+          medianEndingValue: sim.median,
         })
       }
-setData(results)
-      setIsLoading(false)
-      })().catch(() => {
-        setIsLoading(false)
-      })
-    }, 100)
-  }
+      if (!controller.signal.aborted) setData(results)
+    }
 
-  // Auto-run when relevant params change
-  useEffect(() => {
-    handleRunSensitivity()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.cashflowAmount, params.initialValue, params.duration, params.expectedReturn, rngSeed])
+    void runSensitivity()
+      .catch((reason: unknown) => {
+        if (!controller.signal.aborted) {
+          setError(reason instanceof Error ? reason.message : 'Sensitivity analysis could not be completed.')
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [
+    mode,
+    params.initialValue,
+    params.startingCostBasis,
+    params.expectedReturn,
+    params.volatility,
+    params.duration,
+    params.cashflowAmount,
+    params.cashflowFrequency,
+    params.inflationAdjustment,
+    params.excludeInflationAdjustment,
+    params.taxEnabled,
+    params.taxType,
+    params.taxRate,
+    params.calculationMode,
+    params.enableCrashRisk,
+    rngSeed,
+    runSimulation,
+  ])
 
   return (
     <Card className="border-primary/20">
@@ -65,17 +111,19 @@ setData(results)
       <CardContent>
         <div className="space-y-4">
           <p className="text-muted-foreground text-xs">
-            See how small changes to your {mode === 'growth' ? 'contributions' : 'withdrawals'} affect your probability of success.
+            See how small changes to your {mode === 'growth' ? 'contributions' : 'withdrawals'} affect your probability of success. Each row uses a reduced {SENSITIVITY_SCENARIO_COUNT}-scenario run with the completed simulation seed.
           </p>
           
           {isLoading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground gap-2 text-xs">
                 <Loader2 className="h-4 w-4 animate-spin" /> Calculating scenarios...
             </div>
+          ) : error ? (
+            <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">{error}</p>
           ) : (
             <div className="w-full">
               <div className="grid grid-cols-3 gap-2 text-center mb-2 border-b border-border/50 pb-2">
-                  <div className="text-[12px] uppercase tracking-wider font-semibold text-muted-foreground">Monthly</div>
+                  <div className="text-[12px] uppercase tracking-wider font-semibold text-muted-foreground">{cashflowFrequencyLabel(params.cashflowFrequency)}</div>
                   <div className="text-[12px] uppercase tracking-wider font-semibold text-muted-foreground">
                       {mode === 'withdrawal' ? 'Survival' : 'Profit'} %
                   </div>
@@ -108,7 +156,7 @@ setData(results)
                         </div>
                         {/* UPDATED: Increased text size here */}
                         <div className="font-semibold text-[11px] sm:text-xs tracking-tight truncate">
-                            {formatCurrency(row.medianEnd, true, 0, false)}
+                            {formatCurrency(row.medianEndingValue, true, 0, false)}
                         </div>
                     </div>
                 ))}

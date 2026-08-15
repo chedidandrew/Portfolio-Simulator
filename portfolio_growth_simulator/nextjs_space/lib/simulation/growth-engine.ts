@@ -1,4 +1,32 @@
-import { GrowthState } from '@/lib/types'
+import type { GrowthState } from '../types'
+import {
+  annualReturnAfterIncomeTaxDrag,
+  assertFiniteResult,
+  embeddedTaxLiability,
+  inflationFactor,
+  netLiquidationValue,
+  normalizeTaxRate,
+  periodicRate,
+  stepsPerYear,
+  toTodaysDollars,
+} from './financial-utils'
+
+export interface GrowthProjectionYear {
+  year: number
+  startingValue: number
+  grossStartingValue: number
+  contributions: number
+  contributionsInTodaysDollars: number
+  cumulativeContributions: number
+  cumulativeContributionsInTodaysDollars: number
+  totalInvested: number
+  totalInvestedInTodaysDollars: number
+  interest: number
+  taxPaid: number
+  changeInEmbeddedTax: number
+  endingValue: number
+  grossEndingValue: number
+}
 
 export interface GrowthProjectionResult {
   finalValue: number
@@ -7,6 +35,10 @@ export interface GrowthProjectionResult {
   endingBalanceNet: number
   finalValueInTodaysDollars: number
   totalContributions: number
+  totalInvested: number
+  periodicContributions: number
+  periodicContributionsInTodaysDollars: number
+  totalInvestedInTodaysDollars: number
   totalInterest: number
   totalProfit: number
   profitGross: number
@@ -17,245 +49,199 @@ export interface GrowthProjectionResult {
   totalTaxWithheld: number
   totalTaxDrag: number
   totalTaxCost: number
-  yearData: Array<{
-    year: number
-    startingValue: number
-    grossStartingValue: number
-    contributions: number
-    interest: number
-    taxPaid: number
-    endingValue: number
-    grossEndingValue: number
-  }>
+  yearData: GrowthProjectionYear[]
   yearsToTarget: number | null
+  targetStep: number | null
+  targetFrequency: GrowthState['frequency']
 }
 
 export function calculateGrowthProjection(state: GrowthState): GrowthProjectionResult {
-  const { 
-    startingBalance, 
+  const {
+    startingBalance,
     startingCostBasis,
-    annualReturn, 
-    duration, 
-    periodicAddition, 
-    frequency, 
+    annualReturn,
+    duration,
+    periodicAddition,
+    frequency,
     inflationAdjustment,
     targetValue,
     excludeInflationAdjustment,
     taxEnabled,
     taxRate = 0,
     taxType = 'capital_gains',
-    calculationMode = 'effective'
+    calculationMode = 'effective',
   } = state
 
-  const getStepsPerYear = (f: GrowthState['frequency']) => {
-    if (f === 'weekly') return 52
-    if (f === 'monthly') return 12
-    if (f === 'quarterly') return 4
-    return 1
-  }
+  if (!Number.isFinite(startingBalance) || startingBalance < 0) throw new Error('Starting balance cannot be negative.')
+  if (!Number.isFinite(duration) || duration <= 0) throw new Error('Duration must be greater than zero.')
+  if (!Number.isFinite(periodicAddition) || periodicAddition < 0) throw new Error('Contribution cannot be negative.')
 
-  const stepsPerYear = getStepsPerYear(frequency)
-  const totalSteps = duration * stepsPerYear
-  
-  // Tax Logic: If 'income' (Annual), apply tax drag to the return rate
-  // 'tax_deferred' and 'capital_gains' do NOT reduce annual return
-  let effectiveAnnualReturn = annualReturn
-  if (taxEnabled && taxType === 'income') {
-    effectiveAnnualReturn = annualReturn * (1 - (taxRate / 100))
-  }
+  const periods = stepsPerYear(frequency)
+  const totalSteps = Math.max(1, Math.round(duration * periods))
+  const afterTaxAnnualReturn = annualReturnAfterIncomeTaxDrag(annualReturn, taxEnabled, taxType, taxRate)
+  const netStepRate = periodicRate(afterTaxAnnualReturn, periods, calculationMode)
+  const grossStepRate = periodicRate(annualReturn, periods, calculationMode)
+  const inflator = inflationFactor(inflationAdjustment)
+  const taxRateFraction = normalizeTaxRate(taxRate)
 
-  // Consistent: Use Effective Step Rate or Nominal Step Rate
-  let stepRate
-  if (calculationMode === 'nominal') {
-    stepRate = effectiveAnnualReturn / 100 / stepsPerYear
-  } else {
-    stepRate = Math.pow(1 + effectiveAnnualReturn / 100, 1 / stepsPerYear) - 1
-  }
-
-  const inflationFactor = 1 + (inflationAdjustment / 100)
-
-  const clampedStartingCostBasis = Math.max(0, startingCostBasis ?? startingBalance)
-
-  let currentBalance = startingBalance
-  let totalContributions = startingBalance
-  let totalBasis = clampedStartingCostBasis
-  let currentPeriodicAddition = periodicAddition
+  let netBalance = startingBalance
+  let grossBalance = startingBalance
+  let basis = Math.max(0, startingCostBasis ?? startingBalance)
+  let currentContribution = periodicAddition
+  let periodicContributions = 0
+  let periodicContributionsReal = 0
   let totalTaxPaid = 0
-  let totalInterest = 0
+  let totalInterestGross = 0
+  let cumulativeContributions = 0
+  let cumulativeContributionsReal = 0
 
-  const yearData = []
-  const getNetLiquidationValue = (balance: number, basis: number) => {
-    if (!taxEnabled) return balance
-    if (taxType === 'capital_gains') {
-      const profitForTax = balance - basis
-      if (profitForTax > 0) return balance - (profitForTax * (taxRate / 100))
-      return balance
-    }
-    if (taxType === 'tax_deferred') {
-      return balance * (1 - (taxRate / 100))
-    }
-    return balance
-  }
-
-  let yearStartBalanceGross = startingBalance
-  let yearStartBalanceNet = getNetLiquidationValue(startingBalance, totalBasis)
+  const yearData: GrowthProjectionYear[] = []
+  let yearStartGross = grossBalance
+  let yearStartNet = netLiquidationValue({ balance: netBalance, basis, taxEnabled, taxType, taxRate })
   let yearContributions = 0
-  let yearInterest = 0
-  let yearTaxPaid = 0
+  let yearContributionsReal = 0
+  let yearGrossInterest = 0
+  let yearTax = 0
 
-  for (let step = 1; step <= totalSteps; step++) {
-    const balanceBeforeInterest = currentBalance
+  for (let step = 1; step <= totalSteps; step += 1) {
+    const yearsElapsed = step / periods
+    const grossBefore = grossBalance
+    const netBefore = netBalance
 
-    // A. Apply Growth
-    currentBalance = currentBalance * (1 + stepRate)
-    const stepInterestNet = currentBalance - balanceBeforeInterest
+    grossBalance *= 1 + grossStepRate
+    netBalance *= 1 + netStepRate
 
-    let stepInterestGross = stepInterestNet
-    if (taxEnabled && taxType === 'income') {
-      // EDGE CASE SAFETY: Clamp tax rate to 99% max for the 'implied tax' division
-      let t = taxRate / 100
-      if (t >= 0.99) t = 0.99
-      stepInterestGross = stepInterestNet / (1 - t)
-      const impliedTax = stepInterestGross - stepInterestNet
-      totalTaxPaid += impliedTax
-      yearTaxPaid += impliedTax
+    const grossGrowth = grossBalance - grossBefore
+    const netGrowth = netBalance - netBefore
+    const taxOnGrowth = taxEnabled && taxType === 'income' ? Math.max(0, grossGrowth - netGrowth) : 0
+
+    totalInterestGross += grossGrowth
+    totalTaxPaid += taxOnGrowth
+    yearGrossInterest += grossGrowth
+    yearTax += taxOnGrowth
+
+    if (currentContribution > 0) {
+      grossBalance += currentContribution
+      netBalance += currentContribution
+      basis += currentContribution
+      periodicContributions += currentContribution
+      cumulativeContributions += currentContribution
+      yearContributions += currentContribution
+
+      const realContribution = toTodaysDollars(currentContribution, inflationAdjustment, yearsElapsed)
+      periodicContributionsReal += realContribution
+      cumulativeContributionsReal += realContribution
+      yearContributionsReal += realContribution
     }
 
-    totalInterest += stepInterestGross
-    yearInterest += stepInterestGross
+    assertFiniteResult(netBalance, 'Portfolio balance')
+    assertFiniteResult(grossBalance, 'Gross portfolio balance')
 
-
-
-    // B. Apply Contributions (Discrete at selected frequency)
-    if (currentPeriodicAddition > 0) {
-      currentBalance += currentPeriodicAddition
-      totalContributions += currentPeriodicAddition
-      totalBasis += currentPeriodicAddition
-      yearContributions += currentPeriodicAddition
-    }
-
-    if (step % stepsPerYear === 0) {
-      let endingValue = currentBalance
-      if (taxEnabled) {
-        if (taxType === 'capital_gains') {
-          const profitForTax = currentBalance - totalBasis
-          if (profitForTax > 0) {
-            endingValue = currentBalance - (profitForTax * (taxRate / 100))
-          }
-        } else if (taxType === 'tax_deferred') {
-          endingValue = currentBalance * (1 - (taxRate / 100))
-        }
-      }
-
+    const isYearEnd = step % periods === 0 || step === totalSteps
+    if (isYearEnd) {
+      const endingNet = netLiquidationValue({ balance: netBalance, basis, taxEnabled, taxType, taxRate })
+      const hasDeferredTax = !!taxEnabled && (taxType === 'capital_gains' || taxType === 'tax_deferred')
+      const startingEmbeddedTax = hasDeferredTax ? Math.max(0, yearStartGross - yearStartNet) : 0
+      const endingEmbeddedTax = hasDeferredTax ? Math.max(0, grossBalance - endingNet) : 0
       yearData.push({
-        year: step / stepsPerYear,
-        startingValue: yearStartBalanceNet,
-        grossStartingValue: yearStartBalanceGross,
+        year: yearsElapsed,
+        startingValue: yearStartNet,
+        grossStartingValue: yearStartGross,
         contributions: yearContributions,
-        interest: yearInterest,
-        taxPaid: yearTaxPaid,
-        endingValue,
-        grossEndingValue: currentBalance,
+        contributionsInTodaysDollars: yearContributionsReal,
+        cumulativeContributions,
+        cumulativeContributionsInTodaysDollars: cumulativeContributionsReal,
+        totalInvested: startingBalance + cumulativeContributions,
+        totalInvestedInTodaysDollars: startingBalance + cumulativeContributionsReal,
+        interest: yearGrossInterest,
+        taxPaid: yearTax,
+        changeInEmbeddedTax: endingEmbeddedTax - startingEmbeddedTax,
+        endingValue: endingNet,
+        grossEndingValue: grossBalance,
       })
 
-      yearStartBalanceGross = currentBalance
-      yearStartBalanceNet = endingValue
+      yearStartGross = grossBalance
+      yearStartNet = endingNet
       yearContributions = 0
-      yearInterest = 0
-      yearTaxPaid = 0
+      yearContributionsReal = 0
+      yearGrossInterest = 0
+      yearTax = 0
 
-      if (!excludeInflationAdjustment) {
-        currentPeriodicAddition *= inflationFactor
-      }
+      if (!excludeInflationAdjustment && step < totalSteps) currentContribution *= inflator
     }
   }
 
-  const finalValue = currentBalance
-
-  const taxableGain = (taxEnabled && taxType === 'capital_gains') ? Math.max(0, finalValue - totalBasis) : 0
-
-  let totalDeferredTax = 0
-  if (taxEnabled) {
-    if (taxType === 'capital_gains') {
-      // Tax on PROFIT only
-      const profitForTax = finalValue - totalBasis
-      if (profitForTax > 0) {
-        totalDeferredTax = profitForTax * (taxRate / 100)
-      }
-    } else if (taxType === 'tax_deferred') {
-      // Tax on ENTIRE BALANCE (Traditional 401k/IRA style)
-      // Assumes the initial balance was also pre-tax or deductible
-      totalDeferredTax = finalValue * (taxRate / 100)
-    }
-  } 
-
-  const finalValueNet = finalValue - totalDeferredTax
-  const totalProfit = finalValueNet - totalContributions
-  const profitGross = finalValue - totalContributions
-  const profitNet = totalProfit
-  const endingBalanceGross = finalValue
+  const finalValue = netBalance
+  const finalValueNet = netLiquidationValue({ balance: netBalance, basis, taxEnabled, taxType, taxRate })
+  const endingBalanceGross = taxType === 'income' && taxEnabled ? grossBalance : netBalance
   const endingBalanceNet = finalValueNet
-  const totalTaxWithheld = 0
-  const totalTaxDrag = totalTaxPaid
-  const totalTaxCost = totalTaxWithheld + totalTaxDrag + totalDeferredTax
-  const finalValueInTodaysDollars = finalValueNet / Math.pow(1 + inflationAdjustment / 100, duration)
+  const totalDeferredTax = embeddedTaxLiability({ balance: netBalance, basis, taxEnabled, taxType, taxRate })
+  const totalTaxDrag = taxEnabled && taxType === 'income' ? Math.max(0, grossBalance - netBalance) : 0
+  const totalTaxCost = totalTaxPaid + totalDeferredTax
+  const taxableGain = taxEnabled && taxType === 'capital_gains' ? Math.max(0, netBalance - basis) : 0
+  const totalContributions = startingBalance + periodicContributions
+  const totalInvestedInTodaysDollars = startingBalance + periodicContributionsReal
+  const profitGross = endingBalanceGross - totalContributions
+  const profitNet = finalValueNet - totalContributions
 
   let yearsToTarget: number | null = null
+  let targetStep: number | null = null
+  if (targetValue && targetValue > 0) {
+    if (netLiquidationValue({ balance: startingBalance, basis: Math.max(0, startingCostBasis ?? startingBalance), taxEnabled, taxType, taxRate }) >= targetValue) {
+      yearsToTarget = 0
+    } else {
+      let targetNet = startingBalance
+      let targetGross = startingBalance
+      let targetBasis = Math.max(0, startingCostBasis ?? startingBalance)
+      let targetContribution = periodicAddition
+      const maxSteps = 1_000 * periods
 
-  if (targetValue && targetValue > startingBalance) {
-    let tBalance = startingBalance
-    let tBasis = clampedStartingCostBasis
-    let tContribution = periodicAddition
-    
-    for (let m = 1; m <= 1000 * stepsPerYear; m++) {
-      tBalance = tBalance * (1 + stepRate)
-      
-      if (tContribution > 0) {
-        tBalance += tContribution
-        tBasis += tContribution
-      }
-
-      let tNet = tBalance
-      if (taxEnabled) {
-        if (taxType === 'capital_gains') {
-          const profitForTax = tBalance - tBasis
-          if (profitForTax > 0) {
-            tNet = tBalance - (profitForTax * (taxRate / 100))
-          }
-        } else if (taxType === 'tax_deferred') {
-          tNet = tBalance * (1 - (taxRate / 100))
+      for (let step = 1; step <= maxSteps; step += 1) {
+        targetGross *= 1 + grossStepRate
+        targetNet *= 1 + netStepRate
+        if (targetContribution > 0) {
+          targetGross += targetContribution
+          targetNet += targetContribution
+          targetBasis += targetContribution
         }
-      }
 
-      if (tNet >= targetValue) {
-        yearsToTarget = parseFloat((m / stepsPerYear).toFixed(1))
-        break
-      }
+        const targetLiquidation = netLiquidationValue({ balance: targetNet, basis: targetBasis, taxEnabled, taxType, taxRate })
+        if (targetLiquidation >= targetValue) {
+          targetStep = step
+          yearsToTarget = step / periods
+          break
+        }
 
-      if (m % stepsPerYear === 0 && !excludeInflationAdjustment) {
-        tContribution *= inflationFactor
+        if (step % periods === 0 && !excludeInflationAdjustment) targetContribution *= inflator
       }
     }
   }
-  
+
+  // Preserve compatibility: finalValue is the modeled account balance before deferred liquidation tax.
   return {
     finalValue,
     finalValueNet,
     endingBalanceGross,
     endingBalanceNet,
-    finalValueInTodaysDollars,
-    totalContributions, 
-    totalInterest, 
-    totalProfit,
+    finalValueInTodaysDollars: toTodaysDollars(finalValueNet, inflationAdjustment, duration),
+    totalContributions,
+    totalInvested: totalContributions,
+    periodicContributions,
+    periodicContributionsInTodaysDollars: periodicContributionsReal,
+    totalInvestedInTodaysDollars,
+    totalInterest: totalInterestGross,
+    totalProfit: profitNet,
     profitGross,
     profitNet,
     taxableGain,
     totalDeferredTax,
     totalTaxPaid,
-    totalTaxWithheld,
+    totalTaxWithheld: 0,
     totalTaxDrag,
     totalTaxCost,
-    yearData, 
-    yearsToTarget 
+    yearData,
+    yearsToTarget,
+    targetStep,
+    targetFrequency: frequency,
   }
 }

@@ -3,11 +3,28 @@
 import { useMemo, useState, useEffect } from 'react'
 import { calculateGrowthProjection } from '@/lib/simulation/growth-engine'
 import { GrowthState } from '@/lib/types'
+import type { GrowthProjectionResult } from '@/lib/simulation/growth-engine'
+import { validateGrowthStateRange } from '@/lib/simulation/deterministic-validation'
 
-export function useGrowthCalculation(state: GrowthState) {
-  // We wrap the heavy calculation in useMemo
-  const result = useMemo(() => {
-    return calculateGrowthProjection(state)
+export interface DeterministicCalculationState<Result> {
+  result: Result | null
+  error: string | null
+  isCalculated: boolean
+}
+
+export function useGrowthCalculation(state: GrowthState): DeterministicCalculationState<GrowthProjectionResult> {
+  const calculation = useMemo(() => {
+    const validationError = validateGrowthStateRange(state)
+    if (validationError) return { result: null, error: validationError }
+
+    try {
+      return { result: calculateGrowthProjection(state), error: null }
+    } catch (error) {
+      return {
+        result: null,
+        error: error instanceof Error ? error.message : 'This growth scenario could not be calculated.',
+      }
+    }
   }, [state])
 
   // Small utility state to prevent hydration mismatch on initial load if needed,
@@ -18,7 +35,7 @@ export function useGrowthCalculation(state: GrowthState) {
     setIsCalculated(true)
     const timer = setTimeout(() => setIsCalculated(false), 500)
     return () => clearTimeout(timer)
-  }, [result])
+  }, [calculation.result])
 
-  return { ...result, isCalculated }
+  return { ...calculation, isCalculated }
 }

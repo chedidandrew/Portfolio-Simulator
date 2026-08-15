@@ -97,10 +97,8 @@ export function MonteCarloMaxDrawdownHistogram({ data, logScale, onLogScaleChang
       }
     })
 
-    // Recompute whenever logScale changes to trigger the same
-    // animation behavior as the Distribution of Ending Values chart
     return bins.filter(bin => bin.count > 0)
-  }, [data, logScale])
+  }, [data])
 
   const handleLogScaleChange = (checked: boolean) => {
       triggerHaptic('light')

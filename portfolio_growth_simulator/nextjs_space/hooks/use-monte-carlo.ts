@@ -1,9 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocalStorage } from '@/hooks/use-local-storage'
-import { SimulationParams } from '@/lib/types'
-import { performMonteCarloSimulationAsync } from '@/lib/simulation/monte-carlo-engine'
+import type { GrowthState, SimulationParams, WithdrawalState } from '@/lib/types'
+import type { SimulationResults } from '@/lib/simulation/monte-carlo-engine'
+import { runMonteCarloOffMainThread } from '@/lib/simulation/monte-carlo-client'
+import { normalizeSimulationParams } from '@/lib/state-normalization'
+
+export type CompletedSimulationResults = SimulationResults & {
+  simulationParams: SimulationParams
+  simulationSeed: string
+  completedAt: string
+}
 
 interface LogScaleSettings {
   chart: boolean
@@ -11,172 +19,160 @@ interface LogScaleSettings {
   drawdown: boolean
 }
 
-const PRESET_PROFILES = {
+export const PRESET_PROFILES = {
   conservative: {
-    name: 'Conservative',
+    name: 'Low Volatility',
     expectedReturn: 5,
     volatility: 6,
-    description: 'Low risk, stable returns - Bond investor',
+    description: 'Illustrative lower-return, lower-volatility assumptions. Not a forecast for any specific portfolio.',
   },
   moderate: {
-    name: 'Moderate',
+    name: 'Balanced',
     expectedReturn: 7,
     volatility: 10,
-    description: 'Balanced risk and return - 60/40 investor',
+    description: 'Illustrative middle-range return and volatility assumptions. Not a forecast for a 60/40 portfolio.',
   },
   aggressive: {
-    name: 'Aggressive',
+    name: 'High Volatility',
     expectedReturn: 10,
     volatility: 18,
-    description: 'High risk, high return potential - S&P 500 index investor',
+    description: 'Illustrative higher-return, higher-volatility assumptions. Not a forecast for the S&P 500.',
   },
   custom: {
     name: 'Custom',
     expectedReturn: 7,
     volatility: 10,
-    description: 'Define your own parameters',
+    description: 'Define your own modeled return and volatility assumptions.',
   },
 }
 
 export function useMonteCarlo(
-  mode: 'growth' | 'withdrawal', 
-  initialValues: any,
-  // NEW: Accept overrides from parent
+  mode: 'growth' | 'withdrawal',
+  initialValues: GrowthState | WithdrawalState,
   initialRngSeed?: string | null,
   initialMCParams?: SimulationParams,
   initialLogScales?: LogScaleSettings,
-  initialShowFullPrecision?: boolean
+  initialShowFullPrecision?: boolean,
 ) {
   const [profile, setProfile] = useLocalStorage<keyof typeof PRESET_PROFILES>(
-    'mc-profile-' + mode,
-    'moderate'
+    `mc-profile-${mode}`,
+    'moderate',
   )
 
   const [params, setParams] = useLocalStorage<SimulationParams>(
-    'mc-params-' + mode,
+    `mc-params-${mode}`,
     {
       initialValue: initialValues?.startingBalance ?? 100000,
+      startingCostBasis: initialValues?.startingCostBasis,
+      costBasisIsUserEdited: initialValues?.costBasisIsUserEdited ?? false,
       expectedReturn: PRESET_PROFILES.moderate.expectedReturn,
       volatility: PRESET_PROFILES.moderate.volatility,
       enableCrashRisk: false,
       duration: initialValues?.duration ?? 30,
-      cashflowAmount:
-        mode === 'growth'
-          ? initialValues?.periodicAddition ?? 500
-          : initialValues?.periodicWithdrawal ?? 3000,
+      cashflowAmount: mode === 'growth'
+        ? ('periodicAddition' in initialValues ? initialValues.periodicAddition : 500)
+        : ('periodicWithdrawal' in initialValues ? initialValues.periodicWithdrawal : 3000),
       cashflowFrequency: initialValues?.frequency ?? 'monthly',
       inflationAdjustment: initialValues?.inflationAdjustment ?? 0,
+      excludeInflationAdjustment: initialValues?.excludeInflationAdjustment ?? false,
       numPaths: 500,
       portfolioGoal: mode === 'growth' ? 1000000 : undefined,
-    }
+      taxEnabled: initialValues?.taxEnabled ?? false,
+      taxRate: initialValues?.taxRate ?? 0,
+      taxType: initialValues?.taxType ?? 'capital_gains',
+      calculationMode: initialValues?.calculationMode ?? 'effective',
+    },
+    { normalize: normalizeSimulationParams },
   )
 
   const [logScales, setLogScales] = useLocalStorage<LogScaleSettings>(
-    'mc-log-scales-' + mode,
-    { chart: false, histogram: false, drawdown: false }
+    `mc-log-scales-${mode}`,
+    { chart: false, histogram: false, drawdown: false },
   )
-
-  const [rngSeed, setRngSeed] = useLocalStorage<string | null>(
-    'mc-seed-' + mode,
-    null
-  )
-
-  const [results, setSimulationResults] = useLocalStorage<any>(
-    `mc-results-${mode}`,
-    null
-  )
-  const [isSimulating, setIsSimulating] = useState(false)
+  const [rngSeed, setRngSeed] = useLocalStorage<string | null>(`mc-seed-${mode}`, null)
   const [showFullPrecision, setShowFullPrecision] = useLocalStorage(
-    'mc-show-full-precision-' + mode,
-    false
+    `mc-show-full-precision-${mode}`,
+    false,
   )
 
-  // 1. Initialize from Shared Link Data (if present)
+  // Raw Monte Carlo arrays can exceed browser localStorage limits. Keep results
+  // in memory and persist only compact inputs, seed, and display preferences.
+  const [results, setSimulationResults] = useState<CompletedSimulationResults | null>(null)
+  const [isSimulating, setIsSimulating] = useState(false)
+  const [simulationError, setSimulationError] = useState<string | null>(null)
+
   useEffect(() => {
     if (initialMCParams) {
-      setParams(prev => ({ ...prev, ...initialMCParams }))
+      setParams((previous) => ({ ...previous, ...initialMCParams }))
       setProfile('custom')
     }
-    if (initialRngSeed) {
-      setRngSeed(initialRngSeed)
-    }
-    if (initialLogScales) {
-      setLogScales(initialLogScales)
-    }
-    if (typeof initialShowFullPrecision === 'boolean') {
-      setShowFullPrecision(initialShowFullPrecision)
-    }
-  }, [initialMCParams, initialRngSeed, initialLogScales, initialShowFullPrecision, setParams, setRngSeed, setProfile, setLogScales, setShowFullPrecision])
+    if (initialRngSeed) setRngSeed(initialRngSeed)
+    if (initialLogScales) setLogScales(initialLogScales)
+    if (typeof initialShowFullPrecision === 'boolean') setShowFullPrecision(initialShowFullPrecision)
+  }, [
+    initialMCParams,
+    initialRngSeed,
+    initialLogScales,
+    initialShowFullPrecision,
+    setParams,
+    setProfile,
+    setRngSeed,
+    setLogScales,
+    setShowFullPrecision,
+  ])
 
-  // 2. Profile Switch Logic (only if NOT custom)
   useEffect(() => {
-    if (profile !== 'custom') {
-      const targetReturn = PRESET_PROFILES[profile].expectedReturn
-      const targetVol = PRESET_PROFILES[profile].volatility
+    if (profile === 'custom') return
+    const preset = PRESET_PROFILES[profile]
+    if (params.expectedReturn === preset.expectedReturn && params.volatility === preset.volatility) return
+    setParams((previous) => ({
+      ...previous,
+      expectedReturn: preset.expectedReturn,
+      volatility: preset.volatility,
+    }))
+  }, [profile, params.expectedReturn, params.volatility, setParams])
 
-      if (
-        params.expectedReturn !== targetReturn ||
-        params.volatility !== targetVol
-      ) {
-        setParams((prev) => ({
-          ...prev,
-          expectedReturn: targetReturn,
-          volatility: targetVol,
-        }))
-      }
-    }
-  }, [profile, setParams, params.expectedReturn, params.volatility])
-
-  const runSimulation = (
+  const runSimulation = useCallback((
     overrideParams?: SimulationParams,
     seedOverride?: string,
     preservedLogScales?: LogScaleSettings,
-    onComplete?: (results: any) => void
+    onComplete?: (completedResults: CompletedSimulationResults) => void,
   ) => {
-    const simParams = overrideParams ?? params
-    
-    // If a seed is passed (e.g. from URL), use it. 
-    // Otherwise use stored seed. 
-    // Finally fallback to new random seed.
-    const seed = seedOverride ?? rngSeed ?? `monte-carlo-${Date.now()}-${Math.random()}`
+    const simulationParams = overrideParams ?? params
+    const simulationSeed = seedOverride ?? rngSeed ?? `monte-carlo-${Date.now()}-${Math.random()}`
 
     setIsSimulating(true)
-    setRngSeed(seed)
+    setSimulationError(null)
+    setRngSeed(simulationSeed)
 
-    setTimeout(() => {
-      ;(async () => {
-      const simResults = await performMonteCarloSimulationAsync(simParams, mode, seed)
-      const finalResults = { ...simResults, simulationParams: simParams }
-
-      if (preservedLogScales) {
-        setLogScales(preservedLogScales)
-      } else {
-        setLogScales({
-          chart: simResults.recommendLogLinear,
-          histogram: simResults.recommendLogHistogram,
-          drawdown: simResults.recommendLogDrawdown,
+    void runMonteCarloOffMainThread(simulationParams, mode, simulationSeed)
+      .then((simulationResults) => {
+        const finalResults = {
+          ...simulationResults,
+          simulationParams: { ...simulationParams },
+          simulationSeed,
+          completedAt: new Date().toISOString(),
+        }
+        setSimulationResults(finalResults)
+        setLogScales(preservedLogScales ?? {
+          chart: simulationResults.recommendLogLinear,
+          histogram: simulationResults.recommendLogHistogram,
+          drawdown: simulationResults.recommendLogDrawdown,
         })
-      }
-
-      setSimulationResults(finalResults)
-      setIsSimulating(false)
-
-      if (onComplete) {
-        onComplete(finalResults)
-      }
-      })().catch(() => {
-        setIsSimulating(false)
+        onComplete?.(finalResults)
       })
-    }, 100)
-  }
+      .catch((error: unknown) => {
+        setSimulationError(error instanceof Error ? error.message : 'The simulation could not be completed.')
+      })
+      .finally(() => setIsSimulating(false))
+  }, [mode, params, rngSeed, setLogScales, setRngSeed])
 
-  // 3. AUTO-RUN: Triggers immediately if a seed was provided via props (Link opened)
   useEffect(() => {
     if (initialRngSeed && initialMCParams) {
-       // Run simulation using the passed params and seed
-       runSimulation(initialMCParams, initialRngSeed)
+      runSimulation(initialMCParams, initialRngSeed, initialLogScales)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // The shared-link values are intentionally the only trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRngSeed])
 
   return {
@@ -186,6 +182,7 @@ export function useMonteCarlo(
     setParams,
     results,
     isSimulating,
+    simulationError,
     logScales,
     setLogScales,
     rngSeed,

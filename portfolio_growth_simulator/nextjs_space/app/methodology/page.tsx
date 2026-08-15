@@ -19,12 +19,11 @@ import {
   FileText
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
-import 'katex/dist/katex.min.css'
 import { BlockMath } from 'react-katex'
 import { DonationSection } from '@/components/donation-section'
 
@@ -82,29 +81,29 @@ function MethodologySection({
           : "border-l-transparent hover:border-l-muted/30 hover:shadow-md",
         className
       )}>
-        <CollapsibleTrigger asChild>
-          <CardHeader className={cn("cursor-pointer py-5 select-none", headerClassName)}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={cn(
+        <CollapsibleTrigger
+          className={cn("w-full cursor-pointer px-6 py-5 text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", headerClassName)}
+        >
+            <span className="flex items-center justify-between">
+              <span className="flex items-center gap-3">
+                <span className={cn(
                   "p-2 rounded-lg transition-colors duration-300 shadow-sm", 
                   iconWrapperClass
                 )}>
                   <Icon className={cn("h-5 w-5", iconColorClass)} />
-                </div>
-                <div className="space-y-1 text-left">
-                  <CardTitle className="text-lg leading-none text-foreground">{title}</CardTitle>
-                  {description && <CardDescription>{description}</CardDescription>}
-                </div>
-              </div>
-              <div className={cn(
+                </span>
+                <span className="block space-y-1 text-left">
+                  <span className="block text-lg font-semibold leading-none tracking-tight text-foreground">{title}</span>
+                  {description && <span className="block text-sm text-muted-foreground">{description}</span>}
+                </span>
+              </span>
+              <span className={cn(
                 "p-1 rounded-full border transition-all duration-300",
                 isOpen ? "bg-muted text-foreground rotate-180 shadow-inner" : "bg-transparent text-muted-foreground border-transparent group-hover:border-border"
               )}>
                 <ChevronDown className="h-4 w-4" />
-              </div>
-            </div>
-          </CardHeader>
+              </span>
+            </span>
         </CollapsibleTrigger>
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
           <CardContent className="pt-0 pb-6 text-sm text-muted-foreground">
@@ -130,12 +129,12 @@ export default function MethodologyPage() {
         
         {/* Header Section */}
         <motion.div variants={itemVariants} className="space-y-4">
-          <Link href="/">
-            <Button variant="ghost" className="pl-0 hover:pl-2 transition-all gap-2 text-muted-foreground hover:text-foreground">
+          <Button asChild variant="ghost" className="pl-0 hover:pl-2 transition-all gap-2 text-muted-foreground hover:text-foreground">
+            <Link href="/">
               <ArrowLeft className="h-4 w-4" />
               Back to Simulator
-            </Button>
-          </Link>
+            </Link>
+          </Button>
           
           <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent sm:text-4xl">
@@ -151,10 +150,10 @@ export default function MethodologyPage() {
         <motion.div variants={itemVariants}>
           <Card className="border-l-4 border-l-primary bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-primary">
+              <h2 className="flex items-center gap-2 text-2xl font-semibold leading-none tracking-tight text-primary">
                 <Scale className="h-5 w-5 shrink-0" />
                 Core Philosophy
-              </CardTitle>
+              </h2>
             </CardHeader>
             <CardContent>
               <p className="leading-relaxed text-foreground/80">
@@ -214,7 +213,7 @@ export default function MethodologyPage() {
                   Timing: End-of-Month
                 </div>
                 <p className="text-sm leading-relaxed">
-                  Growth assumes you contribute money at the <strong>end</strong> of the month. This means your new contributions don't earn interest in the very first month they are added.
+                  Growth assumes you contribute money at the <strong>end</strong> of the month. This means your new contributions don’t earn interest in the very first month they are added.
                 </p>
                 <Badge variant="outline" className="mt-1 text-emerald-600 border-emerald-500/30">
                   Prevents Over-Estimation
@@ -295,7 +294,7 @@ export default function MethodologyPage() {
           >
             <div className="space-y-4">
               <p className="text-sm leading-relaxed">
-                $1 million in 30 years won't buy what $1 million buys today. Portfolio Simulator calculates two values simultaneously:
+                $1 million in 30 years won’t buy what $1 million buys today. Portfolio Simulator calculates two values simultaneously:
               </p>
               
               <div className="grid gap-4 sm:grid-cols-2">
@@ -305,7 +304,7 @@ export default function MethodologyPage() {
                 </div>
                 <div className="p-3 bg-muted/40 rounded-lg border border-border/50">
                   <span className="font-semibold block mb-1 text-foreground">Real Value (Adjusted)</span>
-                  <span className="text-xs">What that check can actually buy in terms of today's goods.</span>
+                  <span className="text-xs">What that check can actually buy in terms of today’s goods.</span>
                 </div>
               </div>
 
@@ -347,13 +346,13 @@ export default function MethodologyPage() {
                   The Math: Nominal vs. Effective
                 </div>
                 <p className="text-sm leading-relaxed">
-                  The simulation relies on "Drift" μ to generate returns. <strong>Effective (Default)</strong> derives drift directly from your input, ensuring the median result matches your target. <strong>Nominal (APR)</strong> converts the rate to an Effective Annual Rate first.
+                  The simulation relies on “Drift” μ to generate returns. <strong>Effective (Default)</strong> derives drift directly from your input, ensuring the median result matches your target. <strong>Nominal (APR)</strong> converts the rate to an Effective Annual Rate first.
                 </p>
 
                 <div className="p-3 bg-background/50 rounded-md border border-border/50">
                   <p className="text-xs font-semibold text-foreground mb-1">Which should I use?</p>
                   <p className="text-xs text-muted-foreground">
-                    Stick with <strong>Effective (Default)</strong>. This guarantees that the "most likely" (median) outcome of the simulation aligns exactly with the return rate you entered.
+                    Stick with <strong>Effective (Default)</strong>. With stress events off, this centers the median geometric path around the return assumption you entered.
                   </p>
                 </div>
               </div>
@@ -382,6 +381,12 @@ export default function MethodologyPage() {
                         <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Vₜ</span>
                         <span>
                         Your portfolio value at the start of the period (for example, this step).
+                        </span>
+                    </li>
+                    <li className="flex gap-3">
+                        <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Goal</span>
+                        <span>
+                        Probability of Ending At or Above Goal checks only each scenario&apos;s terminal value. It is not the probability that a path touched the goal at any earlier time.
                         </span>
                     </li>
 
@@ -430,7 +435,7 @@ export default function MethodologyPage() {
                     <li className="flex gap-3">
                         <span className="font-bold text-foreground shrink-0 min-w-[3rem]">Result</span>
                         <span>
-                        Running this thousands of times shows best-case, worst-case, and most-likely outcomes instead of a single straight-line forecast.
+                        Running this thousands of times shows upside, downside, and median modeled outcomes instead of a single straight-line forecast.
                         </span>
                     </li>
                     </ul>
@@ -532,7 +537,7 @@ export default function MethodologyPage() {
                     <div className="p-3 bg-background/50 rounded-md border border-border/50 overflow-x-auto">
                         <p className="text-xs font-semibold text-foreground mb-1">During Growth</p>
                         <p className="text-xs text-muted-foreground">
-                            0% tax is paid. Your money compounds tax-free until withdrawal.
+                            The simplified model assumes no capital-gains realization during growth and estimates tax when value is liquidated or withdrawn.
                         </p>
                     </div>
                     <div className="p-3 bg-background/50 rounded-md border border-border/50 overflow-x-auto">

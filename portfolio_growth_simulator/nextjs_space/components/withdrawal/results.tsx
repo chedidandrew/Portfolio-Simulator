@@ -13,6 +13,7 @@ import { formatCurrency, getLargeNumberName } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { WithdrawalChart } from '@/components/withdrawal-chart'
 import { WithdrawalProjectionResult } from '@/lib/simulation/withdrawal-engine'
+import { formatFinancialHorizon } from '@/lib/financial-horizon'
 
 interface WithdrawalResultsProps {
   data: WithdrawalProjectionResult
@@ -46,6 +47,8 @@ export function WithdrawalResults({
     totalWithdrawnInTodaysDollars,
     isSustainable, 
     yearsUntilZero, 
+    depletionStep,
+    depletionFrequency,
     yearData 
   } = data
   
@@ -69,6 +72,11 @@ export function WithdrawalResults({
   const showTaxDrag = totalTaxDrag > 0.01
   const showTax = showTaxWithheld || showTaxDrag
   const showGrossBalance = Math.abs((endingBalanceGross ?? 0) - (endingBalance ?? 0)) > 0.01
+  const formatHorizon = (years: number, useDepletionPeriod = false) => formatFinancialHorizon({
+    years,
+    periods: useDepletionPeriod ? depletionStep : undefined,
+    frequency: useDepletionPeriod ? depletionFrequency : undefined,
+  })
 
   return (
     <>
@@ -119,8 +127,8 @@ export function WithdrawalResults({
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     {isSustainable
-                      ? `Your portfolio can sustain withdrawals for the full ${duration} years`
-                      : `Your portfolio will be depleted in approximately ${yearsUntilZero} years`}
+                      ? `Your portfolio can sustain withdrawals for the full ${formatHorizon(duration)}`
+                      : `Your portfolio could not fully fund the requested withdrawal at approximately ${formatHorizon(yearsUntilZero ?? duration, true)}.`}
                   </p>
                 </div>
               </div>
@@ -211,7 +219,9 @@ export function WithdrawalResults({
 
               <MetricCard
                 label="Portfolio Lasts"
-                value={`${yearsUntilZero ?? duration}+ years`}
+                value={isSustainable && yearsUntilZero === null
+                  ? `${formatHorizon(duration)} (full horizon)`
+                  : formatHorizon(yearsUntilZero ?? duration, true)}
                 colorClass="text-purple-500"
                 bgClass="bg-gradient-to-br from-purple-500/10 to-purple-500/5"
               />
@@ -254,7 +264,12 @@ export function WithdrawalResults({
         </Card>
       </motion.div>
 
-      <WithdrawalChart data={yearData} />
+      <WithdrawalChart
+        data={yearData}
+        yearsUntilZero={yearsUntilZero}
+        depletionStep={depletionStep}
+        depletionFrequency={depletionFrequency}
+      />
     </>
   )
 }
@@ -285,7 +300,7 @@ function MetricCard({
 }
 
 function ActionButtons({ onShare, onExportPdf, onExportExcel }: any) {
-  const btnClass = "inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 font-medium shadow-sm transition-colors duration-150"
+  const btnClass = "inline-flex min-h-11 items-center gap-1 rounded-full border px-3 py-2 font-medium shadow-sm transition-colors duration-150"
   
   return (
     <>

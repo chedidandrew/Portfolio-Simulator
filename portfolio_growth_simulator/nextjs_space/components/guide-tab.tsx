@@ -174,6 +174,14 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
           <Card
             className="h-full group cursor-pointer border-primary/20 bg-gradient-to-br from-primary/5 to-transparent hover:border-primary/40 hover:shadow-lg transition-all duration-300"
             onClick={() => onLaunchMode('growth')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                onLaunchMode('growth')
+              }
+            }}
           >
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -196,6 +204,14 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
           <Card
             className="h-full group cursor-pointer border-primary/20 bg-gradient-to-br from-primary/5 to-transparent hover:border-primary/40 hover:shadow-lg transition-all duration-300"
             onClick={() => onLaunchMode('withdrawal')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                onLaunchMode('withdrawal')
+              }
+            }}
           >
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -336,7 +352,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                       <span className="flex items-center justify-center w-5 h-5 rounded-full bg-violet-500/10 text-violet-500 text-xs font-bold shrink-0 mt-0.5">
                         2
                       </span>
-                      <span>Choose the number of scenarios (up to 100,000 for high precision).</span>
+                      <span>Choose the number of scenarios. More scenarios reduce Monte Carlo sampling noise but do not make the return and volatility assumptions more accurate.</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="flex items-center justify-center w-5 h-5 rounded-full bg-violet-500/10 text-violet-500 text-xs font-bold shrink-0 mt-0.5">
@@ -378,7 +394,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   <strong>Tax Drag (Income):</strong> Taxes are paid annually on growth (like a bank account), slowing down compounding. <br/>
-                  <strong>Gross Up (Transaction):</strong> Taxes are only paid when you withdraw. We withdraw *extra* to cover the tax bill so your net pocket money stays the same.
+                  <strong>Gross Up (Transaction):</strong> Taxes are only paid when you withdraw. The entered withdrawal is treated as a gross account distribution, and modeled tax is deducted to estimate spendable cash.
                 </p>
               </div>
 
@@ -388,7 +404,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                   Expected Return
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  The average annual return you anticipate. Historical stock market returns average around 10% before inflation, but future returns may vary. Conservative estimates use 6-8%.
+                  The average annual return you anticipate. Expected return is a user-supplied modeling assumption, not a forecast. Test several lower and higher assumptions rather than relying on one historical average.
                 </p>
               </div>
 
@@ -398,7 +414,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                   Volatility (Std Dev)
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  A measure of how much returns fluctuate year-to-year. Higher volatility means more uncertainty. Stocks are volatile (~15-18%), while bonds are more stable (~5-8%).
+                  A measure of how much returns fluctuate year-to-year. Higher volatility means more uncertainty. Volatility is an annualized model assumption. Use values appropriate to the portfolio being modeled and test a range of alternatives.
                 </p>
               </div>
 
@@ -418,7 +434,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                   Percentiles
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Statistical markers. The 50th percentile (median) means half of scenarios are better, half worse. The 10th percentile represents a "bad case" scenario (only 10% were worse).
+                  Statistical markers. The 50th percentile (median) means half of scenarios are better, half worse. The 10th percentile represents a “bad case” scenario (only 10% were worse).
                 </p>
               </div>
 
@@ -468,7 +484,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
               <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
                 <Dices className="h-5 w-5 text-violet-500 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium text-foreground text-sm">Check the "Worst Case"</p>
+                  <p className="font-medium text-foreground text-sm">Check the “Downside Case”</p>
                   <p className="text-xs mt-1 text-muted-foreground">
                     If your plan fails in the bottom 10% of Monte Carlo scenarios, it might be too risky. Aim for plans that succeed in 80-90% of simulations to have a margin of safety.
                   </p>
@@ -513,7 +529,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-900 text-white text-xs font-bold shrink-0 dark:bg-gray-700">1</span>
                         <div>
                           <p className="font-semibold text-gray-900 dark:text-white">Open in Safari</p>
-                          <p className="text-gray-700 dark:text-gray-300 text-xs mt-0.5">Make sure you're viewing this page in Safari browser</p>
+                          <p className="text-gray-700 dark:text-gray-300 text-xs mt-0.5">Make sure you’re viewing this page in Safari browser</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
@@ -529,7 +545,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-900 text-white text-xs font-bold shrink-0 dark:bg-gray-700">3</span>
                         <div>
                           <p className="font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
-                            Select "Add to Home Screen" <Plus className="h-3 w-3" />
+                            Select “Add to Home Screen” <Plus className="h-3 w-3" />
                           </p>
                           <p className="text-gray-700 dark:text-gray-300 text-xs mt-0.5">Scroll down in the share menu to find this option</p>
                         </div>
@@ -538,7 +554,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-900 text-white text-xs font-bold shrink-0 dark:bg-gray-700">4</span>
                         <div>
                           <p className="font-semibold text-gray-900 dark:text-white">Confirm and Add</p>
-                          <p className="text-gray-700 dark:text-gray-300 text-xs mt-0.5">Customize the name and tap "Add" in top right</p>
+                          <p className="text-gray-700 dark:text-gray-300 text-xs mt-0.5">Customize the name and tap “Add” in top right</p>
                         </div>
                       </li>
                     </ol>
@@ -577,8 +593,8 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                       <li className="flex items-start gap-3">
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold shrink-0 shadow-sm">3</span>
                         <div>
-                          <p className="font-semibold">Select "Install App"</p>
-                          <p className="text-muted-foreground text-xs mt-0.5">Or "Add to Home screen" depending on version</p>
+                          <p className="font-semibold">Select “Install App”</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Or “Add to Home screen” depending on version</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
@@ -623,7 +639,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                       <li className="flex items-start gap-3">
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0 shadow-sm">3</span>
                         <div>
-                          <p className="font-semibold">Click "Install"</p>
+                          <p className="font-semibold">Click “Install”</p>
                           <p className="text-muted-foreground text-xs mt-0.5">Chrome will create a standalone app window on your desktop</p>
                         </div>
                       </li>
@@ -655,14 +671,14 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                       <li className="flex items-start gap-3">
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-cyan-600 text-white text-xs font-bold shrink-0 shadow-sm">2</span>
                         <div>
-                          <p className="font-semibold">Click "App Available"</p>
+                          <p className="font-semibold">Click “App Available”</p>
                           <p className="text-muted-foreground text-xs mt-0.5">Located in the top right of the address bar</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-cyan-600 text-white text-xs font-bold shrink-0 shadow-sm">3</span>
                         <div>
-                          <p className="font-semibold">Choose "Install"</p>
+                          <p className="font-semibold">Choose “Install”</p>
                           <p className="text-muted-foreground text-xs mt-0.5">Edge installs Portfolio Simulator as a native-style Windows app</p>
                         </div>
                       </li>
@@ -702,7 +718,7 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                       <li className="flex items-start gap-3">
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FF7139] text-white text-xs font-bold shrink-0 shadow-sm">3</span>
                         <div>
-                          <p className="font-semibold">Select "Install" or "Use as App"</p>
+                          <p className="font-semibold">Select “Install” or “Use as App”</p>
                           <p className="text-muted-foreground text-xs mt-0.5">This will pin the app to your taskbar in its own window</p>
                         </div>
                       </li>
@@ -736,13 +752,13 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0 shadow-sm">2</span>
                         <div>
                           <p className="font-semibold">Open the browser menu</p>
-                          <p className="text-muted-foreground text-xs mt-0.5">Click the Brave menu and look for "Apps" or "Install Portfolio Simulator"</p>
+                          <p className="text-muted-foreground text-xs mt-0.5">Click the Brave menu and look for “Apps” or “Install Portfolio Simulator”</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#FB542B] text-white text-xs font-bold shrink-0 shadow-sm">3</span>
                         <div>
-                          <p className="font-semibold">Click "Install"</p>
+                          <p className="font-semibold">Click “Install”</p>
                           <p className="text-muted-foreground text-xs mt-0.5">Brave will create a separate app style window on your desktop</p>
                         </div>
                       </li>
@@ -817,6 +833,12 @@ export function GuideTab({ onLaunchMode }: GuideTabProps) {
               <p>
                 <strong>Past performance does not guarantee future results.</strong> All investments involve risk, including the potential loss of principal. Before making any financial decisions, please consult with a qualified financial advisor who can assess your individual situation.
               </p>
+              <div className="rounded-lg border border-border/60 bg-background/50 p-3">
+                <p className="font-medium text-foreground">Privacy and analytics</p>
+                <p className="mt-1 text-xs leading-relaxed">
+                  Simulation calculations run in your browser. Vercel Analytics is enabled and may collect site-usage data. Portfolio Simulator does not define custom analytics events for your financial inputs. If you create a share link, its URL contains the scenario settings needed to reproduce it.
+                </p>
+              </div>
             </div>
           </GuideSection>
         </motion.div>

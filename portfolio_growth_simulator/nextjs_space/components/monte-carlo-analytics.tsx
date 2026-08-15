@@ -55,7 +55,7 @@ function useCustomTicks(data: any[]) {
 }
 
 const formatXAxis = (value: number, maxYear: number) => {
-  if (value === 0) return 'Month 1'
+  if (value === 0) return 'Start'
   const isInteger = Math.abs(value % 1) < 0.001
 
   if (maxYear <= 0.5) {
@@ -80,7 +80,7 @@ const formatXAxis = (value: number, maxYear: number) => {
   return `Year ${value}`
 }
 
-const commonXAxisProps = (isDark: boolean, data: any[]) => {
+const useCommonXAxisProps = (isDark: boolean, data: any[]) => {
   const ticks = useCustomTicks(data)
   const maxYear = data && data.length > 0 ? data[data.length - 1].year : 0
 
@@ -120,8 +120,7 @@ const commonXAxisProps = (isDark: boolean, data: any[]) => {
 /* ------------------------------------------------------------------ */
 
 const formatTooltipLabel = (label: number) => {
-  // "Start" corresponds to Month 1 (Day 0)
-  if (label === 0) return 'Month 1'
+  if (label === 0) return 'Start'
   
   const years = Math.floor(label)
   const fraction = label - years
@@ -154,7 +153,7 @@ const formatTooltipLabel = (label: number) => {
   // However, Month logic is usually "completed months".
   // If we want "Month 1, Week 2", that means we are IN Month 1.
   
-  // Adjust month index to be 1-based and align with "Start = Month 1"
+  // Adjust month index to be 1-based after the explicit Start point.
   if (month === 0) month = 1
   if (month > 12) month = 12
 
@@ -278,7 +277,7 @@ const LossProbabilitiesTooltip = ({ active, payload }: any) => {
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#ef4444' }} />
-            <span className="text-muted-foreground">At the end (final balance)</span>
+            <span className="text-muted-foreground">At the end (cashflow-neutral performance)</span>
           </div>
           <span className="font-semibold text-foreground">{end.toFixed(1)}%</span>
         </div>
@@ -331,7 +330,7 @@ const InvestmentTooltip = ({ active, payload, label }: any) => {
 /* ---------------------------------------------------------------------- */
 
 export function AnnualReturnsChart({ data, isDark, enableAnimation = true }: AnalyticsProps) {
-  const commonProps = commonXAxisProps(isDark, data)
+  const commonProps = useCommonXAxisProps(isDark, data)
   
   // Custom Logic: Remove 'Start' (0) tick for CAGR Chart
   const filteredTicks = commonProps.ticks.filter(t => t !== 0)
@@ -366,11 +365,11 @@ export function AnnualReturnsChart({ data, isDark, enableAnimation = true }: Ana
                 />
                 <Tooltip content={<AnnualReturnsTooltip mode="cagr" />} />
                 <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} />
-                <Line type="monotone" dataKey="p90" stroke="#0f766e" name="90th Percentile" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
-                <Line type="monotone" dataKey="p75" stroke="#14b8a6" name="75th Percentile" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
-                <Line type="monotone" dataKey="median" stroke="#06b6d4" name="50th Percentile (Median)" dot={false} strokeWidth={3} animationDuration={enableAnimation ? 1000 : 0} />
-                <Line type="monotone" dataKey="p25" stroke="#0ea5e9" name="25th Percentile" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
-                <Line type="monotone" dataKey="p10" stroke="#f29a45" name="10th Percentile" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="linear" dataKey="p90" stroke="#0f766e" name="90th Percentile" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="linear" dataKey="p75" stroke="#14b8a6" name="75th Percentile" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="linear" dataKey="median" stroke="#06b6d4" name="50th Percentile (Median)" dot={false} strokeWidth={3} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="linear" dataKey="p25" stroke="#0ea5e9" name="25th Percentile" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="linear" dataKey="p10" stroke="#f29a45" name="10th Percentile" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -388,7 +387,7 @@ export function AnnualReturnsChart({ data, isDark, enableAnimation = true }: Ana
 /* ---------------------------------------------------------------------- */
 
 export function ReturnProbabilitiesChart({ data, isDark, enableAnimation = true }: AnalyticsProps) {
-  const commonProps = commonXAxisProps(isDark, data)
+  const commonProps = useCommonXAxisProps(isDark, data)
   
   // Custom Logic: Remove 'Start' (0) tick for Probability Chart
   const filteredTicks = commonProps.ticks.filter(t => t !== 0)
@@ -424,12 +423,12 @@ export function ReturnProbabilitiesChart({ data, isDark, enableAnimation = true 
                 />
                 <Tooltip content={<ReturnProbabilitiesTooltip mode="probability" />} />
                 <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} />
-                <Line type="monotone" dataKey="prob5" stroke="#7e22ce" name="≥ 5% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
-                <Line type="monotone" dataKey="prob8" stroke="#8b5cf6" name="≥ 8% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
-                <Line type="monotone" dataKey="prob10" stroke="#6366f1" name="≥ 10% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
-                <Line type="monotone" dataKey="prob12" stroke="#3b82f6" name="≥ 12% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
-                <Line type="monotone" dataKey="prob15" stroke="#0ea5e9" name="≥ 15% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
-                <Line type="monotone" dataKey="prob20" stroke="#f29a45" name="≥ 20% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="linear" dataKey="prob5" stroke="#7e22ce" name="≥ 5% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="linear" dataKey="prob8" stroke="#8b5cf6" name="≥ 8% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="linear" dataKey="prob10" stroke="#6366f1" name="≥ 10% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="linear" dataKey="prob12" stroke="#3b82f6" name="≥ 12% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="linear" dataKey="prob15" stroke="#0ea5e9" name="≥ 15% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
+                <Line type="linear" dataKey="prob20" stroke="#f29a45" name="≥ 20% CAGR" dot={false} strokeWidth={2} animationDuration={enableAnimation ? 1000 : 0} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -496,12 +495,12 @@ export function LossProbabilitiesChart({ data, isDark, enableAnimation = true }:
                 />
                 <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} />
                 <Bar dataKey="intraPeriod" name="At any point (Intra-period)" fill="#f59e0b" radius={[4, 4, 0, 0]} animationDuration={enableAnimation ? 400 : 0} />
-                <Bar dataKey="endPeriod" name="At the end (Final Balance)" fill="#ef4444" radius={[4, 4, 0, 0]} animationDuration={enableAnimation ? 400 : 0} />
+                <Bar dataKey="endPeriod" name="At the end (Performance)" fill="#ef4444" radius={[4, 4, 0, 0]} animationDuration={enableAnimation ? 400 : 0} />
               </BarChart>
             </ResponsiveContainer>
           </div>
           <p className="text-xs text-muted-foreground mt-3 text-center">
-            Shows how likely your portfolio is to experience a specific loss magnitude, either at any point or at year end.
+            Shows loss probabilities from a cashflow-neutral investment-performance index, so deposits and withdrawals do not create or hide market losses.
           </p>
         </CardContent>
       </Card>
@@ -514,7 +513,7 @@ export function LossProbabilitiesChart({ data, isDark, enableAnimation = true }:
 /* ---------------------------------------------------------------------- */
 
 export function InvestmentBreakdownChart({ data, isDark, enableAnimation = true }: AnalyticsProps) {
-  const xAxisProps = commonXAxisProps(isDark, data)
+  const xAxisProps = useCommonXAxisProps(isDark, data)
 
   return (
     <motion.div
@@ -554,7 +553,7 @@ export function InvestmentBreakdownChart({ data, isDark, enableAnimation = true 
                 <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, marginTop: '-10px' }} />
                 
                 <Area 
-                  type="monotone" 
+                  type="linear"
                   dataKey="initial" 
                   stackId="1" 
                   stroke="#3b82f6" 
@@ -564,7 +563,7 @@ export function InvestmentBreakdownChart({ data, isDark, enableAnimation = true 
                   animationDuration={enableAnimation ? 1000 : 0}
                 />
                 <Area 
-                  type="monotone" 
+                  type="linear"
                   dataKey="contributions" 
                   stackId="1" 
                   stroke="#10b981" 

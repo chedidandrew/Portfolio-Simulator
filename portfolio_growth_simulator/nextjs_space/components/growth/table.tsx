@@ -1,44 +1,33 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Calendar } from 'lucide-react'
-import { motion } from 'framer-motion'
+import type { GrowthProjectionYear } from '@/lib/simulation/growth-engine'
 import { formatCurrency } from '@/lib/utils'
+import { motion } from 'framer-motion'
+import { Calendar } from 'lucide-react'
 
 interface GrowthTableProps {
-  data: Array<{
-    year: number
-    startingValue: number
-    contributions: number
-    interest: number
-    taxPaid?: number
-    endingValue: number
-    grossStartingValue?: number
-    grossEndingValue?: number
-  }>
+  data: GrowthProjectionYear[]
   taxEnabled?: boolean
   taxType?: 'capital_gains' | 'income' | 'tax_deferred'
-  taxRate?: number
 }
 
-export function GrowthTable({ data, taxEnabled, taxType, taxRate }: GrowthTableProps) {
-  if (!data || data.length === 0) return null
+export function GrowthTable({ data, taxEnabled, taxType }: GrowthTableProps) {
+  if (!data?.length) return null
 
-  const showTaxColumn = !!taxEnabled && taxType === 'income'
-
-  let t = (taxRate || 0) / 100
-  if (t >= 0.99) t = 0.99
-  const taxMultiplier = showTaxColumn ? (t / (1 - t)) : 0
-
+  const showTaxDrag = !!taxEnabled && taxType === 'income'
+  const showDeferredValues = !!taxEnabled && (taxType === 'capital_gains' || taxType === 'tax_deferred')
   const totals = data.reduce(
-    (acc, row) => {
-      acc.contributions += row.contributions
-      acc.interest += row.interest
-      if (showTaxColumn) acc.taxPaid += row.interest * taxMultiplier
-      return acc
-    },
-    { contributions: 0, interest: 0, taxPaid: 0 }
+    (acc, row) => ({
+      contributions: acc.contributions + row.contributions,
+      interest: acc.interest + row.interest,
+      taxPaid: acc.taxPaid + row.taxPaid,
+      changeInEmbeddedTax: acc.changeInEmbeddedTax + row.changeInEmbeddedTax,
+    }),
+    { contributions: 0, interest: 0, taxPaid: 0, changeInEmbeddedTax: 0 },
   )
+
+  const money = (value: number) => formatCurrency(value, true, 2, false)
 
   return (
     <Card>
@@ -54,13 +43,26 @@ export function GrowthTable({ data, taxEnabled, taxType, taxRate }: GrowthTableP
             <thead className="sticky top-0 bg-muted">
               <tr className="border-b">
                 <th className="p-3 text-left text-sm font-semibold">Year</th>
-                <th className="p-3 text-right text-sm font-semibold">Starting Value</th>
-                <th className="p-3 text-right text-sm font-semibold">Contributions</th>
-                <th className="p-3 text-right text-sm font-semibold">Interest Earned</th>
-                {showTaxColumn && (
-                  <th className="p-3 text-right text-sm font-semibold">Tax Paid</th>
+                {showDeferredValues ? (
+                  <>
+                    <th className="p-3 text-right text-sm font-semibold">Starting Value, Gross</th>
+                    <th className="p-3 text-right text-sm font-semibold">Starting Value, Spendable</th>
+                  </>
+                ) : (
+                  <th className="p-3 text-right text-sm font-semibold">Starting {showTaxDrag ? 'Spendable ' : ''}Value</th>
                 )}
-                <th className="p-3 text-right text-sm font-semibold">Ending Value</th>
+                <th className="p-3 text-right text-sm font-semibold">Contributions</th>
+                <th className="p-3 text-right text-sm font-semibold">Gross Market Growth</th>
+                {showTaxDrag && <th className="p-3 text-right text-sm font-semibold">Tax Drag</th>}
+                {showDeferredValues && <th className="p-3 text-right text-sm font-semibold">Change in Embedded Tax</th>}
+                {showDeferredValues ? (
+                  <>
+                    <th className="p-3 text-right text-sm font-semibold">Ending Value, Gross</th>
+                    <th className="p-3 text-right text-sm font-semibold">Ending Value, Spendable</th>
+                  </>
+                ) : (
+                  <th className="p-3 text-right text-sm font-semibold">Ending {showTaxDrag ? 'Spendable ' : ''}Value</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -69,44 +71,29 @@ export function GrowthTable({ data, taxEnabled, taxType, taxRate }: GrowthTableP
                   key={row.year}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: Math.min(idx * 0.02, 1.0) }} 
+                  transition={{ delay: Math.min(idx * 0.02, 1) }}
                   className="border-b hover:bg-muted/50 transition-colors"
                 >
                   <td className="p-3 text-sm font-medium">{row.year}</td>
-                  <td className="p-3 text-sm text-right">
-                    {formatCurrency(row.startingValue, true, 2, false)}
-                  </td>
-                  <td className="p-3 text-sm text-right text-muted-foreground">
-                    {formatCurrency(row.contributions, true, 2, false)}
-                  </td>
-                  <td className="p-3 text-sm text-right">
-                    {formatCurrency(row.interest, true, 2, false)}
-                  </td>
-                  {showTaxColumn && (
-                    <td className="p-3 text-sm text-right text-muted-foreground">
-                      {formatCurrency(row.interest * taxMultiplier, true, 2, false)}
-                    </td>
-                  )}
-                  <td className="p-3 text-sm text-right font-semibold text-primary">
-                    {formatCurrency(row.endingValue, true, 2, false)}
-                  </td>
+                  {showDeferredValues && <td className="p-3 text-sm text-right">{money(row.grossStartingValue)}</td>}
+                  <td className="p-3 text-sm text-right">{money(row.startingValue)}</td>
+                  <td className="p-3 text-sm text-right text-muted-foreground">{money(row.contributions)}</td>
+                  <td className="p-3 text-sm text-right">{money(row.interest)}</td>
+                  {showTaxDrag && <td className="p-3 text-sm text-right text-muted-foreground">{money(row.taxPaid)}</td>}
+                  {showDeferredValues && <td className="p-3 text-sm text-right text-muted-foreground">{money(row.changeInEmbeddedTax)}</td>}
+                  {showDeferredValues && <td className="p-3 text-sm text-right font-semibold">{money(row.grossEndingValue)}</td>}
+                  <td className="p-3 text-sm text-right font-semibold text-primary">{money(row.endingValue)}</td>
                 </motion.tr>
               ))}
-
               <tr className="border-t bg-muted/40">
                 <td className="p-3 text-sm font-semibold">Total</td>
                 <td className="p-3" />
-                <td className="p-3 text-sm text-right font-semibold">
-                  {formatCurrency(totals.contributions, true, 2, false)}
-                </td>
-                <td className="p-3 text-sm text-right font-semibold">
-                  {formatCurrency(totals.interest, true, 2, false)}
-                </td>
-                {showTaxColumn && (
-                  <td className="p-3 text-sm text-right font-semibold">
-                    {formatCurrency(totals.taxPaid, true, 2, false)}
-                  </td>
-                )}
+                {showDeferredValues && <td className="p-3" />}
+                <td className="p-3 text-sm text-right font-semibold">{money(totals.contributions)}</td>
+                <td className="p-3 text-sm text-right font-semibold">{money(totals.interest)}</td>
+                {showTaxDrag && <td className="p-3 text-sm text-right font-semibold">{money(totals.taxPaid)}</td>}
+                {showDeferredValues && <td className="p-3 text-sm text-right font-semibold">{money(totals.changeInEmbeddedTax)}</td>}
+                {showDeferredValues && <td className="p-3" />}
                 <td className="p-3" />
               </tr>
             </tbody>

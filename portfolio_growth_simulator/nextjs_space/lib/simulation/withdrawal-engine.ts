@@ -1,4 +1,38 @@
-import { WithdrawalState } from '@/lib/types'
+import type { WithdrawalState } from '../types'
+import {
+  annualReturnAfterIncomeTaxDrag,
+  assertFiniteResult,
+  embeddedTaxLiability,
+  inflationFactor,
+  netLiquidationValue,
+  normalizeTaxRate,
+  periodicRate,
+  proportionalCapitalGainsTax,
+  reduceBasisProportionally,
+  stepsPerYear,
+  toTodaysDollars,
+} from './financial-utils'
+
+export interface WithdrawalProjectionYear {
+  year: number
+  startingBalance: number
+  startingBalanceNet: number
+  grossStartingBalance: number
+  withdrawals: number
+  withdrawalsInTodaysDollars: number
+  netIncome: number
+  netIncomeInTodaysDollars: number
+  taxPaid: number
+  taxPaidInTodaysDollars: number
+  taxWithheld: number
+  taxDrag: number
+  marketGrowth: number
+  endingCostBasis: number
+  endingBalance: number
+  endingBalanceNet: number
+  grossEndingBalance: number
+  isSustainable: boolean
+}
 
 export interface WithdrawalProjectionResult {
   endingBalance: number
@@ -6,31 +40,25 @@ export interface WithdrawalProjectionResult {
   endingBalanceNet: number
   endingBalanceInTodaysDollars: number
   totalWithdrawn: number
-  totalWithdrawnNet: number // After tax
+  totalWithdrawnNet: number
   totalTaxPaid: number
+  totalTaxPaidInTodaysDollars: number
   totalTaxWithheld: number
   totalTaxDrag: number
+  totalMarketGrowth: number
+  endingCostBasis: number
+  remainingEmbeddedTax: number
+  remainingEmbeddedTaxInTodaysDollars: number
   totalTaxCost: number
+  totalTaxCostInTodaysDollars: number
   totalWithdrawnInTodaysDollars: number
+  totalGrossWithdrawnInTodaysDollars: number
   isSustainable: boolean
   yearsUntilZero: number | null
-  yearData: Array<{
-    year: number
-    startingBalance: number
-    startingBalanceNet: number
-    grossStartingBalance: number
-    withdrawals: number
-    netIncome: number // what user actually got
-    taxPaid: number   // New: explicit tax tracking (withheld + drag)
-    taxWithheld: number
-    taxDrag: number
-    endingBalance: number
-    endingBalanceNet: number
-    grossEndingBalance: number
-    isSustainable: boolean
-  }>
+  depletionStep: number | null
+  depletionFrequency: WithdrawalState['frequency']
+  yearData: WithdrawalProjectionYear[]
 }
-
 
 export function calculateWithdrawalProjection(state: WithdrawalState): WithdrawalProjectionResult {
   const {
@@ -45,244 +73,210 @@ export function calculateWithdrawalProjection(state: WithdrawalState): Withdrawa
     taxEnabled,
     taxRate = 0,
     taxType = 'capital_gains',
-    calculationMode = 'effective'
+    calculationMode = 'effective',
   } = state
 
-  // --- 1. Engine Configuration ---
-  const getStepsPerYear = (f: WithdrawalState['frequency']) => {
-    if (f === 'weekly') return 52
-    if (f === 'monthly') return 12
-    if (f === 'quarterly') return 4
-    return 1
-  }
+  if (!Number.isFinite(startingBalance) || startingBalance < 0) throw new Error('Starting balance cannot be negative.')
+  if (!Number.isFinite(duration) || duration <= 0) throw new Error('Duration must be greater than zero.')
+  if (!Number.isFinite(periodicWithdrawal) || periodicWithdrawal < 0) throw new Error('Withdrawal cannot be negative.')
 
-  const stepsPerYear = getStepsPerYear(frequency)
-  const totalSteps = duration * stepsPerYear
-  
-  // Effective vs Nominal Rate Calculation
-  let effectiveAnnualReturn = annualReturn
-  if (taxEnabled && taxType === 'income') {
-    effectiveAnnualReturn = annualReturn * (1 - (taxRate / 100))
-  }
+  const periods = stepsPerYear(frequency)
+  const totalSteps = Math.max(1, Math.round(duration * periods))
+  const afterTaxAnnualReturn = annualReturnAfterIncomeTaxDrag(annualReturn, taxEnabled, taxType, taxRate)
+  const netStepRate = periodicRate(afterTaxAnnualReturn, periods, calculationMode)
+  const grossStepRate = periodicRate(annualReturn, periods, calculationMode)
+  const inflator = inflationFactor(inflationAdjustment)
+  const taxRateFraction = normalizeTaxRate(taxRate)
 
-  let stepRate
-  if (calculationMode === 'nominal') {
-    stepRate = effectiveAnnualReturn / 100 / stepsPerYear
-  } else {
-    stepRate = Math.pow(1 + effectiveAnnualReturn / 100, 1 / stepsPerYear) - 1
-  }
-
-  const inflationFactor = 1 + inflationAdjustment / 100
-
-  const clampedStartingCostBasis = Math.max(0, startingCostBasis ?? startingBalance)
-
-  // --- 2. Simulation State ---
-  let currentBalance = startingBalance
-  let totalBasis = clampedStartingCostBasis
-  let currentPeriodicWithdrawal = periodicWithdrawal 
-  
+  let balance = startingBalance
+  let noDragBalance = startingBalance
+  let basis = Math.max(0, startingCostBasis ?? startingBalance)
+  let currentWithdrawal = periodicWithdrawal
   let yearsUntilZero: number | null = null
+  let depletionStep: number | null = null
+  let allScheduledWithdrawalsFulfilled = true
+
   let totalWithdrawn = 0
   let totalWithdrawnNet = 0
   let totalTaxPaid = 0
+  let totalTaxPaidReal = 0
   let totalTaxWithheld = 0
   let totalTaxDrag = 0
-  let totalWithdrawnInTodaysDollars = 0
+  let totalMarketGrowth = 0
+  let totalNetReal = 0
+  let totalGrossReal = 0
 
-  const yearData = []
-  let yearStartBalance = startingBalance
-  let yearStartBasis = totalBasis
+  const yearData: WithdrawalProjectionYear[] = []
+  let yearStartGross = balance
+  let yearStartBasis = basis
   let yearWithdrawals = 0
+  let yearWithdrawalsReal = 0
   let yearNetIncome = 0
-  let yearTaxPaid = 0 // New accumulator
+  let yearNetIncomeReal = 0
+  let yearTaxPaid = 0
+  let yearTaxPaidReal = 0
   let yearTaxWithheld = 0
   let yearTaxDrag = 0
+  let yearMarketGrowth = 0
 
-  // --- 3. Run Simulation ---
-  for (let step = 1; step <= totalSteps; step++) {
-    
-    // --- STEP 1: Determine Withdrawal ---
-    const inputAmountThisStep = currentPeriodicWithdrawal
-
-    // Execute Withdrawal
-    if (inputAmountThisStep > 0) {
-      let requiredGross = inputAmountThisStep
-      let calculatedTax = 0
-
-      // TAX LOGIC BRANCH
-      if (taxEnabled && taxType !== 'income') {
-         if (taxType === 'tax_deferred') {
-           const effectiveRate = taxRate / 100
-           requiredGross = inputAmountThisStep
-           calculatedTax = requiredGross * effectiveRate
-           
-         } else {
-           // Capital Gains
-           let gainFraction = 0
-           if (currentBalance > totalBasis) {
-             gainFraction = (currentBalance - totalBasis) / currentBalance
-           }
-           if (gainFraction < 0) gainFraction = 0
-           
-           let effectiveTaxRate = (taxRate / 100) * gainFraction
-           if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99 
-           
-           requiredGross = inputAmountThisStep
-           calculatedTax = requiredGross * effectiveTaxRate
-         }
+  for (let step = 1; step <= totalSteps; step += 1) {
+    const yearsElapsed = step / periods
+    const balanceBeforeWithdrawal = balance
+    const grossWithdrawal = Math.min(balance, currentWithdrawal)
+    if (grossWithdrawal + 1e-9 < currentWithdrawal) {
+      allScheduledWithdrawalsFulfilled = false
+      if (yearsUntilZero === null) {
+        yearsUntilZero = yearsElapsed
+        depletionStep = step
       }
+    }
 
-      const actualGrossWithdrawal = Math.min(currentBalance, requiredGross)
-      
-      let actualTaxPaid = 0
-      if (requiredGross > 0) {
-          actualTaxPaid = calculatedTax * (actualGrossWithdrawal / requiredGross)
-      }
-      
-      const actualNetReceived = actualGrossWithdrawal - actualTaxPaid
-
+    let withholdingTax = 0
+    if (taxEnabled && grossWithdrawal > 0) {
+      if (taxType === 'tax_deferred') withholdingTax = grossWithdrawal * taxRateFraction
       if (taxType === 'capital_gains') {
-        if (currentBalance > 0) {
-          const withdrawalRatio = actualGrossWithdrawal / currentBalance
-          totalBasis = totalBasis * (1 - withdrawalRatio)
-        } else {
-          totalBasis = 0
-        }
+        withholdingTax = proportionalCapitalGainsTax(balanceBeforeWithdrawal, basis, grossWithdrawal, taxRate)
       }
-
-      currentBalance -= actualGrossWithdrawal
-      
-      totalWithdrawn += actualGrossWithdrawal
-      totalWithdrawnNet += actualNetReceived
-      totalTaxPaid += actualTaxPaid
-      totalTaxWithheld += actualTaxPaid
-      
-      yearWithdrawals += actualGrossWithdrawal
-      yearNetIncome += actualNetReceived
-      yearTaxPaid += actualTaxPaid // Accumulate withdrawal tax
-      yearTaxWithheld += actualTaxPaid
-
-      const discountFactor = Math.pow(inflationFactor, step / stepsPerYear)
-      totalWithdrawnInTodaysDollars += (actualNetReceived / discountFactor)
     }
 
-    // --- STEP 2: Apply Growth ---
-    if (currentBalance > 0) {
-      const balanceBefore = currentBalance
-      currentBalance = currentBalance * (1 + stepRate)
-      
+    const netReceived = Math.max(0, grossWithdrawal - withholdingTax)
+    if (taxType === 'capital_gains') {
+      basis = reduceBasisProportionally(balanceBeforeWithdrawal, basis, grossWithdrawal)
+    }
+
+    balance = Math.max(0, balance - grossWithdrawal)
+    noDragBalance = Math.max(0, noDragBalance - Math.min(noDragBalance, grossWithdrawal))
+
+    const grossWithdrawalReal = toTodaysDollars(grossWithdrawal, inflationAdjustment, yearsElapsed)
+    const netReceivedReal = toTodaysDollars(netReceived, inflationAdjustment, yearsElapsed)
+    const withholdingReal = toTodaysDollars(withholdingTax, inflationAdjustment, yearsElapsed)
+
+    totalWithdrawn += grossWithdrawal
+    totalWithdrawnNet += netReceived
+    totalTaxPaid += withholdingTax
+    totalTaxWithheld += withholdingTax
+    totalTaxPaidReal += withholdingReal
+    totalNetReal += netReceivedReal
+    totalGrossReal += grossWithdrawalReal
+
+    yearWithdrawals += grossWithdrawal
+    yearWithdrawalsReal += grossWithdrawalReal
+    yearNetIncome += netReceived
+    yearNetIncomeReal += netReceivedReal
+    yearTaxPaid += withholdingTax
+    yearTaxPaidReal += withholdingReal
+    yearTaxWithheld += withholdingTax
+
+    if (balance > 0) {
+      const beforeNetGrowth = balance
+      const beforeGrossGrowth = noDragBalance
+      balance *= 1 + netStepRate
+      noDragBalance *= 1 + grossStepRate
+      const grossMarketGrowth = noDragBalance - beforeGrossGrowth
+      yearMarketGrowth += grossMarketGrowth
+      totalMarketGrowth += grossMarketGrowth
+
       if (taxEnabled && taxType === 'income') {
-        const growth = currentBalance - balanceBefore
-        let t = taxRate / 100
-        if (t >= 0.99) t = 0.99
-        
-        // "Implied Tax" calculation: Tax = Growth_PreTax - Growth_PostTax
-        // Growth_PreTax = Growth_PostTax / (1 - Rate)
-        // Tax = Growth_PostTax * (Rate / (1 - Rate))
-        const dragAmount = growth * (t / (1 - t))
-        
-        totalTaxDrag += dragAmount
-        yearTaxDrag += dragAmount
-
-        totalTaxPaid += dragAmount
-        yearTaxPaid += dragAmount
+        const taxDrag = Math.max(0, (noDragBalance - beforeGrossGrowth) - (balance - beforeNetGrowth))
+        totalTaxDrag += taxDrag
+        totalTaxPaid += taxDrag
+        const taxDragReal = toTodaysDollars(taxDrag, inflationAdjustment, yearsElapsed)
+        totalTaxPaidReal += taxDragReal
+        yearTaxDrag += taxDrag
+        yearTaxPaid += taxDrag
+        yearTaxPaidReal += taxDragReal
       }
     }
 
-    if (currentBalance <= 0.01 && yearsUntilZero === null) {
-      currentBalance = 0
-      yearsUntilZero = parseFloat((step / stepsPerYear).toFixed(1))
+    assertFiniteResult(balance, 'Portfolio balance')
+    assertFiniteResult(noDragBalance, 'Pre-tax comparison balance')
+
+    if (balance <= 0.01) {
+      balance = 0
+      noDragBalance = Math.max(0, noDragBalance)
+      // Ending exactly at zero on the final requested payment still means the
+      // plan fulfilled its complete horizon. Only report early depletion.
+      if (step < totalSteps && yearsUntilZero === null) {
+        yearsUntilZero = yearsElapsed
+        depletionStep = step
+      }
     }
 
-    // D. End of Year Processing
-    if (step % stepsPerYear === 0) {
-      const endingGross = Math.max(0, currentBalance)
-      const startingGross = Math.max(0, yearStartBalance)
-
-      let startingNet = startingGross
-      let endingNet = endingGross
-
-      if (taxEnabled) {
-        if (taxType === 'capital_gains') {
-          const profitStart = startingGross - yearStartBasis
-          if (profitStart > 0) {
-            startingNet = startingGross - (profitStart * (taxRate / 100))
-          }
-
-          const profitEnd = endingGross - totalBasis
-          if (profitEnd > 0) {
-            endingNet = endingGross - (profitEnd * (taxRate / 100))
-          }
-        } else if (taxType === 'tax_deferred') {
-          const effectiveRate = taxRate / 100
-          startingNet = startingGross * (1 - effectiveRate)
-          endingNet = endingGross * (1 - effectiveRate)
-        }
-      }
+    const isYearEnd = step % periods === 0 || step === totalSteps
+    if (isYearEnd) {
+      const startingNet = netLiquidationValue({
+        balance: yearStartGross,
+        basis: yearStartBasis,
+        taxEnabled,
+        taxType,
+        taxRate,
+      })
+      const endingNet = netLiquidationValue({ balance, basis, taxEnabled, taxType, taxRate })
 
       yearData.push({
-        year: step / stepsPerYear,
+        year: yearsElapsed,
         startingBalance: startingNet,
         startingBalanceNet: startingNet,
-        grossStartingBalance: startingGross,
+        grossStartingBalance: yearStartGross,
         withdrawals: yearWithdrawals,
+        withdrawalsInTodaysDollars: yearWithdrawalsReal,
         netIncome: yearNetIncome,
-        taxPaid: yearTaxPaid, // Pass the tracked total (withheld + drag)
+        netIncomeInTodaysDollars: yearNetIncomeReal,
+        taxPaid: yearTaxPaid,
+        taxPaidInTodaysDollars: yearTaxPaidReal,
         taxWithheld: yearTaxWithheld,
         taxDrag: yearTaxDrag,
+        marketGrowth: yearMarketGrowth,
+        endingCostBasis: basis,
         endingBalance: endingNet,
         endingBalanceNet: endingNet,
-        grossEndingBalance: endingGross,
-        isSustainable: currentBalance > 0,
+        grossEndingBalance: balance,
+        isSustainable: allScheduledWithdrawalsFulfilled,
       })
 
-      yearStartBalance = currentBalance
-      yearStartBasis = totalBasis
+      yearStartGross = balance
+      yearStartBasis = basis
       yearWithdrawals = 0
+      yearWithdrawalsReal = 0
       yearNetIncome = 0
+      yearNetIncomeReal = 0
       yearTaxPaid = 0
+      yearTaxPaidReal = 0
       yearTaxWithheld = 0
       yearTaxDrag = 0
+      yearMarketGrowth = 0
 
-      if (!excludeInflationAdjustment) {
-        currentPeriodicWithdrawal *= inflationFactor
-      }
+      if (!excludeInflationAdjustment && step < totalSteps) currentWithdrawal *= inflator
     }
   }
 
-  const endingBalanceGross = Math.max(0, currentBalance)
-  let endingBalanceNet = endingBalanceGross
-
-  if (taxEnabled) {
-    if (taxType === 'capital_gains') {
-      const profitForTax = endingBalanceGross - totalBasis
-      if (profitForTax > 0) {
-        endingBalanceNet = endingBalanceGross - (profitForTax * (taxRate / 100))
-      }
-    } else if (taxType === 'tax_deferred') {
-      const effectiveRate = taxRate / 100
-      endingBalanceNet = endingBalanceGross * (1 - effectiveRate)
-    }
-  }
-
-  const endingBalance = endingBalanceNet
-  const isSustainable = endingBalanceGross > 0
-  const endingBalanceInTodaysDollars = endingBalance / Math.pow(inflationFactor, duration)
+  const endingBalanceGross = Math.max(0, balance)
+  const endingBalanceNet = netLiquidationValue({ balance: endingBalanceGross, basis, taxEnabled, taxType, taxRate })
+  const remainingEmbeddedTax = embeddedTaxLiability({ balance: endingBalanceGross, basis, taxEnabled, taxType, taxRate })
 
   return {
-    endingBalance,
+    endingBalance: endingBalanceNet,
     endingBalanceGross,
     endingBalanceNet,
-    endingBalanceInTodaysDollars,
+    endingBalanceInTodaysDollars: toTodaysDollars(endingBalanceNet, inflationAdjustment, duration),
     totalWithdrawn,
     totalWithdrawnNet,
     totalTaxPaid,
+    totalTaxPaidInTodaysDollars: totalTaxPaidReal,
     totalTaxWithheld,
     totalTaxDrag,
-    totalTaxCost: totalTaxPaid,
-    totalWithdrawnInTodaysDollars,
-    isSustainable,
+    totalMarketGrowth,
+    endingCostBasis: basis,
+    remainingEmbeddedTax,
+    remainingEmbeddedTaxInTodaysDollars: toTodaysDollars(remainingEmbeddedTax, inflationAdjustment, duration),
+    totalTaxCost: totalTaxPaid + remainingEmbeddedTax,
+    totalTaxCostInTodaysDollars: totalTaxPaidReal + toTodaysDollars(remainingEmbeddedTax, inflationAdjustment, duration),
+    totalWithdrawnInTodaysDollars: totalNetReal,
+    totalGrossWithdrawnInTodaysDollars: totalGrossReal,
+    isSustainable: allScheduledWithdrawalsFulfilled,
     yearsUntilZero,
+    depletionStep,
+    depletionFrequency: frequency,
     yearData,
   }
 }

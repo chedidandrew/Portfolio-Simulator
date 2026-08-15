@@ -10,6 +10,8 @@ import { WithdrawalState } from '@/lib/types'
 import { getAppCurrency, formatCurrency } from '@/lib/utils'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { TaxSettingsPanel } from '@/components/tax-settings-panel'
+import { markCostBasisUserEdited, updateStartingBalanceWithTrackedBasis } from '@/lib/state-normalization'
 
 interface WithdrawalParametersProps {
   state: WithdrawalState
@@ -61,12 +63,12 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               onChange={(value) => {
                 let n = Number(value)
                 if (!isFinite(n)) {
-                  setState({ ...state, startingBalance: 0 })
+                  setState(updateStartingBalanceWithTrackedBasis(state, 0))
                   return
                 }
                 if (n !== 0 && Math.abs(n) < 0.01) n = 0.01
                 const limited = Number(n.toFixed(2))
-                setState({ ...state, startingBalance: limited })
+                setState(updateStartingBalanceWithTrackedBasis(state, limited))
               }}
               min={0}
               max={1_000_000_000_000_000_000}
@@ -135,36 +137,30 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               max={1e18}
               maxErrorMessage="Speedrunning bankruptcy? :)"
             />
-            
-            {/* --- TAX MESSAGE LOGIC START --- */}
-            {state.taxEnabled && state.taxType === 'tax_deferred' && (
-              <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                Withdrawing <span className="font-semibold text-primary">{formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}</span> per {state.frequency?.replace('ly', '') || 'month'}, you will net{' '}
-                <span className="font-semibold text-primary">
-                  {formatCurrencyFullUnder100m(
-                    (state.periodicWithdrawal ?? 0) * (1 - Math.min(state.taxRate ?? 0, 99) / 100)
-                  )}
-                </span>{' '}
-                after taxes.
-              </p>
-            )}
+          </div>
 
-            {state.taxEnabled && state.taxType === 'capital_gains' && (
-              <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                 Withdrawing <span className="font-semibold">{formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}</span> (Gross), capital gains tax will be deducted from this amount.
-                 <br/>
-                 <span className="opacity-80">Your net pocket money will vary each year as your cost basis changes.</span>
-              </p>
-            )}
-
-            {state.taxEnabled && state.taxType === 'income' && (
-              <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                Like a High-Yield Savings account. Taxes are paid annually on interest, which <span className="font-semibold text-orange-600/90 dark:text-orange-400/90">slows down your growth</span>. 
-                Your withdrawal remains exactly {formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}.
-              </p>
-            )}
-            {/* --- TAX MESSAGE LOGIC END --- */}
-
+          {/* Frequency */}
+          <div className="space-y-2">
+            <Label htmlFor="frequency-w">Withdrawal Frequency</Label>
+            <Select
+              value={state.frequency ?? 'monthly'}
+              onValueChange={(value: any) =>
+                setState({ ...state, frequency: value })
+              }
+            >
+              <SelectTrigger id="frequency-w" className="print:hidden">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="quarterly">Quarterly</SelectItem>
+                <SelectItem value="yearly">Yearly</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="hidden print:block text-xs text-muted-foreground pt-1 capitalize">
+              Selected: {state.frequency ?? 'monthly'}
+            </p>
           </div>
           
           {/* Inflation Adjustment - With Toggle */}
@@ -212,7 +208,7 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
           </div>
           
           {/* Tax Configuration */}
-          <div className="space-y-2">
+          <div className="space-y-2 sm:col-span-2">
              <div className="flex items-center justify-left gap-2">
               <Label htmlFor="tax-enabled-w" className="flex items-center gap-2">
                 <Scale className="h-4 w-4" />
@@ -233,64 +229,34 @@ export function WithdrawalParameters({ state, setState }: WithdrawalParametersPr
               />
             </div>
 
-            {state.taxEnabled && (
-               <div className="pt-2 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                 <div className="space-y-1">
-                   <Label htmlFor="tax-rate-w" className="text-xs">Tax Rate (%)</Label>
-                   <NumericInput
-                     id="tax-rate-w"
-                     value={state.taxRate ?? 0}
-                     onChange={(value) => setState({ ...state, taxRate: Math.max(0, Math.min(99, value)) })}
-                     min={0}
-                     max={99}
-                   />
-                 </div>
-                 <div className="space-y-1">
-                   <Label htmlFor="tax-type-w" className="text-xs">Tax Type</Label>
-                   <Select
-                      value={state.taxType ?? 'capital_gains'}
-                      onValueChange={(value: any) => setState({ ...state, taxType: value })}
-                    >
-                      <SelectTrigger id="tax-type-w" className="h-10 print:hidden">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="capital_gains">Taxable Account (capital gains on liquidation)</SelectItem>
-                        <SelectItem value="tax_deferred">Tax deferred (401k/IRA), taxed on withdrawal</SelectItem>
-                        <SelectItem value="income">Annual income tax drag</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="hidden print:block text-xs text-muted-foreground pt-1">
-                      Selected: {state.taxType === 'income' ? 'Annual income tax drag' : (state.taxType === 'tax_deferred' ? 'Tax deferred (401k/IRA), taxed on withdrawal' : 'Taxable Account (capital gains on liquidation)')}
-                    </p>
-                 </div>
-               </div>
-            )}
           </div>
 
-          {/* Frequency */}
-          <div className="space-y-2">
-            <Label htmlFor="frequency-w">Withdrawal Frequency</Label>
-            <Select
-              value={state.frequency ?? 'monthly'}
-              onValueChange={(value: any) =>
-                setState({ ...state, frequency: value })
-              }
-            >
-              <SelectTrigger id="frequency-w" className="print:hidden">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="weekly">Weekly</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="quarterly">Quarterly</SelectItem>
-                <SelectItem value="yearly">Yearly</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="hidden print:block text-xs text-muted-foreground pt-1 capitalize">
-              Selected: {state.frequency ?? 'monthly'}
-            </p>
-          </div>
+          {state.taxEnabled && (
+            <TaxSettingsPanel
+              testId="withdrawal-tax-details"
+              taxRateId="tax-rate-w"
+              taxTypeId="tax-type-w"
+              costBasisId="starting-cost-basis-w"
+              taxRate={state.taxRate ?? 0}
+              taxType={state.taxType ?? 'capital_gains'}
+              currentCostBasis={state.startingCostBasis ?? state.startingBalance}
+              currencySymbol={currencySymbol}
+              basisHelp="Enter the remaining tax basis of the current taxable portfolio. Until you edit it, the simulator assumes basis equals the starting balance. A basis above market value is allowed for an unrealized loss."
+              onTaxRateChange={(value) => setState({ ...state, taxRate: Math.max(0, Math.min(99, value)) })}
+              onTaxTypeChange={(value) => setState({ ...state, taxType: value })}
+              onCostBasisChange={(value) => setState(markCostBasisUserEdited(state, value))}
+              description={state.taxType === 'tax_deferred'
+                ? <>
+                    Withdrawing <span className="font-semibold text-primary">{formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}</span> per {state.frequency?.replace('ly', '') || 'month'}, you will net{' '}
+                    <span className="font-semibold text-primary">
+                      {formatCurrencyFullUnder100m((state.periodicWithdrawal ?? 0) * (1 - Math.min(state.taxRate ?? 0, 99) / 100))}
+                    </span>{' '}after taxes.
+                  </>
+                : state.taxType === 'income'
+                  ? <>Like a high-yield savings account, taxes are paid annually on interest and slow portfolio growth. Your withdrawal remains {formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}.</>
+                  : <>Withdrawing <span className="font-semibold">{formatCurrencyFullUnder100m(state.periodicWithdrawal ?? 0)}</span> gross, capital gains tax is deducted from this amount. Net spending varies as cost basis changes.</>}
+            />
+          )}
         </div>
 
         {/* Advanced Settings */}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -31,12 +31,14 @@ import { TaxImpactChart } from '@/components/monte-carlo/tax-impact-chart'
 import { formatCurrency, getLargeNumberName, getAppCurrency } from '@/lib/utils'
 import { SimulationParams } from '@/lib/types'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import type { CompletedSimulationResults } from '@/hooks/use-monte-carlo'
+import { GoalTerminalOutcomeSummary, MonteCarloInvestmentInsight, MonteCarloSuccessInsight } from './mode-insights'
 
 export type ExportState = 'idle' | 'pdf' | 'excel'
 
 interface MonteCarloResultsProps {
   mode: 'growth' | 'withdrawal'
-  results: any
+  results: CompletedSimulationResults
   params: SimulationParams
   logScales: { chart: boolean; histogram: boolean; drawdown: boolean }
   setLogScales: (scales: { chart: boolean; histogram: boolean; drawdown: boolean }) => void
@@ -73,11 +75,11 @@ export function MonteCarloResults({
   const inflationAdjustment = params.inflationAdjustment ?? 0
   const duration = params.duration
 
-  const deflate = (val: number, years: number) => {
+  const deflate = useCallback((val: number, years: number) => {
     if (!isRealDollars) return val
     if (inflationAdjustment === 0) return val
     return val / Math.pow(1 + inflationAdjustment / 100, years)
-  }
+  }, [inflationAdjustment, isRealDollars])
 
   const getAdjustedScalar = (val: number | undefined) => {
     if (val === undefined) return 0
@@ -88,18 +90,21 @@ export function MonteCarloResults({
     if (!results?.endingValues) return []
     if (!isRealDollars) return results.endingValues
     return results.endingValues.map((v: number) => deflate(v, duration))
-  }, [results?.endingValues, isRealDollars, duration, inflationAdjustment])
+  }, [results?.endingValues, isRealDollars, duration, deflate])
 
   const adjustedInvestmentData = useMemo(() => {
     if (!results?.investmentData) return []
     if (!isRealDollars) return results.investmentData
-    return results.investmentData.map((pt: any) => ({
-      ...pt,
-      initial: deflate(pt.initial, pt.year),
-      contributions: deflate(pt.contributions, pt.year),
-      total: deflate(pt.total, pt.year)
+    return results.investmentData.map((point: any) => ({
+      ...point,
+      initial: point.realInitial ?? point.initial,
+      contributions: point.realContributions ?? point.contributions,
+      withdrawals: point.realWithdrawals ?? point.withdrawals,
+      netSpending: point.realNetSpending ?? point.netSpending,
+      taxesPaid: point.realTaxesPaid ?? point.taxesPaid,
+      total: point.realTotal ?? point.total,
     }))
-  }, [results?.investmentData, isRealDollars, inflationAdjustment])
+  }, [results?.investmentData, isRealDollars])
 
   const adjustedAnnualReturnsData = useMemo(() => {
     if (!results?.annualReturnsData) return []
@@ -124,6 +129,12 @@ export function MonteCarloResults({
   }, [results?.annualReturnsData, isRealDollars, inflationAdjustment])
 
 
+  const formatDisplayCurrency = (value: number | undefined) => {
+    const safeValue = value ?? 0
+    const compact = Math.abs(safeValue) >= 1e100 || !showFullPrecision
+    return formatCurrency(safeValue, true, 2, compact)
+  }
+
   const renderFormattedResult = (val: number | undefined) => {
     const adjusted = getAdjustedScalar(val)
     if (adjusted === undefined) return formatCurrency(0)
@@ -139,28 +150,12 @@ export function MonteCarloResults({
   }
 
   const totalInvested = useMemo(() => {
-    const initial = params.initialValue || 0
-    if (mode === 'withdrawal') return initial
-
-    const durationYears = params.duration
-    const inflationRate = (params.inflationAdjustment ?? 0) / 100
-    let currentMonthlyContribution = params.cashflowAmount
-    let totalContributions = 0
-
-    const fullYears = Math.floor(durationYears)
-    const remainingFraction = durationYears - fullYears
-
-    for (let i = 0; i < fullYears; i++) {
-        totalContributions += currentMonthlyContribution * 12
-        currentMonthlyContribution *= (1 + inflationRate)
-    }
-
-    if (remainingFraction > 0) {
-      totalContributions += currentMonthlyContribution * 12 * remainingFraction
-    }
-    
-    return initial + totalContributions
-  }, [params, mode])
+    const points = results?.investmentData ?? []
+    const last = points[points.length - 1]
+    if (!last) return params.initialValue || 0
+    if (mode === 'withdrawal') return isRealDollars ? (last.realInitial ?? last.initial) : last.initial
+    return isRealDollars ? (last.realTotal ?? last.total) : last.total
+  }, [results?.investmentData, params.initialValue, mode, isRealDollars])
 
   if (!results) return null
   
@@ -217,6 +212,10 @@ export function MonteCarloResults({
           </div>
         </CardHeader>
 
+        <p className="hidden print:block px-6 pb-2 text-xs text-muted-foreground">
+          Completed simulation seed: {results.simulationSeed}
+        </p>
+
         <CardContent className="space-y-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <MetricCard 
@@ -237,7 +236,7 @@ export function MonteCarloResults({
                delay={0.05} 
             />
             <MetricCard 
-               label={showGrossSummary ? "Best Case (95%) (Net)" : "Best Case (95%)"} 
+               label={showGrossSummary ? "95th Percentile (Upside) (Net)" : "95th Percentile (Upside)"}
                value={renderFormattedResult(results.p95)}
                subLabel={showGrossSummary ? "Gross:" : undefined}
                subValue={showGrossSummary ? renderFormattedResult(results.p95Gross) : undefined} 
@@ -246,7 +245,7 @@ export function MonteCarloResults({
                delay={0.1} 
             />
             <MetricCard 
-               label={showGrossSummary ? "Worst Case (5%) (Net)" : "Worst Case (5%)"} 
+               label={showGrossSummary ? "5th Percentile (Downside) (Net)" : "5th Percentile (Downside)"}
                value={renderFormattedResult(results.p5)}
                subLabel={showGrossSummary ? "Gross:" : undefined}
                subValue={showGrossSummary ? renderFormattedResult(results.p5Gross) : undefined} 
@@ -266,13 +265,40 @@ export function MonteCarloResults({
                 <div>
                    <span className="font-semibold text-red-600 dark:text-red-400">Estimated Tax Cost: </span>
                    <span className="font-bold">
-                      {formatCurrency(getAdjustedScalar((results.totalTaxCost ?? results.taxDragAmount)))}
+                      {formatDisplayCurrency(isRealDollars ? (results.totalTaxCostInTodaysDollars ?? getAdjustedScalar(results.totalTaxCost ?? results.taxDragAmount)) : (results.totalTaxCost ?? results.taxDragAmount))}
                    </span>
                    <span className="text-muted-foreground ml-1">
-                      (Avg diff between pre-tax and post-tax outcome)
+                      (Modeled difference between gross and spendable outcomes)
                    </span>
                 </div>
              </motion.div>
+          )}
+
+          {mode === 'withdrawal' && results.representativeCashflowBreakdown && (
+            <div className="space-y-2">
+              <Label>Representative Median-Ending Path</Label>
+              <p className="text-xs text-muted-foreground">
+                Cashflow components below come from the single simulated path whose ending spendable value is closest to the median, so the accounting components reconcile exactly.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                <DistributionItem
+                  label="Gross withdrawn"
+                  value={formatDisplayCurrency(isRealDollars ? results.representativeCashflowBreakdown.grossWithdrawnInTodaysDollars : results.representativeCashflowBreakdown.grossWithdrawn)}
+                />
+                <DistributionItem
+                  label="After-tax spending"
+                  value={formatDisplayCurrency(isRealDollars ? results.representativeCashflowBreakdown.netSpendingInTodaysDollars : results.representativeCashflowBreakdown.netSpending)}
+                />
+                <DistributionItem
+                  label="Withdrawal taxes"
+                  value={formatDisplayCurrency(isRealDollars ? results.representativeCashflowBreakdown.withdrawalTaxesInTodaysDollars : results.representativeCashflowBreakdown.withdrawalTaxes)}
+                />
+                <DistributionItem
+                  label="Return tax drag"
+                  value={formatDisplayCurrency(isRealDollars ? results.representativeCashflowBreakdown.incomeTaxDragInTodaysDollars : results.representativeCashflowBreakdown.incomeTaxDrag)}
+                />
+              </div>
+            </div>
           )}
 
           <div className="space-y-2">
@@ -282,8 +308,8 @@ export function MonteCarloResults({
               <DistributionItem label="25th percentile" value={renderFormattedResult(results.p25)} />
               <DistributionItem label="75th percentile" value={renderFormattedResult(results.p75)} />
               <DistributionItem label="90th percentile" value={renderFormattedResult(results.p90)} />
-              <DistributionItem label="Best outcome" value={renderFormattedResult(results.best)} valueClass="text-emerald-500" />
-              <DistributionItem label="Worst outcome" value={renderFormattedResult(results.worst)} valueClass="text-orange-500" />
+              <DistributionItem label="Sample maximum" value={renderFormattedResult(results.best)} valueClass="text-emerald-500" />
+              <DistributionItem label="Sample minimum" value={renderFormattedResult(results.worst)} valueClass="text-orange-500" />
             </div>
           </div>
 
@@ -294,14 +320,12 @@ export function MonteCarloResults({
               className="flex items-center gap-3 p-4 bg-primary/10 rounded-lg"
             >
               <Target className="h-6 w-6 text-primary" />
-              <div className="flex-1">
-                <p className="font-semibold">
-                  {results.goalProbability?.toFixed(1) ?? '0'}% chance of reaching {formatCurrency(getAdjustedScalar(results.portfolioGoalSnapshot ?? params.portfolioGoal))}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  In {results.pathsReachingGoal ?? 0} out of {results.numPathsUsed ?? params.numPaths} scenarios, you reached your goal
-                </p>
-              </div>
+              <GoalTerminalOutcomeSummary
+                probability={results.endingAtOrAboveGoalProbability ?? 0}
+                formattedGoal={formatCurrency(getAdjustedScalar(results.portfolioGoalSnapshot ?? params.portfolioGoal))}
+                pathsEndedAtOrAboveGoal={results.pathsEndingAtOrAboveGoal ?? 0}
+                scenarioCount={results.numPathsUsed ?? params.numPaths}
+              />
             </motion.div>
           )}
 
@@ -313,12 +337,11 @@ export function MonteCarloResults({
               </Label>
               <div className="space-y-2 text-sm">
                 <div className="p-3 bg-muted/50 rounded-lg">
-                  <p>
-                    <span className="font-semibold">Total Invested:</span> Over {params.duration} years, you invested a total of{' '}
-                    <span className="text-indigo-500 font-bold">
-                      {renderFormattedResult(totalInvested)}
-                    </span>
-                  </p>
+                  <MonteCarloInvestmentInsight
+                    mode={mode}
+                    duration={params.duration}
+                    formattedTotal={formatDisplayCurrency(totalInvested)}
+                  />
                 </div>
                 <div className="p-3 bg-muted/50 rounded-lg">
                   <p>
@@ -343,26 +366,17 @@ export function MonteCarloResults({
               <div className="space-y-2 text-sm">
                 <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                   <p>
-                    <span className="font-semibold text-blue-600 dark:text-blue-400">The Multiplier Effect:</span> In the best outcome scenario, your money grew by a factor of{' '}
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">The Multiplier Effect:</span> At the 95th-percentile outcome, the modeled ending value was{' '}
                     <span className="font-bold">
-                      {((results.best ?? 0) / (totalInvested || 1)).toFixed(1)}x
+                      {((isRealDollars ? deflate(results.p95 ?? 0, duration) : (results.p95 ?? 0)) / (totalInvested || 1)).toFixed(1)}x
                     </span>.
                   </p>
                 </div>
                 <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                  <p>
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                      {mode === 'withdrawal' ? 'Success Rate:' : 'Profit Probability:'}
-                    </span>{' '}
-                    You have a{' '}
-                    <span className="font-bold">
-                      {mode === 'withdrawal' 
-                        ? results.solventRate?.toFixed(1) 
-                        : results.profitableRate?.toFixed(1)
-                      }%
-                    </span>{' '}
-                    chance of {mode === 'withdrawal' ? 'not running out of money' : 'making a profit on your total investment'}.
-                  </p>
+                  <MonteCarloSuccessInsight
+                    mode={mode}
+                    successRate={mode === 'withdrawal' ? results.solventRate : results.profitableRate}
+                  />
                 </div>
               </div>
             </div>
@@ -384,18 +398,19 @@ export function MonteCarloResults({
           deterministicData={results.deterministicSeries}
         />
 
-        <CashflowChart params={params} mode={mode} />
+        <CashflowChart params={params} mode={mode} investmentData={results.investmentData ?? []} isRealDollars={isRealDollars} />
              
         {taxEnabled && (
            <TaxImpactChart 
-              data={results.chartData} 
+              data={results.chartData}
+              grossData={results.chartDataGross}
               investmentData={results.investmentData} 
               params={params} 
               isRealDollars={isRealDollars} 
            />
         )}
 
-        <SensitivityTable params={params} mode={mode} />
+        <SensitivityTable params={params} mode={mode} rngSeed={results.simulationSeed} />
 
         <MonteCarloHistogram 
           data={adjustedEndingValues} 
@@ -411,11 +426,13 @@ export function MonteCarloResults({
           enableAnimation={!isExporting}
         />
 
-        <InvestmentBreakdownChart 
-          data={adjustedInvestmentData} 
-          isDark={isDark} 
-          enableAnimation={!isExporting}
-        />
+        {mode === 'growth' && (
+          <InvestmentBreakdownChart
+            data={adjustedInvestmentData}
+            isDark={isDark}
+            enableAnimation={!isExporting}
+          />
+        )}
 
         <AnnualReturnsChart 
           data={adjustedAnnualReturnsData} 
@@ -477,7 +494,7 @@ function ActionButtons({ onShare, onExportPdf, onExportExcel, exportState }: {
   onExportExcel: () => void
   exportState: ExportState
 }) {
-  const btnClass = "inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 font-medium shadow-sm transition-colors duration-150 disabled:opacity-50 disabled:cursor-wait"
+  const btnClass = "inline-flex min-h-11 items-center gap-1 rounded-full border px-3 py-2 font-medium shadow-sm transition-colors duration-150 disabled:opacity-50 disabled:cursor-wait"
   const isAnyExporting = exportState !== 'idle'
 
   return (

@@ -1,19 +1,19 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import 'katex/dist/katex.min.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import Script from 'next/script'
+import Image from 'next/image'
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt'
+import { Analytics } from '@vercel/analytics/next'
+import { Toaster } from '@/components/ui/sonner'
 
 const inter = Inter({ subsets: ['latin'] })
-
-export const dynamic = 'force-dynamic'
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: 'white' },
@@ -27,7 +27,9 @@ export const metadata: Metadata = {
     default: 'Portfolio Simulator | Growth, Monte Carlo, & Withdrawal Calculator',
     template: '%s | Portfolio Simulator',
   },
-  description: 'Free portfolio simulator for growth and withdrawal strategies. Run Monte Carlo simulations, calculate compound interest, and test safe withdrawal rates.',
+  description: 'Free portfolio simulator for growth and withdrawal strategies. Run Monte Carlo simulations, calculate compound interest, and test withdrawal sustainability.',
+  alternates: { canonical: 'https://portfoliosimulator.org' },
+  robots: { index: true, follow: true },
   keywords: ['portfolio simulator', 'monte carlo simulation', 'retirement calculator', 'investment growth', 'fire calculator', 'safe withdrawal rate'],
   icons: {
     icon: '/favicon.png',
@@ -38,7 +40,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'Portfolio Simulator | Growth, Monte Carlo, & Withdrawal Calculator',
-    description: 'Free portfolio simulator for growth and withdrawal strategies. Run Monte Carlo simulations, calculate compound interest, and test safe withdrawal rates.',
+    description: 'Free portfolio simulator for growth and withdrawal strategies. Run Monte Carlo simulations, calculate compound interest, and test withdrawal sustainability.',
     images: ['/og-image.png'],
   },
   manifest: '/manifest.json',
@@ -53,7 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
-    name: 'Portfolio Growth Simulator',
+    name: 'Portfolio Simulator',
     image: 'https://portfoliosimulator.org/og-image.png',
     url: 'https://portfoliosimulator.org',
     applicationCategory: 'FinanceApplication',
@@ -66,7 +68,7 @@ const jsonLd = {
     featureList: [
       'Monte Carlo Simulation',
       'Portfolio Growth Calculator',
-      'Safe Withdrawal Rate Analysis',
+      'Withdrawal Sustainability Analysis',
       'Sequence of Returns Risk',
     ],
   }
@@ -92,7 +94,7 @@ const jsonLd = {
       >
         {/* Print only header */}
         <header className="print-header">
-          <img
+          <Image
             src="/favicon.png"
             alt="Portfolio Simulator"
             width={24}
@@ -102,6 +104,7 @@ const jsonLd = {
           <span className="print-header__title">Portfolio Simulator</span>
         </header>
         {children}
+        <Toaster />
         <PwaInstallPrompt />
       </ThemeProvider>
         <Script
@@ -111,12 +114,25 @@ const jsonLd = {
             __html: `
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
+                  const isLocalDevelopment = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+                  if (isLocalDevelopment) {
+                    navigator.serviceWorker.getRegistrations()
+                      .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+                      .catch(() => {});
+                    if ('caches' in window) {
+                      caches.keys()
+                        .then((keys) => Promise.all(keys.filter((key) => key.startsWith('portfolio-simulator-')).map((key) => caches.delete(key))))
+                        .catch(() => {});
+                    }
+                    return;
+                  }
                   navigator.serviceWorker.register('/service-worker.js').catch(() => {});
                 });
               }
             `,
           }}
         />
+        <Analytics />
       </body>
     </html>
   )

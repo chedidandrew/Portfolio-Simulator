@@ -3,3 +3,29 @@
 **/dist/
 **/out/
 .vercel/
+node_modules/
+.next/
+out/
+coverage/
+**/*.tsbuildinfo
+*.log
+*.zip
+*.xlsx
+*.xls
+.env
+.env.local
+.env.*.local
+.portfolio-simulator-audit-backup-*/
+audit_artifacts/
+.vscode/
+
+# Local Codex workflow files (kept on this computer, not published with the site)
+AGENTS.md
+create-source-zip.ps1
+
+# Local audit and release reports
+FINAL_*_REPORT.md
+FINAL_RELEASE_REVALIDATION.md
+LOCAL_PRE_RELEASE_AUDIT.md
+POST_FIX_PRE_RELEASE_AUDIT.md
+WEBSITE_AUDIT_CHANGES.md

@@ -18,10 +18,6 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "typeRoots": [
-      "./node_modules/@types",
-      "./node_modules/@webgpu"
-    ],
     "plugins": [
       {
         "name": "next"

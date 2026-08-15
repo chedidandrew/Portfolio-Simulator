@@ -1,23 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Coffee, ExternalLink, X, Share2 } from 'lucide-react'
+import { Coffee, ExternalLink, Share2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
 import { useLocalStorage } from '@/hooks/use-local-storage'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 
 let sessionHidden = false
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 export function DonationSection() {
   const [isOpen, setIsOpen] = useState(false)
+  const donationTriggerRef = useRef<HTMLButtonElement>(null)
   const [hideForSession, setHideForSession] = useState(sessionHidden)
   const [hasSupported, setHasSupported] = useState(false)
   const [showDonations, setShowDonations] = useLocalStorage<boolean>('portfolio-sim-show-donations', true)
   const [donationsHiddenUntil, setDonationsHiddenUntil] = useLocalStorage<number>('portfolio-sim-donations-hidden-until', 0)
   const donationPopupUrl = 'https://buymeacoffee.com/chedidandrew'
-  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
   useEffect(() => {
     if (showDonations && hideForSession) {
@@ -199,6 +201,7 @@ export function DonationSection() {
                       }}
                     >
                       <Button
+                        ref={donationTriggerRef}
                         type="button"
                         onClick={() => setIsOpen(true)}
                         className={`
@@ -238,6 +241,7 @@ export function DonationSection() {
                       <div className="p-3 rounded-2xl bg-white shadow-[0_0_20px_rgba(250,204,21,0.4)] border border-amber-300/40">
                         <QRCodeSVG
                           value={donationPopupUrl}
+                          title="Buy Me a Coffee donation link"
                           size={120}
                           bgColor="#ffffff"   // always light background
                           fgColor="#000000"
@@ -257,45 +261,21 @@ export function DonationSection() {
         </motion.div>
       </motion.div>
 
-      <AnimatePresence>
-        {isOpen && !hasSupported && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md px-3 py-6 sm:px-0 sm:py-0 overflow-y-auto"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsOpen(false)}
-          >
+      <Dialog open={isOpen && !hasSupported} onOpenChange={setIsOpen}>
+            <DialogContent
+              className="w-[calc(100%-1.5rem)] max-w-lg rounded-2xl border-[3px] border-amber-400/80 bg-gradient-to-b from-zinc-50 via-white to-zinc-100 px-4 py-4 shadow-[0_0_30px_rgba(251,191,36,0.45)] dark:border-[#FACC15] dark:from-zinc-950 dark:via-zinc-900 dark:to-black sm:px-8 sm:py-7 max-h-[calc(100vh-3rem)] overflow-y-auto"
+              onCloseAutoFocus={(event) => {
+                event.preventDefault()
+                donationTriggerRef.current?.focus()
+              }}
+            >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 24 }}
+              initial={{ scale: 0.98, opacity: 0, y: 8 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 12 }}
               transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-              className="relative w-full max-w-lg mx-auto rounded-2xl border-[3px] border-amber-400/80 dark:border-[#FACC15] bg-gradient-to-b from-zinc-50 via-white to-zinc-100 dark:from-zinc-950 dark:via-zinc-900 dark:to-black shadow-[0_0_30px_rgba(251,191,36,0.45)] px-4 py-4 sm:px-8 sm:py-7 max-h-[calc(100vh-3rem)] overflow-y-auto"
-              onClick={e => e.stopPropagation()}
+              className="relative"
             >
               <div className="pointer-events-none absolute inset-0 rounded-2xl bg-amber-200/20 dark:bg-amber-300/5 blur-3xl" />
-
-              {/* Close button */}
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="
-                  absolute right-3 top-3
-                  flex items-center justify-center
-                  h-6 w-6
-                  rounded-full
-                  bg-zinc-900/80 dark:bg-black/40
-                  border border-amber-300/50
-                  text-amber-100/90
-                  shadow-[0_0_10px_rgba(250,204,21,0.55)]
-                  transition-all duration-200
-                  hover:bg-amber-500/30 hover:text-white hover:scale-105
-                  active:scale-95
-                "
-              >
-                <X className="h-4 w-4 pointer-events-none" />
-              </button>
 
               <div className="relative space-y-6 pt-2">
                 <div className="flex flex-col items-center text-center gap-2">
@@ -310,12 +290,12 @@ export function DonationSection() {
                     <Coffee className="h-6 w-6" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-zinc-900 dark:text-foreground">
+                    <DialogTitle className="text-xl font-bold text-zinc-900 dark:text-foreground">
                       Fuel the simulator
-                    </h3>
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-muted-foreground max-w-[80%] mx-auto">
+                    </DialogTitle>
+                    <DialogDescription className="mt-1 text-sm text-zinc-600 dark:text-muted-foreground max-w-[80%] mx-auto">
                       I’ve always hated ads. Your support keeps this tool free - forever.
-                    </p>
+                    </DialogDescription>
                   </div>
                 </div>
 
@@ -408,9 +388,8 @@ export function DonationSection() {
                 </motion.div>
               </div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </DialogContent>
+      </Dialog>
 
       {/* PRINT ONLY SECTION - BUY ME A COFFEE */}
       <div className="hidden print:flex w-full flex-col items-center justify-center p-6 pt-10 border border-zinc-200 rounded-lg break-inside-avoid text-center bg-white">
@@ -425,6 +404,7 @@ export function DonationSection() {
         <div className="p-2 bg-white border border-zinc-200 rounded-lg">
           <QRCodeSVG
             value={donationPopupUrl}
+            title="Buy Me a Coffee donation link"
             size={200}
             bgColor="#ffffff"
             fgColor="#000000"

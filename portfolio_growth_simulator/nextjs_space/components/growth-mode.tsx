@@ -9,8 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Dices } from 'lucide-react'
 import { motion } from 'framer-motion'
-import ExcelJS from 'exceljs'
-import { roundToCents } from '@/lib/utils'
+import { getAppCurrency, roundToCents } from '@/lib/utils'
 import { toast } from 'sonner'
 import { GrowthParameters } from '@/components/growth/parameters'
 import { GrowthResults } from '@/components/growth/results'
@@ -18,22 +17,25 @@ import { GrowthTable } from '@/components/growth/table'
 import { MonteCarloSimulator } from '@/components/monte-carlo-simulator'
 import { DonationSection } from '@/components/donation-section'
 import { useGrowthCalculation } from '@/hooks/use-growth-calculation'
-import LZString from 'lz-string'
+import { CalculationErrorCard } from '@/components/calculation-error-card'
+import { clearSimulatorScenario } from '@/lib/owned-storage'
+import { validateGrowthStateRange } from '@/lib/simulation/deterministic-validation'
+import { MONTE_CARLO_SWITCH_LABELS } from '@/lib/accessibility-labels'
+import { normalizeGrowthState } from '@/lib/state-normalization'
+import { DEFAULT_GROWTH_STATE } from '@/lib/default-states'
+import { buildShareUrl as buildVersionedShareUrl, cleanShareDataFromUrl } from '@/lib/share-links'
 
-export function GrowthMode() {
-  const [state, setState] = useLocalStorage<GrowthState>('growth-mode-state', {
-    startingBalance: 10000,
-    annualReturn: 8,
-    duration: 30,
-    periodicAddition: 500,
-    frequency: 'monthly',
-    targetValue: 500000,
-    inflationAdjustment: 2.5,
-    excludeInflationAdjustment: true,
-    taxEnabled: false,
-    taxRate: 15,
-    taxType: 'capital_gains'
-  })
+export { DEFAULT_GROWTH_STATE } from '@/lib/default-states'
+
+export function GrowthMode({ sharedPayload }: { sharedPayload?: SharePayload | null }) {
+  const [state, setState] = useLocalStorage<GrowthState>(
+    'growth-mode-state',
+    DEFAULT_GROWTH_STATE,
+    {
+      normalize: normalizeGrowthState,
+      shouldPersist: (nextState) => validateGrowthStateRange(nextState) === null,
+    },
+  )
 
   const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('growth-show-monte-carlo', false)
   const [showFullPrecision, setShowFullPrecision] = useLocalStorage('growth-show-full-precision', false)
@@ -45,19 +47,19 @@ export function GrowthMode() {
   const [initialLogScales, setInitialLogScales] = useState<SharePayload['logScales'] | undefined>(undefined)
   const [initialMCShowFullPrecision, setInitialMCShowFullPrecision] = useState<boolean | undefined>(undefined)
 
-  const calculation = useGrowthCalculation(state)
+  const calculationState = useGrowthCalculation(state)
+  const calculation = calculationState.result
 
   // Listen for the event dispatched by app/page.tsx
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const handleOpenFromLink = (event: any) => {
-      const decoded = event.detail
+    const applySharedPayload = (decoded: SharePayload) => {
       if (decoded?.mode !== 'growth') return
 
       // 1) Restore deterministic params (supports new and old keys)
       const loadedParams = decoded.deterministicParams || decoded.params
-      if (loadedParams) setState(loadedParams)
+      if (loadedParams && 'periodicAddition' in loadedParams) setState(loadedParams)
 
       // Restore precision toggle if present
       if (typeof decoded.showFullPrecision === 'boolean') {
@@ -75,8 +77,14 @@ export function GrowthMode() {
       }
       
       // Clean URL
-      window.history.replaceState(null, '', window.location.pathname)
+      window.history.replaceState(null, '', cleanShareDataFromUrl(window.location.href))
     }
+
+    const handleOpenFromLink = (event: Event) => {
+      applySharedPayload((event as CustomEvent<SharePayload>).detail)
+    }
+
+    if (sharedPayload) applySharedPayload(sharedPayload)
 
     // Check on mount if we already have the payload in URL (direct load)
     try {
@@ -94,14 +102,13 @@ export function GrowthMode() {
     window.addEventListener('openMonteCarloFromLink', handleOpenFromLink)
     return () => window.removeEventListener('openMonteCarloFromLink', handleOpenFromLink)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [sharedPayload, setInitialMCParams, setInitialMCShowFullPrecision, setInitialRngSeed, setInitialLogScales, setShowFullPrecision, setState, setUseMonteCarloMode])
 
   const buildShareUrl = () => {
     if (typeof window === 'undefined') return ''
     const url = new URL(window.location.href)
 
-    // Dynamic payload based on current mode
-    const payload = {
+    const payload: SharePayload = {
       mode: 'growth',
       type: useMonteCarloMode ? 'monte-carlo' : 'deterministic',
       deterministicParams: state,
@@ -109,11 +116,7 @@ export function GrowthMode() {
       showFullPrecision,
     }
 
-    // Legacy encoding method: encodeURIComponent -> btoa
-    const encoded = typeof btoa !== 'undefined' ? btoa(encodeURIComponent(JSON.stringify(payload))) : ''
-    
-    if (encoded) url.searchParams.set('mc', encoded)
-    return url.toString()
+    return buildVersionedShareUrl(url.toString(), payload, getAppCurrency().code)
   }
 
   const handleShareLink = async () => {
@@ -122,7 +125,8 @@ export function GrowthMode() {
     if (!url) return
 
     try {
-      if (typeof navigator !== 'undefined' && 'share' in navigator) {
+      const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+      if (canNativeShare) {
         await navigator.share({
           title: 'Portfolio Simulator',
           text: 'Take a look at my portfolio results',
@@ -131,15 +135,15 @@ export function GrowthMode() {
         return
       }
 
-      if ((navigator as any)?.clipboard?.writeText) {
-        await (navigator as any).clipboard.writeText(url)
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url)
         toast('Link copied')
         return
       }
 
       toast('Copy not supported on this browser')
-    } catch (err: any) {
-      const name = err?.name
+    } catch (error: unknown) {
+      const name = error instanceof DOMException || error instanceof Error ? error.name : undefined
       if (name === 'AbortError' || name === 'NotAllowedError') return
       toast('Could not share or copy link')
     }
@@ -152,8 +156,12 @@ export function GrowthMode() {
 
   const handleExportExcel = async () => {
     triggerHaptic('light')
-    if (!calculation.yearData.length) return
+    if (!calculation?.yearData.length) return
 
+    const [{ default: ExcelJS }, { formatFinancialWorkbook }] = await Promise.all([
+      import('exceljs'),
+      import('@/lib/export/excel-formatting'),
+    ])
     const workbook = new ExcelJS.Workbook()
 
     // 1. Summary Sheet
@@ -165,6 +173,7 @@ export function GrowthMode() {
 
     const summaryRows = [
       { Key: 'Mode', Value: 'Growth (Deterministic)' },
+      { Key: 'Display Currency', Value: getAppCurrency().code },
       { Key: 'Starting Balance', Value: roundToCents(state.startingBalance) },
       { Key: 'Annual Return %', Value: state.annualReturn },
       { Key: 'Duration Years', Value: state.duration },
@@ -172,7 +181,9 @@ export function GrowthMode() {
       { Key: 'Frequency', Value: state.frequency },
       { Key: 'Inflation Adjustment %', Value: state.inflationAdjustment },
       { Key: 'Target Value', Value: roundToCents(state.targetValue) || 'N/A' },
-      { Key: 'Total Contributions', Value: roundToCents(calculation.totalContributions) },
+      { Key: 'Total Invested', Value: roundToCents(calculation.totalContributions) },
+      { Key: 'Periodic Contributions', Value: roundToCents(calculation.periodicContributions) },
+      { Key: "Final Value (Today's Dollars)", Value: roundToCents(calculation.finalValueInTodaysDollars) },
     ]
 
     // Add Tax info if enabled
@@ -219,17 +230,13 @@ export function GrowthMode() {
     // FIXED: Defined this variable which was missing in your code
     const hasGrossColumns = !!state.taxEnabled && state.taxType !== 'income'
     
-    let t = (state.taxRate || 0) / 100
-    if (t >= 0.99) t = 0.99
-    const taxMultiplier = showIncomeTaxColumn ? (t / (1 - t)) : 0
-
     wsData.columns = [
       { header: 'Year', key: 'Year', width: 10 },
       { header: 'Starting Value', key: 'Starting Value', width: 20 },
       ...(hasGrossColumns ? [{ header: 'Starting Value (Gross)', key: 'Starting Value (Gross)', width: 20 }] : []),
       { header: 'Contributions', key: 'Contributions', width: 20 },
       { header: 'Interest Earned', key: 'Interest Earned', width: 20 },
-      ...(showIncomeTaxColumn ? [{ header: 'Tax Paid', key: 'Tax Paid', width: 20 }] : []),
+      ...(showIncomeTaxColumn ? [{ header: 'Tax Drag', key: 'Tax Drag', width: 20 }] : []),
       { header: 'Ending Value', key: 'Ending Value', width: 20 },
       ...(hasGrossColumns ? [{ header: 'Ending Value (Gross)', key: 'Ending Value (Gross)', width: 20 }] : []),
     ]
@@ -240,11 +247,12 @@ export function GrowthMode() {
       ...(hasGrossColumns ? { 'Starting Value (Gross)': roundToCents(row.grossStartingValue ?? row.startingValue) } : {}),
       Contributions: roundToCents(row.contributions),
       'Interest Earned': roundToCents(row.interest),
-      ...(showIncomeTaxColumn ? { 'Tax Paid': roundToCents(row.taxPaid ?? (row.interest * taxMultiplier)) } : {}),
+      ...(showIncomeTaxColumn ? { 'Tax Drag': roundToCents(row.taxPaid) } : {}),
       'Ending Value': roundToCents(row.endingValue),
       ...(hasGrossColumns ? { 'Ending Value (Gross)': roundToCents(row.grossEndingValue ?? row.endingValue) } : {}),
     }))
     wsData.addRows(excelData)
+    formatFinancialWorkbook(workbook, getAppCurrency().symbol)
 
     // Generate and Download
     const buffer = await workbook.xlsx.writeBuffer()
@@ -258,6 +266,11 @@ export function GrowthMode() {
     anchor.download = fileName
     anchor.click()
     window.URL.revokeObjectURL(url)
+  }
+
+  const handleResetScenario = () => {
+    if (typeof window !== 'undefined') clearSimulatorScenario(window.localStorage, 'growth')
+    setState(DEFAULT_GROWTH_STATE)
   }
 
   return (
@@ -286,7 +299,12 @@ export function GrowthMode() {
                   Model market volatility with randomized scenarios
                 </p>
               </div>
-              <Switch checked={useMonteCarloMode} onCheckedChange={setUseMonteCarloMode} />
+              <Switch
+                id="growth-monte-carlo-mode"
+                aria-label={MONTE_CARLO_SWITCH_LABELS.growth}
+                checked={useMonteCarloMode}
+                onCheckedChange={setUseMonteCarloMode}
+              />
             </div>
           </CardContent>
         </Card>
@@ -307,23 +325,29 @@ export function GrowthMode() {
             <GrowthParameters state={state} setState={setState} />
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-            <GrowthResults
-              data={calculation}
-              targetValue={state.targetValue}
-              taxEnabled={state.taxEnabled}
-              taxType={state.taxType}
-              showFullPrecision={showFullPrecision}
-              setShowFullPrecision={setShowFullPrecision}
-              onShare={handleShareLink}
-              onExportPdf={handleExportPdf}
-              onExportExcel={handleExportExcel}
-            />
-          </motion.div>
+          {calculationState.error ? (
+            <CalculationErrorCard message={calculationState.error} onReset={handleResetScenario} />
+          ) : calculation ? (
+            <>
+              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+                <GrowthResults
+                  data={calculation}
+                  targetValue={state.targetValue}
+                  taxEnabled={state.taxEnabled}
+                  taxType={state.taxType}
+                  showFullPrecision={showFullPrecision}
+                  setShowFullPrecision={setShowFullPrecision}
+                  onShare={handleShareLink}
+                  onExportPdf={handleExportPdf}
+                  onExportExcel={handleExportExcel}
+                />
+              </motion.div>
 
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-            <GrowthTable data={calculation.yearData} taxEnabled={state.taxEnabled} taxType={state.taxType} taxRate={state.taxRate} />
-          </motion.div>
+              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+                <GrowthTable data={calculation.yearData} taxEnabled={state.taxEnabled} taxType={state.taxType} />
+              </motion.div>
+            </>
+          ) : null}
         </>
       )}
 

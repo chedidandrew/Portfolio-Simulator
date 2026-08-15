@@ -10,6 +10,9 @@ import { Coins, Zap, Scale, Settings2 } from 'lucide-react'
 import { SimulationParams } from '@/lib/types'
 import { getAppCurrency, formatCurrency } from '@/lib/utils'
 import { useState } from 'react'
+import { MAX_MONTE_CARLO_WORK, stepsPerYear } from '@/lib/simulation/financial-utils'
+import { TaxSettingsPanel } from '@/components/tax-settings-panel'
+import { markCostBasisUserEdited, updateInitialValueWithTrackedBasis } from '@/lib/state-normalization'
 
 interface MonteCarloParametersProps {
   mode: 'growth' | 'withdrawal'
@@ -35,6 +38,8 @@ export function MonteCarloParameters({
   
   const currencySymbol = getAppCurrency().symbol
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const estimatedWork = params.numPaths * Math.ceil(params.duration * stepsPerYear(params.cashflowFrequency))
+  const workloadTooLarge = !Number.isSafeInteger(estimatedWork) || estimatedWork > MAX_MONTE_CARLO_WORK
 
   const formatCurrencyFullUnder100m = (amount: number) => {
     const n = Number(amount)
@@ -147,15 +152,15 @@ export function MonteCarloParameters({
                 onChange={(value) => {
                   let n = Number(value)
                   if (!isFinite(n)) {
-                    setParams({ ...params, initialValue: 0 })
+                    setParams(updateInitialValueWithTrackedBasis(params, 0))
                     return
                   }
                   // Currency clamp
                   if (n !== 0 && Math.abs(n) < 0.01) n = 0.01
                   const limited = Number(n.toFixed(2))
-                  setParams({ ...params, initialValue: limited })
+                  setParams(updateInitialValueWithTrackedBasis(params, limited))
                 }}
-                min={1}
+                min={mode === 'growth' ? 0 : 0.01}
                 max={1e18}
                 maxErrorMessage="This number violates several economic laws :)"
               />
@@ -300,111 +305,41 @@ export function MonteCarloParameters({
               />
             </div>
 
-            {/* Tax Options */}
+            {/* Number of Scenarios */}
             <div className="space-y-2">
-              <div className="flex items-center justify-left gap-2">
-                <Label htmlFor="mc-tax-enabled" className="flex items-center gap-2">
-                  <Scale className="h-4 w-4" />
-                  Enable Taxes
-                  <span className="hidden print:inline font-normal text-muted-foreground">
-                    {params.taxEnabled ? '(Enabled)' : '(Disabled)'}
-                  </span>
-                </Label>
-                <Switch
-                  id="mc-tax-enabled"
-                  className="print:hidden"
-                  checked={params.taxEnabled ?? false}
-                  onCheckedChange={(checked) => {
-                    let newRate = params.taxRate ?? 0
+              <Label htmlFor="mc-paths">Number of Scenarios</Label>
+              <Select
+                value={params.numPaths?.toString() ?? '500'}
+                onValueChange={(value) => setParams({ ...params, numPaths: Number(value) })}
+              >
+                <SelectTrigger id="mc-paths" className="print:hidden">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 scenario - sample path</SelectItem>
+                  <SelectItem value="100">100 scenarios</SelectItem>
+                  <SelectItem value="500">500 scenarios</SelectItem>
+                  <SelectItem value="1000">1,000 scenarios</SelectItem>
+                  <SelectItem value="5000">5,000 scenarios</SelectItem>
+                  <SelectItem value="10000">10,000 scenarios</SelectItem>
+                  <SelectItem value="50000">50,000 scenarios</SelectItem>
+                  <SelectItem value="100000">100,000 scenarios (Slow)</SelectItem>
+                </SelectContent>
+              </Select>
+              {workloadTooLarge ? (
+                <p className="text-[10px] text-destructive font-medium pt-1 print:hidden">
+                  This request contains {estimatedWork.toLocaleString()} path-period calculations. Reduce scenarios, duration, or frequency to {MAX_MONTE_CARLO_WORK.toLocaleString()} or less.
+                </p>
+              ) : params.numPaths >= 50_000 ? (
+                <p className="text-[10px] text-orange-500 font-medium pt-1 print:hidden">
+                  Large simulations can take noticeable time. More scenarios reduce sampling noise but do not improve the assumptions themselves.
+                </p>
+              ) : null}
 
-                    if (checked && newRate === 0) {
-                      if (mode === 'withdrawal') {
-                        newRate = 20 // Withdrawal Income Tax default
-                      } else {
-                        // Growth defaults
-                        newRate = params.taxType === 'income' ? 25 : 15
-                      }
-                    }
-
-                    setParams({ ...params, taxEnabled: checked, taxRate: newRate })
-                  }}
-                />
-              </div>
-
-              {params.taxEnabled && (
-                <div className="pt-0 grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="space-y-2">
-                    <Label htmlFor="mc-tax-rate" className="text-xs">Tax Rate (%)</Label>
-                    <NumericInput
-                      id="mc-tax-rate"
-                      value={params.taxRate ?? 0}
-                      onChange={(value) => setParams({ ...params, taxRate: Math.max(0, Math.min(99, value)) })}
-                      min={0}
-                      max={99}
-                      maxErrorMessage="At 100% you are officially working for free :)"
-                    />
-                    
-                    {/* DYNAMIC TAX MESSAGE */}
-                    {mode === 'withdrawal' && params.taxType === 'tax_deferred' && (
-                       <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                        Withdrawing <span className="font-semibold text-primary">{formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}</span> per {getCashflowPeriodNoun()}, you will net{' '}
-                        <span className="font-semibold text-primary">
-                          {formatCurrency(
-                            (params.cashflowAmount ?? 0) * (1 - Math.min(params.taxRate ?? 0, 99) / 100),
-                            true, 2, false
-                          )}
-                        </span>{' '}
-                        after taxes.
-                      </p>
-                    )}
-
-                    {mode === 'withdrawal' && params.taxType === 'capital_gains' && (
-                      <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                        Withdrawing <span className="font-semibold">{formatCurrencyFullUnder100m(params.cashflowAmount ?? 0)}</span> (Gross), capital gains tax will be deducted from this amount.
-                        <br/>
-                        <span className="opacity-80">Your net pocket money will vary each year as your cost basis changes.</span>
-                      </p>
-                    )}
-
-                    {mode === 'withdrawal' && params.taxType === 'income' && (
-                       <p className="text-[11px] text-muted-foreground pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                        Like a High-Yield Savings account. Taxes are paid annually on interest, which <span className="font-semibold text-orange-600/90 dark:text-orange-400/90">slows down your growth</span>. 
-                        Your withdrawal remains exactly {formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="mc-tax-type" className="text-xs">Tax Type</Label>
-                    <Select
-                      value={params.taxType ?? 'capital_gains'}
-                      onValueChange={(value: any) => setParams({ ...params, taxType: value })}
-                    >
-                      <SelectTrigger id="mc-tax-type" className="h-10 print:hidden">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="capital_gains">
-                          {mode === 'growth' ? 'Taxable Account (capital gains on liquidation)' : 'Taxable Account (capital gains on liquidation)'}
-                        </SelectItem>
-                        <SelectItem value="tax_deferred">Tax deferred (401k/IRA), taxed on withdrawal</SelectItem>
-                        <SelectItem value="income">Annual income tax drag</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="hidden print:block text-xs text-muted-foreground pt-1">
-                      Selected: {params.taxType === 'income' 
-                        ? 'Annual income tax drag' 
-                        : (params.taxType === 'tax_deferred' ? 'Tax deferred (401k/IRA), taxed on withdrawal' : (mode === 'growth' ? 'Taxable Account (capital gains on liquidation)' : 'Taxable Account (capital gains on liquidation)'))}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground pt-1 print:hidden">
-                      {params.taxType === 'income'
-                        ? 'Reduces annual return rate.'
-                        : (params.taxType === 'tax_deferred' ? 'Full balance/withdrawal taxed.' : (mode === 'growth' ? 'Deducts tax from final profit.' : 'Capital gains tax is deducted from this withdrawal amount.'))}
-                    </p>
-                  </div>
-                 </div>
-               )}
-             </div>
+              <p className="hidden print:block text-xs text-muted-foreground">
+                Selected: {(params.numPaths ?? 500).toLocaleString()}
+              </p>
+            </div>
 
             {/* Portfolio Goal (Growth Mode Only) */}
             {mode === 'growth' && (
@@ -433,38 +368,64 @@ export function MonteCarloParameters({
               </div>
             )}
 
-            {/* Number of Scenarios */}
-            <div className="space-y-2">
-              <Label htmlFor="mc-paths">Number of Scenarios</Label>
-              <Select
-                value={params.numPaths?.toString() ?? '500'}
-                onValueChange={(value) => setParams({ ...params, numPaths: Number(value) })}
-              >
-                <SelectTrigger id="mc-paths" className="print:hidden">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 scenario - sample path</SelectItem>
-                  <SelectItem value="100">100 scenarios</SelectItem>
-                  <SelectItem value="500">500 scenarios</SelectItem>
-                  <SelectItem value="1000">1,000 scenarios</SelectItem>
-                  <SelectItem value="5000">5,000 scenarios</SelectItem>
-                  <SelectItem value="10000">10,000 scenarios</SelectItem>
-                  <SelectItem value="50000">50,000 scenarios</SelectItem>
-                  <SelectItem value="100000">100,000 scenarios (Slow)</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              {params.numPaths === 100000 && (
-                <p className="text-[10px] text-orange-500 font-medium animate-pulse pt-1 print:hidden">
-                  Warning: 100,000 paths might freeze/crash on slower devices. Recommended: Enable webGPU on your browser for best performance.
-                </p>
-              )}
-
-              <p className="hidden print:block text-xs text-muted-foreground">
-                Selected: {(params.numPaths ?? 500).toLocaleString()}
-              </p>
+            {/* Tax Options */}
+            <div className={`space-y-2 self-start sm:pt-1 ${mode === 'withdrawal' ? 'sm:col-span-2' : ''}`}>
+              <div className="flex items-center justify-left gap-2">
+                <Label htmlFor="mc-tax-enabled" className="flex items-center gap-2">
+                  <Scale className="h-4 w-4" />
+                  Enable Taxes
+                  <span className="hidden print:inline font-normal text-muted-foreground">
+                    {params.taxEnabled ? '(Enabled)' : '(Disabled)'}
+                  </span>
+                </Label>
+                <Switch
+                  id="mc-tax-enabled"
+                  className="print:hidden"
+                  checked={params.taxEnabled ?? false}
+                  onCheckedChange={(checked) => {
+                    let newRate = params.taxRate ?? 0
+                    if (checked && newRate === 0) {
+                      newRate = mode === 'withdrawal' ? 20 : params.taxType === 'income' ? 25 : 15
+                    }
+                    setParams({ ...params, taxEnabled: checked, taxRate: newRate })
+                  }}
+                />
+              </div>
             </div>
+
+            {params.taxEnabled && (
+              <TaxSettingsPanel
+                testId="monte-carlo-tax-details"
+                taxRateId="mc-tax-rate"
+                taxTypeId="mc-tax-type"
+                costBasisId="mc-starting-cost-basis"
+                taxRate={params.taxRate ?? 0}
+                taxType={params.taxType ?? 'capital_gains'}
+                currentCostBasis={params.startingCostBasis ?? params.initialValue}
+                currencySymbol={currencySymbol}
+                basisHelp="Automatically follows Initial Portfolio Value until you edit it. Tax basis is then tracked separately for the taxable-account calculation."
+                taxRateErrorMessage="At 100% you are officially working for free :)"
+                onTaxRateChange={(value) => setParams({ ...params, taxRate: Math.max(0, Math.min(99, value)) })}
+                onTaxTypeChange={(value) => setParams({ ...params, taxType: value })}
+                onCostBasisChange={(value) => setParams(markCostBasisUserEdited(params, value))}
+                description={mode === 'growth'
+                  ? params.taxType === 'income'
+                    ? 'Taxes reduce the annual return rate.'
+                    : params.taxType === 'tax_deferred'
+                      ? 'The full balance is valued after the assumed effective tax rate.'
+                      : 'Capital gains tax is deducted from final profit.'
+                  : params.taxType === 'tax_deferred'
+                    ? <>
+                        Withdrawing <span className="font-semibold text-primary">{formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}</span> per {getCashflowPeriodNoun()}, you will net{' '}
+                        <span className="font-semibold text-primary">
+                          {formatCurrency((params.cashflowAmount ?? 0) * (1 - Math.min(params.taxRate ?? 0, 99) / 100), true, 2, false)}
+                        </span>{' '}after taxes.
+                      </>
+                    : params.taxType === 'income'
+                      ? <>Taxes are paid annually on interest and slow portfolio growth. Your withdrawal remains {formatCurrency(params.cashflowAmount ?? 0, true, 0, false)}.</>
+                      : <>Withdrawing <span className="font-semibold">{formatCurrencyFullUnder100m(params.cashflowAmount ?? 0)}</span> gross, capital gains tax is deducted from this amount. Net spending varies as cost basis changes.</>}
+              />
+            )}
 
           </div>
 
@@ -512,12 +473,12 @@ export function MonteCarloParameters({
                   <p className="text-xs text-muted-foreground">
                     {params.calculationMode === 'nominal'
                       ? "Input is Nominal (APR). We convert this to a higher Effective Annual Rate for the simulation to account for monthly compounding."
-                      : "Input is Effective (APY). The simulation's Median (most likely) outcome will match this return rate exactly."}
+                      : "Input is Effective (APY). With stress events off, the model centers its median geometric path around this assumption."}
                   </p>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="mc-crash-risk">Extreme crash & recovery cycles</Label>
+                    <Label htmlFor="mc-crash-risk">Market crash and recovery stress events</Label>
                     <Switch
                       id="mc-crash-risk"
                       checked={params.enableCrashRisk ?? false}
@@ -525,7 +486,7 @@ export function MonteCarloParameters({
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Simulates historically common volatility spikes (2x-3x) for short windows, roughly once or twice per decade.
+                    Adds optional horizon-scaled market declines followed by partial recoveries. Short simulations may have no stress event.
                   </p>
                 </div>
               </div>
@@ -534,7 +495,7 @@ export function MonteCarloParameters({
 
           <Button
             onClick={onRun}
-            disabled={isSimulating}
+            disabled={isSimulating || workloadTooLarge}
             className="w-full sm:w-auto print:hidden" 
           >
             <Zap className="h-4 w-4 mr-2" />

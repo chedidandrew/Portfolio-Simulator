@@ -6,9 +6,6 @@
 @layer base {
   html,
   body {
-    /* 1. Prevent pinch-zoom */
-    touch-action: pan-x pan-y; 
-    
     /* 2. Prevent text scaling in landscape */
     -webkit-text-size-adjust: 100%; 
   }
@@ -246,4 +243,14 @@
   h1, h2, h3 { color: black !important; margin-bottom: 10px !important; }
   
   .recharts-default-tooltip { border: 1px solid #000 !important; }
+}
+
+/* Respect operating-system motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

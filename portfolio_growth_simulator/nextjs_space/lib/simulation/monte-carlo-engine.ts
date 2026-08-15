@@ -1,56 +1,123 @@
-import seedrandom from 'seedrandom'
-import { SimulationParams } from '@/lib/types'
+import type { SimulationParams } from '../types'
+import {
+  MAX_CHART_POINTS,
+  MAX_RECORDED_VALUES,
+  annualReturnAfterIncomeTaxDrag,
+  assertFiniteResult,
+  assertMonteCarloWorkload,
+  calculatePercentile,
+  createSeededRandom,
+  effectiveAnnualReturnFromInput,
+  inflationFactor,
+  mean,
+  netLiquidationValue,
+  normalRandom,
+  normalizeTaxRate,
+  poissonRandom,
+  proportionalCapitalGainsTax,
+  reduceBasisProportionally,
+  stepsPerYear,
+  toTodaysDollars,
+} from './financial-utils'
 
-export function calculatePercentile(sortedArray: number[], p: number): number {
-  if (sortedArray.length === 0) return 0
-  if (sortedArray.length === 1) return sortedArray[0]
+export { calculatePercentile } from './financial-utils'
 
-  const index = p * (sortedArray.length - 1)
-  const lowerIndex = Math.floor(index)
-  const upperIndex = Math.ceil(index)
-
-  if (lowerIndex === upperIndex) {
-    return sortedArray[lowerIndex]
-  }
-
-  const lowerValue = sortedArray[lowerIndex]
-  const upperValue = sortedArray[upperIndex]
-  const fraction = index - lowerIndex
-
-  return lowerValue + (upperValue - lowerValue) * fraction
+export interface InvestmentDataPoint {
+  year: number
+  initial: number
+  contributions: number
+  withdrawals: number
+  total: number
+  realInitial: number
+  realContributions: number
+  realWithdrawals: number
+  realTotal: number
+  netSpending?: number
+  realNetSpending?: number
+  taxesPaid?: number
+  realTaxesPaid?: number
+  withdrawalTaxes?: number
+  realWithdrawalTaxes?: number
+  incomeTaxDrag?: number
+  realIncomeTaxDrag?: number
 }
 
+interface StressSchedule {
+  multipliers: Float64Array
+  eventCount: number
+}
+
+function createStressSchedule(
+  totalSteps: number,
+  periodsPerYear: number,
+  durationYears: number,
+  seed: string,
+  enabled: boolean,
+): StressSchedule {
+  const multipliers = new Float64Array(totalSteps + 1)
+  multipliers.fill(1)
+  if (!enabled || totalSteps < 1) return { multipliers, eventCount: 0 }
+
+  const random = createSeededRandom(seed)
+  // Roughly 1.2 stress events per decade. A short horizon can legitimately have none.
+  const eventCount = Math.min(12, poissonRandom(Math.max(0, durationYears) * 0.12, random))
+
+  for (let event = 0; event < eventCount; event += 1) {
+    const crashStep = 1 + Math.floor(random() * totalSteps)
+    const decline = 0.15 + random() * 0.35
+    const recoveredLossFraction = 0.35 + random() * 0.55
+    const recoverySteps = Math.max(1, Math.round(periodsPerYear * (0.25 + random() * 0.75)))
+
+    multipliers[crashStep] *= 1 - decline
+
+    const afterCrash = 1 - decline
+    const targetLevel = afterCrash + decline * recoveredLossFraction
+    const recoveryMultiplier = Math.pow(targetLevel / afterCrash, 1 / recoverySteps)
+
+    for (let offset = 1; offset <= recoverySteps; offset += 1) {
+      const step = crashStep + offset
+      if (step > totalSteps) break
+      multipliers[step] *= recoveryMultiplier
+    }
+  }
+
+  return { multipliers, eventCount }
+}
+
+function sorted(values: number[]): number[] {
+  return [...values].sort((a, b) => a - b)
+}
+
+function percentileSet(values: number[]) {
+  const s = sorted(values)
+  return {
+    p5: calculatePercentile(s, 0.05),
+    p10: calculatePercentile(s, 0.10),
+    p25: calculatePercentile(s, 0.25),
+    p50: calculatePercentile(s, 0.50),
+    p75: calculatePercentile(s, 0.75),
+    p90: calculatePercentile(s, 0.90),
+    p95: calculatePercentile(s, 0.95),
+  }
+}
 
 export async function performMonteCarloSimulationAsync(
   params: SimulationParams,
   mode: 'growth' | 'withdrawal',
-  seed?: string
+  seed?: string,
 ) {
-  try {
-    if (params.enableCrashRisk) {
-      return performMonteCarloSimulation(params, mode, seed)
-    }
-    if (typeof navigator !== 'undefined' && (navigator as any).gpu) {
-      const { performMonteCarloSimulationWebGPU } = await import('./monte-carlo-webgpu')
-      return await performMonteCarloSimulationWebGPU(params, mode, seed)
-    } else {
-       console.warn("WebGPU not available on this device/browser. Using CPU fallback.")
-    }
-  } catch (e) {
-    console.error("WebGPU initialization failed. Using CPU fallback.", e)
-  }
+  // The audited CPU implementation is the source of truth. The former WebGPU
+  // implementation used Float32 arithmetic and had diverging tax/risk logic.
+  // Yield once so React can paint its loading state before the synchronous work.
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
   return performMonteCarloSimulation(params, mode, seed)
 }
 
 export function performMonteCarloSimulation(
   params: SimulationParams,
   mode: 'growth' | 'withdrawal',
-  seed?: string
+  seed = 'portfolio-simulator',
 ) {
-  if (params.initialValue <= 0) {
-    throw new Error('Initial portfolio value must be greater than zero.')
-  }
-
   const {
     initialValue,
     startingCostBasis,
@@ -67,124 +134,542 @@ export function performMonteCarloSimulation(
     taxEnabled,
     taxRate = 0,
     taxType = 'capital_gains',
-    calculationMode = 'effective'
+    calculationMode = 'effective',
   } = params
 
-  const getStepsPerYear = (f: SimulationParams['cashflowFrequency']) => {
-    if (f === 'weekly') return 52
-    if (f === 'monthly') return 12
-    if (f === 'quarterly') return 4
-    return 1
+  if (!Number.isFinite(initialValue) || initialValue < 0) throw new Error('Initial portfolio value cannot be negative.')
+  if (mode === 'withdrawal' && initialValue <= 0) throw new Error('Withdrawal simulations require a positive starting portfolio.')
+  if (mode === 'growth' && initialValue === 0 && cashflowAmount <= 0) {
+    throw new Error('Enter a starting portfolio or a positive contribution.')
   }
+  if (!Number.isFinite(volatility) || volatility < 0) throw new Error('Volatility cannot be negative.')
+  if (!Number.isFinite(cashflowAmount) || cashflowAmount < 0) throw new Error('Cashflow cannot be negative.')
 
-  const timeStepsPerYear = getStepsPerYear(cashflowFrequency)
+  const periods = stepsPerYear(cashflowFrequency)
+  const totalSteps = Math.max(1, Math.round(duration * periods))
+  assertMonteCarloWorkload(numPaths, duration, periods)
 
-  const MAX_TOTAL_DATA_POINTS = 2_500_000 
-  const MAX_CHART_STEPS = 500
-  const totalSimulationSteps = Math.floor(duration * timeStepsPerYear)
-  const memoryAllowedSteps = Math.floor(MAX_TOTAL_DATA_POINTS / numPaths)
-  const targetSteps = Math.max(2, Math.min(memoryAllowedSteps, MAX_CHART_STEPS))
-  let recordFrequency = Math.ceil(totalSimulationSteps / targetSteps)
-  if (recordFrequency < 1) recordFrequency = 1
+  const postTaxReturnPct = annualReturnAfterIncomeTaxDrag(expectedReturn, taxEnabled, taxType, taxRate)
+  const postTaxAnnual = effectiveAnnualReturnFromInput(postTaxReturnPct, periods, calculationMode)
+  const preTaxAnnual = effectiveAnnualReturnFromInput(expectedReturn, periods, calculationMode)
+  if (postTaxAnnual <= -1 || preTaxAnnual <= -1) throw new Error('The selected return produces an invalid logarithmic growth rate.')
 
-  const dt = 1 / timeStepsPerYear
-  const totalTimeSteps = totalSimulationSteps
-
-  const isIncomeTax = taxEnabled && taxType === 'income'
-
-  let preTaxReturn = expectedReturn
-  let postTaxReturn = expectedReturn
-
-  if (isIncomeTax) {
-    postTaxReturn = expectedReturn * (1 - taxRate / 100)
-  }
-
-  if (calculationMode === 'nominal') {
-    preTaxReturn = (Math.pow(1 + preTaxReturn / 100 / timeStepsPerYear, timeStepsPerYear) - 1) * 100
-    postTaxReturn = (Math.pow(1 + postTaxReturn / 100 / timeStepsPerYear, timeStepsPerYear) - 1) * 100
-  }
-
-  const r = postTaxReturn / 100
-  const rPreTax = preTaxReturn / 100
+  const dt = 1 / periods
   const sigma = volatility / 100
-  const mu = Math.log(1 + r)
-  const muPreTax = Math.log(1 + rPreTax)
-  const drift = mu * dt
-  const driftPreTax = muPreTax * dt
+  const drift = Math.log1p(postTaxAnnual) * dt
+  const driftPreTax = Math.log1p(preTaxAnnual) * dt
   const diffusion = sigma * Math.sqrt(dt)
-  
-  let cashflowPerStep = cashflowAmount
-  
-  const inflationFactor = 1 + inflationAdjustment / 100
-  const rng = seedrandom(seed ?? `monte-carlo-${Date.now()}-${Math.random()}`)
+  const inflator = inflationFactor(inflationAdjustment)
+  const rate = normalizeTaxRate(taxRate)
+  const isIncomeTax = Boolean(taxEnabled && taxType === 'income')
 
-  function normalRandom(): number {
-    let u = 0, v = 0
-    while (u === 0) u = rng()
-    while (v === 0) v = rng()
-    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)
-  }
+  const maxRecordedStepsByMemory = Math.max(1, Math.floor(MAX_RECORDED_VALUES / numPaths))
+  const targetRecordedSteps = Math.max(1, Math.min(MAX_CHART_POINTS, maxRecordedStepsByMemory, totalSteps))
+  const recordFrequency = Math.max(1, Math.ceil(totalSteps / targetRecordedSteps))
+  const recordSteps: number[] = [0]
+  for (let step = recordFrequency; step < totalSteps; step += recordFrequency) recordSteps.push(step)
+  if (recordSteps[recordSteps.length - 1] !== totalSteps) recordSteps.push(totalSteps)
 
-  const createCrashSchedule = (totalSteps: number, stepsPerYear: number, scheduleRng: seedrandom.PRNG) => {
-    const multipliers = new Float32Array(totalSteps + 1)
-    multipliers.fill(1)
+  const recordIndexByStep = new Map<number, number>()
+  recordSteps.forEach((step, index) => recordIndexByStep.set(step, index))
 
-    if (!enableCrashRisk) return multipliers
+  const netDistributions = recordSteps.map(() => [] as number[])
+  const grossDistributions = recordSteps.map(() => [] as number[])
+  const cagrDistributions = recordSteps.map(() => [] as number[])
+  const grossWithdrawalDistributions = recordSteps.map(() => [] as number[])
+  const netSpendingDistributions = recordSteps.map(() => [] as number[])
+  const taxPaidDistributions = recordSteps.map(() => [] as number[])
+  const grossWithdrawalRealDistributions = recordSteps.map(() => [] as number[])
+  const netSpendingRealDistributions = recordSteps.map(() => [] as number[])
+  const taxPaidRealDistributions = recordSteps.map(() => [] as number[])
+  const survivalDistributions = recordSteps.map(() => [] as number[])
 
-    const decadeSteps = stepsPerYear * 10
-    const minShockSteps = Math.max(1, Math.round(stepsPerYear * 0.25))
-    const maxShockSteps = Math.max(minShockSteps, Math.round(stepsPerYear * 1))
+  const endingValues: number[] = []
+  const endingValuesGross: number[] = []
+  const maxDrawdowns: number[] = []
+  const finalPerformanceValues: number[] = []
+  const lowestPerformanceValues: number[] = []
+  const totalGrossWithdrawals: number[] = []
+  const totalNetSpending: number[] = []
+  const totalTaxesPaid: number[] = []
+  const totalTaxWithheld: number[] = []
+  const totalIncomeTaxDrag: number[] = []
+  const remainingEmbeddedTaxes: number[] = []
+  const totalModeledTaxCosts: number[] = []
+  const totalGrossWithdrawalsReal: number[] = []
+  const totalNetSpendingReal: number[] = []
+  const totalTaxesPaidReal: number[] = []
+  const totalTaxWithheldReal: number[] = []
+  const totalIncomeTaxDragReal: number[] = []
+  const remainingEmbeddedTaxesReal: number[] = []
+  const totalModeledTaxCostsReal: number[] = []
 
-    const randomInt = (min: number, max: number) => {
-      const span = Math.max(1, max - min + 1)
-      return min + Math.floor(scheduleRng() * span)
-    }
+  let pathsEndingAtOrAboveGoal = 0
+  let pathsProfitable = 0
+  let pathsSolvent = 0
 
-    for (let decadeStart = 1; decadeStart <= totalSteps; decadeStart += decadeSteps) {
-      const decadeEnd = Math.min(totalSteps, decadeStart + decadeSteps - 1)
-      const eventsThisDecade = scheduleRng() < 0.7 ? 1 : 2
-      let scheduled = 0
-      let attempts = 0
+  const startingBasis = Math.max(0, startingCostBasis ?? initialValue)
+  const baseSeed = seed || 'portfolio-simulator'
 
-      while (scheduled < eventsThisDecade && attempts < 25) {
-        attempts += 1
-        const durationSteps = randomInt(minShockSteps, maxShockSteps)
-        const latestStart = Math.max(decadeStart, decadeEnd - durationSteps + 1)
-        const windowStart = randomInt(decadeStart, latestStart)
-        const windowEnd = Math.min(decadeEnd, windowStart + durationSteps - 1)
+  for (let path = 0; path < numPaths; path += 1) {
+    const random = createSeededRandom(`${baseSeed}:path:${path}`)
+    const stress = createStressSchedule(totalSteps, periods, duration, `${baseSeed}:stress:${path}`, enableCrashRisk)
 
-        let overlaps = false
-        for (let i = windowStart; i <= windowEnd; i += 1) {
-          if (multipliers[i] > 1) {
-            overlaps = true
-            break
-          }
+    let currentValue = initialValue
+    let preTaxValue = initialValue
+    let basis = startingBasis
+    let performanceBasis = initialValue
+    let currentCashflow = cashflowAmount
+    let performanceIndex = 1
+    let performancePeak = 1
+    let performanceLow = 1
+    let maxDrawdown = 0
+    let grossWithdrawn = 0
+    let netSpending = 0
+    let taxesPaid = 0
+    let taxWithheld = 0
+    let incomeTaxDrag = 0
+    let grossWithdrawnReal = 0
+    let netSpendingReal = 0
+    let taxesPaidReal = 0
+    let taxWithheldReal = 0
+    let incomeTaxDragReal = 0
+    let pathMetAllWithdrawals = true
+
+    netDistributions[0].push(netLiquidationValue({ balance: currentValue, basis, taxEnabled, taxType, taxRate }))
+    grossDistributions[0].push(isIncomeTax ? preTaxValue : currentValue)
+    cagrDistributions[0].push(0)
+    grossWithdrawalDistributions[0].push(0)
+    netSpendingDistributions[0].push(0)
+    taxPaidDistributions[0].push(0)
+    grossWithdrawalRealDistributions[0].push(0)
+    netSpendingRealDistributions[0].push(0)
+    taxPaidRealDistributions[0].push(0)
+    survivalDistributions[0].push(1)
+
+    for (let step = 1; step <= totalSteps; step += 1) {
+      const yearsElapsed = step / periods
+      const z = normalRandom(random)
+      const stressMultiplier = stress.multipliers[step]
+      const growthFactor = Math.exp(drift + diffusion * z) * stressMultiplier
+      const preTaxGrowthFactor = Math.exp(driftPreTax + diffusion * z) * stressMultiplier
+      const incomeDragDifferenceBefore = isIncomeTax ? preTaxValue - currentValue : 0
+
+      performanceIndex *= growthFactor
+      performancePeak = Math.max(performancePeak, performanceIndex)
+      performanceLow = Math.min(performanceLow, performanceIndex)
+      if (performancePeak > 0) maxDrawdown = Math.max(maxDrawdown, (performancePeak - performanceIndex) / performancePeak)
+
+      if (mode === 'growth') {
+        currentValue *= growthFactor
+        if (isIncomeTax) preTaxValue *= preTaxGrowthFactor
+
+        if (currentCashflow > 0) {
+          currentValue += currentCashflow
+          if (isIncomeTax) preTaxValue += currentCashflow
+          basis += currentCashflow
+          performanceBasis += currentCashflow
         }
-
-        if (overlaps) continue
-
-        const spike = scheduleRng() < 0.75 ? 2 : 3
-        for (let i = windowStart; i <= windowEnd; i += 1) {
-          multipliers[i] = spike
+      } else {
+        const beforeWithdrawal = currentValue
+        const grossWithdrawal = Math.min(beforeWithdrawal, currentCashflow)
+        if (grossWithdrawal + 1e-9 < currentCashflow) pathMetAllWithdrawals = false
+        let withholding = 0
+        if (taxEnabled && taxType === 'tax_deferred') withholding = grossWithdrawal * rate
+        if (taxEnabled && taxType === 'capital_gains') {
+          withholding = proportionalCapitalGainsTax(beforeWithdrawal, basis, grossWithdrawal, taxRate)
+          basis = reduceBasisProportionally(beforeWithdrawal, basis, grossWithdrawal)
         }
-        scheduled += 1
+        const netReceived = Math.max(0, grossWithdrawal - withholding)
+
+        currentValue = Math.max(0, currentValue - grossWithdrawal) * growthFactor
+        if (isIncomeTax) preTaxValue = Math.max(0, preTaxValue - Math.min(preTaxValue, grossWithdrawal)) * preTaxGrowthFactor
+
+        // Income-tax drag is measured from the no-drag comparison at the end of
+        // the path. Transaction withholding is tracked at the time it occurs.
+        grossWithdrawn += grossWithdrawal
+        netSpending += netReceived
+        taxesPaid += withholding
+        taxWithheld += withholding
+        grossWithdrawnReal += toTodaysDollars(grossWithdrawal, inflationAdjustment, yearsElapsed)
+        netSpendingReal += toTodaysDollars(netReceived, inflationAdjustment, yearsElapsed)
+        const withholdingReal = toTodaysDollars(withholding, inflationAdjustment, yearsElapsed)
+        taxesPaidReal += withholdingReal
+        taxWithheldReal += withholdingReal
       }
+
+      if (isIncomeTax) {
+        const incomeDragDifferenceAfter = preTaxValue - currentValue
+        const dragChange = incomeDragDifferenceAfter - incomeDragDifferenceBefore
+        incomeTaxDrag += dragChange
+        incomeTaxDragReal += toTodaysDollars(dragChange, inflationAdjustment, yearsElapsed)
+      }
+
+      assertFiniteResult(currentValue, 'Monte Carlo portfolio value')
+      if (isIncomeTax) assertFiniteResult(preTaxValue, 'Monte Carlo pre-tax comparison value')
+
+      const recordIndex = recordIndexByStep.get(step)
+      if (recordIndex !== undefined) {
+        const netValue = netLiquidationValue({ balance: currentValue, basis, taxEnabled, taxType, taxRate })
+        const grossValue = isIncomeTax ? preTaxValue : currentValue
+        netDistributions[recordIndex].push(netValue)
+        grossDistributions[recordIndex].push(grossValue)
+        const cagr = yearsElapsed > 0 ? Math.pow(performanceIndex, 1 / yearsElapsed) - 1 : 0
+        cagrDistributions[recordIndex].push(cagr * 100)
+        grossWithdrawalDistributions[recordIndex].push(grossWithdrawn)
+        netSpendingDistributions[recordIndex].push(netSpending)
+        taxPaidDistributions[recordIndex].push(taxesPaid + (isIncomeTax ? incomeTaxDrag : 0))
+        grossWithdrawalRealDistributions[recordIndex].push(grossWithdrawnReal)
+        netSpendingRealDistributions[recordIndex].push(netSpendingReal)
+        taxPaidRealDistributions[recordIndex].push(taxesPaidReal + (isIncomeTax ? incomeTaxDragReal : 0))
+        survivalDistributions[recordIndex].push(pathMetAllWithdrawals ? 1 : 0)
+      }
+
+      if (step % periods === 0 && !excludeInflationAdjustment) currentCashflow *= inflator
     }
 
-    return multipliers
+    const endingNet = netLiquidationValue({ balance: currentValue, basis, taxEnabled, taxType, taxRate })
+    const endingGross = isIncomeTax ? preTaxValue : currentValue
+    endingValues.push(endingNet)
+    endingValuesGross.push(endingGross)
+    maxDrawdowns.push(maxDrawdown)
+    finalPerformanceValues.push(performanceIndex)
+    lowestPerformanceValues.push(performanceLow)
+
+    if (isIncomeTax) {
+      incomeTaxDrag = Math.max(0, incomeTaxDrag)
+      incomeTaxDragReal = Math.max(0, incomeTaxDragReal)
+      taxesPaid += incomeTaxDrag
+      taxesPaidReal += incomeTaxDragReal
+    }
+
+    totalGrossWithdrawals.push(grossWithdrawn)
+    totalNetSpending.push(netSpending)
+    totalTaxesPaid.push(taxesPaid)
+    const remainingEmbeddedTax = taxType === 'income'
+      ? 0
+      : Math.max(0, endingGross - endingNet)
+    const remainingEmbeddedTaxReal = toTodaysDollars(remainingEmbeddedTax, inflationAdjustment, duration)
+
+    totalTaxWithheld.push(taxWithheld)
+    totalIncomeTaxDrag.push(incomeTaxDrag)
+    remainingEmbeddedTaxes.push(remainingEmbeddedTax)
+    totalModeledTaxCosts.push(taxesPaid + remainingEmbeddedTax)
+    totalGrossWithdrawalsReal.push(grossWithdrawnReal)
+    totalNetSpendingReal.push(netSpendingReal)
+    totalTaxesPaidReal.push(taxesPaidReal)
+    totalTaxWithheldReal.push(taxWithheldReal)
+    totalIncomeTaxDragReal.push(incomeTaxDragReal)
+    remainingEmbeddedTaxesReal.push(remainingEmbeddedTaxReal)
+    totalModeledTaxCostsReal.push(taxesPaidReal + remainingEmbeddedTaxReal)
+
+    if (portfolioGoal && endingNet >= portfolioGoal) pathsEndingAtOrAboveGoal += 1
+    if (mode === 'growth' && endingNet > performanceBasis) pathsProfitable += 1
+    if (mode === 'withdrawal' ? pathMetAllWithdrawals : currentValue > 0.01) pathsSolvent += 1
   }
 
-  const numRecordedSteps = Math.floor(totalTimeSteps / recordFrequency)
-  
-  const stepDistributions: number[][] = Array.from({ length: numRecordedSteps + 1 }, () => [])
-  const stepDistributionsGross: number[][] = Array.from({ length: numRecordedSteps + 1 }, () => [])
-  const stepCAGRs: number[][] = Array.from({ length: numRecordedSteps + 1 }, () => [])
+  const netSorted = sorted(endingValues)
+  const grossSorted = sorted(endingValuesGross)
+  const netP = percentileSet(netSorted)
+  const grossP = percentileSet(grossSorted)
 
-  const solvencySeries: { year: number, solventRate: number }[] = []
-  const deterministicSeries: { year: number, value: number }[] = []
-  const deterministicSeriesGross: { year: number, value: number }[] = []
-  
-  const deterministicYearData: Array<{
+  const chartData = netDistributions.map((values, index) => {
+    const p = percentileSet(values)
+    return { year: recordSteps[index] / periods, p10: p.p10, p25: p.p25, p50: p.p50, p75: p.p75, p90: p.p90 }
+  })
+  const chartDataGross = grossDistributions.map((values, index) => {
+    const p = percentileSet(values)
+    return { year: recordSteps[index] / periods, p10: p.p10, p25: p.p25, p50: p.p50, p75: p.p75, p90: p.p90 }
+  })
+
+  const annualReturnsData = cagrDistributions.slice(1).map((values, offset) => {
+    const s = sorted(values)
+    const p = percentileSet(s)
+    const probabilityAtLeast = (threshold: number) => values.length
+      ? values.filter((value) => value >= threshold).length / values.length * 100
+      : 0
+    return {
+      year: recordSteps[offset + 1] / periods,
+      p10: p.p10,
+      p25: p.p25,
+      median: p.p50,
+      p75: p.p75,
+      p90: p.p90,
+      prob5: probabilityAtLeast(5),
+      prob8: probabilityAtLeast(8),
+      prob10: probabilityAtLeast(10),
+      prob12: probabilityAtLeast(12),
+      prob15: probabilityAtLeast(15),
+      prob20: probabilityAtLeast(20),
+      prob25: probabilityAtLeast(25),
+      prob30: probabilityAtLeast(30),
+    }
+  })
+
+  const lossThresholds = [2.5, 5, 10, 15, 20, 30, 50]
+  const lossProbData = lossThresholds.map((threshold) => ({
+    threshold: `>= ${threshold}%`,
+    endPeriod: finalPerformanceValues.filter((value) => (1 - value) * 100 >= threshold).length / numPaths * 100,
+    intraPeriod: lowestPerformanceValues.filter((value) => (1 - value) * 100 >= threshold).length / numPaths * 100,
+  }))
+
+  const investmentData: InvestmentDataPoint[] = []
+
+  if (mode === 'growth') {
+    let scheduledCashflow = cashflowAmount
+    let cumulativeContributions = 0
+    let realContributions = 0
+    const recordSet = new Set(recordSteps)
+
+    investmentData.push({
+      year: 0,
+      initial: initialValue,
+      contributions: 0,
+      withdrawals: 0,
+      total: initialValue,
+      realInitial: initialValue,
+      realContributions: 0,
+      realWithdrawals: 0,
+      realTotal: initialValue,
+    })
+
+    for (let step = 1; step <= totalSteps; step += 1) {
+      const yearsElapsed = step / periods
+      cumulativeContributions += scheduledCashflow
+      realContributions += toTodaysDollars(scheduledCashflow, inflationAdjustment, yearsElapsed)
+
+      if (recordSet.has(step)) {
+        investmentData.push({
+          year: yearsElapsed,
+          initial: initialValue,
+          contributions: cumulativeContributions,
+          withdrawals: 0,
+          total: initialValue + cumulativeContributions,
+          realInitial: initialValue,
+          realContributions,
+          realWithdrawals: 0,
+          realTotal: initialValue + realContributions,
+        })
+      }
+
+      if (step % periods === 0 && !excludeInflationAdjustment) scheduledCashflow *= inflator
+    }
+  } else {
+    for (let index = 0; index < recordSteps.length; index += 1) {
+      const medianOf = (values: number[]) => calculatePercentile(sorted(values), 0.5)
+      const gross = medianOf(grossWithdrawalDistributions[index])
+      const spending = medianOf(netSpendingDistributions[index])
+      const tax = medianOf(taxPaidDistributions[index])
+      const grossReal = medianOf(grossWithdrawalRealDistributions[index])
+      const spendingReal = medianOf(netSpendingRealDistributions[index])
+      const taxReal = medianOf(taxPaidRealDistributions[index])
+      // Component-wise medians do not generally add exactly. For retirement
+      // cashflow presentation, derive transaction tax from the displayed gross
+      // and spendable medians so the accounting identity remains exact. Income
+      // tax drag is a portfolio-return cost rather than withdrawal withholding.
+      const withdrawalTax = Math.max(0, gross - spending)
+      const withdrawalTaxReal = Math.max(0, grossReal - spendingReal)
+      const incomeDrag = isIncomeTax ? Math.max(0, tax) : 0
+      const incomeDragReal = isIncomeTax ? Math.max(0, taxReal) : 0
+      investmentData.push({
+        year: recordSteps[index] / periods,
+        initial: initialValue,
+        contributions: 0,
+        withdrawals: gross,
+        total: initialValue,
+        realInitial: initialValue,
+        realContributions: 0,
+        realWithdrawals: grossReal,
+        realTotal: initialValue,
+        netSpending: spending,
+        realNetSpending: spendingReal,
+        withdrawalTaxes: withdrawalTax,
+        realWithdrawalTaxes: withdrawalTaxReal,
+        incomeTaxDrag: incomeDrag,
+        realIncomeTaxDrag: incomeDragReal,
+        taxesPaid: withdrawalTax + incomeDrag,
+        realTaxesPaid: withdrawalTaxReal + incomeDragReal,
+      })
+    }
+  }
+
+  const deterministic = createDeterministicPath(params, mode, recordSteps, periods)
+  const solvencySeries = mode === 'withdrawal'
+    ? survivalDistributions.map((values, index) => ({
+        year: recordSteps[index] / periods,
+        solventRate: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length * 100 : 100,
+      }))
+    : netDistributions.map((values, index) => ({
+        year: recordSteps[index] / periods,
+        solventRate: values.filter((value) => value > 0.01).length / numPaths * 100,
+      }))
+
+  const taxDragAmount = Math.max(0, mean(endingValuesGross) - mean(endingValues))
+  const sortedDrawdowns = sorted(maxDrawdowns)
+  const medianDrawdown = calculatePercentile(sortedDrawdowns, 0.5)
+  const worstDrawdown = sortedDrawdowns[sortedDrawdowns.length - 1] ?? 0
+  const spreadRatio = netP.p5 > 0 ? netP.p95 / netP.p5 : 0
+  const hasDepletion = chartData.some((point) => point.p10 <= 0 || point.p25 <= 0 || point.p50 <= 0)
+  const growthRatio = initialValue > 0 ? netP.p90 / initialValue : 0
+
+  // Retirement cashflow components are also exposed from one actual simulated
+  // path: the path whose ending spendable value is closest to the median ending
+  // value. This keeps gross withdrawals, spendable cash, transaction taxes and
+  // modeled tax drag internally reconcilable instead of mixing independent
+  // marginal medians from different paths.
+  let representativePathIndex = -1
+  if (mode === 'withdrawal' && endingValues.length > 0) {
+    let closestDistance = Number.POSITIVE_INFINITY
+    endingValues.forEach((value, index) => {
+      const distance = Math.abs(value - netP.p50)
+      if (distance < closestDistance) {
+        closestDistance = distance
+        representativePathIndex = index
+      }
+    })
+  }
+
+  const representativeCashflowBreakdown = representativePathIndex >= 0
+    ? {
+        basis: 'path-closest-to-median-ending-value' as const,
+        endingValue: endingValues[representativePathIndex],
+        endingValueGross: endingValuesGross[representativePathIndex],
+        grossWithdrawn: totalGrossWithdrawals[representativePathIndex],
+        netSpending: totalNetSpending[representativePathIndex],
+        withdrawalTaxes: totalTaxWithheld[representativePathIndex],
+        incomeTaxDrag: totalIncomeTaxDrag[representativePathIndex],
+        taxesPaid: totalTaxesPaid[representativePathIndex],
+        remainingEmbeddedTax: remainingEmbeddedTaxes[representativePathIndex],
+        totalTaxCost: totalModeledTaxCosts[representativePathIndex],
+        grossWithdrawnInTodaysDollars: totalGrossWithdrawalsReal[representativePathIndex],
+        netSpendingInTodaysDollars: totalNetSpendingReal[representativePathIndex],
+        withdrawalTaxesInTodaysDollars: totalTaxWithheldReal[representativePathIndex],
+        incomeTaxDragInTodaysDollars: totalIncomeTaxDragReal[representativePathIndex],
+        taxesPaidInTodaysDollars: totalTaxesPaidReal[representativePathIndex],
+        remainingEmbeddedTaxInTodaysDollars: remainingEmbeddedTaxesReal[representativePathIndex],
+        totalTaxCostInTodaysDollars: totalModeledTaxCostsReal[representativePathIndex],
+      }
+    : null
+
+  return {
+    endingValues,
+    endingValuesGross,
+    maxDrawdowns,
+    annualReturnsData,
+    lossProbData,
+    investmentData,
+    chartData,
+    chartDataGross,
+    solvencySeries,
+    deterministicSeries: deterministic.netSeries,
+    deterministicSeriesGross: deterministic.grossSeries,
+    deterministicYearData: deterministic.yearData,
+    representativeCashflowBreakdown,
+    taxDragAmount,
+    totalTaxWithheld: mode === 'withdrawal'
+      ? calculatePercentile(sorted(totalTaxWithheld), 0.5)
+      : 0,
+    totalTaxWithheldInTodaysDollars: mode === 'withdrawal'
+      ? calculatePercentile(sorted(totalTaxWithheldReal), 0.5)
+      : 0,
+    totalTaxDrag: mode === 'withdrawal'
+      ? calculatePercentile(sorted(totalIncomeTaxDrag), 0.5)
+      : taxDragAmount,
+    totalTaxDragInTodaysDollars: mode === 'withdrawal'
+      ? calculatePercentile(sorted(totalIncomeTaxDragReal), 0.5)
+      : (isIncomeTax ? mean(totalIncomeTaxDragReal) : 0),
+    remainingEmbeddedTax: mode === 'withdrawal'
+      ? calculatePercentile(sorted(remainingEmbeddedTaxes), 0.5)
+      : (isIncomeTax ? 0 : taxDragAmount),
+    remainingEmbeddedTaxInTodaysDollars: mode === 'withdrawal'
+      ? calculatePercentile(sorted(remainingEmbeddedTaxesReal), 0.5)
+      : (isIncomeTax ? 0 : toTodaysDollars(taxDragAmount, inflationAdjustment, duration)),
+    totalTaxCost: mode === 'withdrawal'
+      ? calculatePercentile(sorted(totalModeledTaxCosts), 0.5)
+      : taxDragAmount,
+    totalTaxCostInTodaysDollars: mode === 'withdrawal'
+      ? calculatePercentile(sorted(totalModeledTaxCostsReal), 0.5)
+      : (isIncomeTax ? mean(totalIncomeTaxDragReal) : toTodaysDollars(taxDragAmount, inflationAdjustment, duration)),
+    medianGrossWithdrawn: calculatePercentile(sorted(totalGrossWithdrawals), 0.5),
+    medianNetSpending: calculatePercentile(sorted(totalNetSpending), 0.5),
+    medianTaxesPaid: calculatePercentile(sorted(totalTaxesPaid), 0.5),
+    medianGrossWithdrawnInTodaysDollars: calculatePercentile(sorted(totalGrossWithdrawalsReal), 0.5),
+    medianNetSpendingInTodaysDollars: calculatePercentile(sorted(totalNetSpendingReal), 0.5),
+    medianTaxesPaidInTodaysDollars: calculatePercentile(sorted(totalTaxesPaidReal), 0.5),
+    mean: mean(endingValues),
+    meanGross: mean(endingValuesGross),
+    median: netP.p50,
+    medianGross: grossP.p50,
+    p5: netP.p5,
+    p5Gross: grossP.p5,
+    p10: netP.p10,
+    p10Gross: grossP.p10,
+    p25: netP.p25,
+    p25Gross: grossP.p25,
+    p75: netP.p75,
+    p75Gross: grossP.p75,
+    p90: netP.p90,
+    p90Gross: grossP.p90,
+    p95: netP.p95,
+    p95Gross: grossP.p95,
+    best: netSorted[netSorted.length - 1] ?? 0,
+    bestGross: grossSorted[grossSorted.length - 1] ?? 0,
+    worst: netSorted[0] ?? 0,
+    worstGross: grossSorted[0] ?? 0,
+    endingAtOrAboveGoalProbability: portfolioGoal ? pathsEndingAtOrAboveGoal / numPaths * 100 : 0,
+    pathsEndingAtOrAboveGoal,
+    profitableRate: mode === 'growth' ? pathsProfitable / numPaths * 100 : 0,
+    solventRate: pathsSolvent / numPaths * 100,
+    numPathsUsed: numPaths,
+    recommendLogLinear: !hasDepletion && growthRatio > 20,
+    recommendLogHistogram: spreadRatio > 15,
+    recommendLogDrawdown: medianDrawdown < 0.1 && worstDrawdown > 0.6,
+    portfolioGoalSnapshot: portfolioGoal,
+    performanceBasisAtEnd: investmentData[investmentData.length - 1]?.total ?? initialValue,
+    hasDepletion,
+    engine: 'audited-cpu-float64',
+  }
+}
+
+export type SimulationResults = ReturnType<typeof performMonteCarloSimulation>
+
+function createDeterministicPath(
+  params: SimulationParams,
+  mode: 'growth' | 'withdrawal',
+  recordSteps: number[],
+  periods: number,
+) {
+  const afterTaxReturnPct = annualReturnAfterIncomeTaxDrag(
+    params.expectedReturn,
+    params.taxEnabled,
+    params.taxType,
+    params.taxRate,
+  )
+  const afterTaxAnnual = effectiveAnnualReturnFromInput(afterTaxReturnPct, periods, params.calculationMode)
+  const grossAnnual = effectiveAnnualReturnFromInput(params.expectedReturn, periods, params.calculationMode)
+  const netGrowth = Math.pow(1 + afterTaxAnnual, 1 / periods)
+  const grossGrowth = Math.pow(1 + grossAnnual, 1 / periods)
+  const inflator = inflationFactor(params.inflationAdjustment)
+  const taxRate = normalizeTaxRate(params.taxRate)
+  const startingBasis = Math.max(0, params.startingCostBasis ?? params.initialValue)
+  const totalSteps = Math.max(1, Math.round(params.duration * periods))
+  const recordSet = new Set(recordSteps)
+
+  let balance = params.initialValue
+  let grossComparison = params.initialValue
+  let basis = startingBasis
+  let cashflow = params.cashflowAmount
+  let yearStartGross = balance
+  let yearGrossWithdrawals = 0
+  let yearNetIncome = 0
+  let yearTax = 0
+  let allScheduledWithdrawalsFulfilled = true
+
+  const netSeries: Array<{ year: number; value: number }> = [
+    { year: 0, value: netLiquidationValue({ balance, basis, taxEnabled: params.taxEnabled, taxType: params.taxType, taxRate: params.taxRate }) },
+  ]
+  const grossSeries: Array<{ year: number; value: number }> = [{ year: 0, value: grossComparison }]
+  const yearData: Array<{
     year: number
     startingBalance: number
     withdrawals: number
@@ -194,479 +679,57 @@ export function performMonteCarloSimulation(
     isSustainable: boolean
   }> = []
 
-  const endingValues: number[] = []
-  const preTaxEndingValues: number[] = [] 
-  const maxDrawdowns: number[] = []
-  const lowestValues: number[] = [] 
-
-  const clampedStartingCostBasis = Math.max(0, startingCostBasis ?? initialValue)
-
-  function getNetLiquidationValue(balance: number, basis: number): number {
-    if (!taxEnabled) return balance
-    if (taxType === 'income') return balance
-    if (taxType === 'tax_deferred') {
-      return balance * (1 - (taxRate / 100))
-    }
-    if (taxType === 'capital_gains') {
-      const profitForTax = balance - basis
-      if (profitForTax > 0) {
-        return balance - (profitForTax * (taxRate / 100))
-      }
-      return balance
-    }
-    return balance
-  }
-
-  let pathsReachingGoal = 0
-  let pathsProfitable = 0 
-  let pathsSolvent = 0 
-
-  // --- DETERMINISTIC PATH CALCULATION ---
-  let detValue = initialValue
-  let detBasis = clampedStartingCostBasis 
-  let detCashflow = cashflowPerStep
-  const detStepRate = Math.pow(1 + r, dt) - 1
-
-  let detYearStartBalance = initialValue
-  let detYearWithdrawals = 0
-  let detYearNetIncome = 0
-  let detYearTaxPaid = 0
-
-  deterministicSeries.push({ year: 0, value: getNetLiquidationValue(initialValue, detBasis) })
-  deterministicSeriesGross.push({ year: 0, value: initialValue })
-  
-  for (let step = 1; step <= totalTimeSteps; step++) {
-    let stepTaxPaid = 0
-    let stepWithdrawal = 0
-    let stepNet = 0 // Initialize to 0
-
-    if (mode === 'withdrawal') {
-       stepWithdrawal = detCashflow
-       stepNet = detCashflow // Default
-       
-       if (taxEnabled && taxType !== 'income') {
-         if (taxType === 'tax_deferred') {
-             // Gross Input
-             stepWithdrawal = detCashflow
-             stepTaxPaid = detCashflow * (taxRate / 100)
-             stepNet = stepWithdrawal - stepTaxPaid
-         } else {
-             // Capital Gains
-             const gainFraction = detValue > detBasis ? (detValue - detBasis) / detValue : 0
-             let effectiveTaxRate = (taxRate / 100) * gainFraction
-             if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99
-             
-             stepWithdrawal = detCashflow
-             stepTaxPaid = stepWithdrawal * effectiveTaxRate
-             stepNet = stepWithdrawal - stepTaxPaid
-         }
-       }
-
-       if (stepWithdrawal > detValue) {
-           const ratio = detValue / (stepWithdrawal || 1)
-           stepWithdrawal = detValue
-           stepNet = stepNet * ratio
-           stepTaxPaid = stepTaxPaid * ratio
-       }
-
-       if (taxType !== 'tax_deferred') {
-          if (detValue > 0) {
-            detBasis = detBasis * (1 - (stepWithdrawal / detValue))
-          }
-       }
-
-       detValue -= stepWithdrawal
-       detValue = Math.max(0, detValue)
-       
-       detYearWithdrawals += stepWithdrawal
-       detYearNetIncome += stepNet
-       detYearTaxPaid += stepTaxPaid
-       
-       // Apply Growth
-       const valueBeforeGrowth = detValue
-       detValue = detValue * (1 + detStepRate)
-
-       // If Income Tax, apply drag
-       if (taxEnabled && taxType === 'income') {
-           const growth = detValue - valueBeforeGrowth
-           let t = taxRate / 100
-           if (t >= 0.99) t = 0.99
-           const drag = growth * (t / (1 - t))
-           detYearTaxPaid += drag
-       }
-
+  for (let step = 1; step <= totalSteps; step += 1) {
+    if (mode === 'growth') {
+      balance *= netGrowth
+      grossComparison *= grossGrowth
+      balance += cashflow
+      grossComparison += cashflow
+      basis += cashflow
     } else {
-       // Growth Mode
-       detValue = detValue * (1 + detStepRate)
-       detValue += detCashflow
-       detBasis += detCashflow
+      const before = balance
+      const grossWithdrawal = Math.min(balance, cashflow)
+      if (grossWithdrawal + 1e-9 < cashflow) allScheduledWithdrawalsFulfilled = false
+      let tax = 0
+      if (params.taxEnabled && params.taxType === 'tax_deferred') tax = grossWithdrawal * taxRate
+      if (params.taxEnabled && params.taxType === 'capital_gains') {
+        tax = proportionalCapitalGainsTax(before, basis, grossWithdrawal, params.taxRate)
+        basis = reduceBasisProportionally(before, basis, grossWithdrawal)
+      }
+      balance = Math.max(0, balance - grossWithdrawal) * netGrowth
+      grossComparison = Math.max(0, grossComparison - Math.min(grossComparison, grossWithdrawal)) * grossGrowth
+      yearGrossWithdrawals += grossWithdrawal
+      yearNetIncome += grossWithdrawal - tax
+      yearTax += tax
     }
 
-    if (step % recordFrequency === 0) {
-      deterministicSeries.push({ 
-        year: step / timeStepsPerYear, 
-        value: getNetLiquidationValue(detValue, detBasis) 
+    if (recordSet.has(step)) {
+      netSeries.push({
+        year: step / periods,
+        value: netLiquidationValue({ balance, basis, taxEnabled: params.taxEnabled, taxType: params.taxType, taxRate: params.taxRate }),
       })
-      deterministicSeriesGross.push({
-        year: step / timeStepsPerYear,
-        value: detValue
-      })
+      grossSeries.push({ year: step / periods, value: params.taxType === 'income' && params.taxEnabled ? grossComparison : balance })
     }
-    
-    if (step % timeStepsPerYear === 0) {
-        if (mode === 'withdrawal') {
-            deterministicYearData.push({
-                year: step / timeStepsPerYear,
-                startingBalance: detYearStartBalance,
-                withdrawals: detYearWithdrawals,
-                netIncome: detYearNetIncome,
-                taxPaid: detYearTaxPaid,
-                endingBalance: getNetLiquidationValue(detValue, detBasis),
-                isSustainable: detValue > 0
-            })
-            detYearStartBalance = getNetLiquidationValue(detValue, detBasis)
-            detYearWithdrawals = 0
-            detYearNetIncome = 0
-            detYearTaxPaid = 0
-        }
 
-        if (!excludeInflationAdjustment) {
-            detCashflow *= inflationFactor
-        }
-    }
-  }
-
-  // --- END DETERMINISTIC ---
-
-  for (let path = 0; path < numPaths; path++) {
-    let currentValue = initialValue
-    let pureValue = initialValue 
-    let lowestValue = initialValue
-    let currentCashflowPerStep = cashflowPerStep
-    let totalInvestedSoFar = clampedStartingCostBasis
-    let totalBasis = clampedStartingCostBasis 
-    let peak = getNetLiquidationValue(currentValue, totalBasis)
-    let maxDrawdownForPath = 0
-    let preTaxValue = initialValue 
-    const crashSchedule = enableCrashRisk
-      ? createCrashSchedule(totalTimeSteps, timeStepsPerYear, seedrandom(`${seed ?? 'monte-carlo'}-shock-${path}`))
-      : null
-
-    stepDistributions[0].push(getNetLiquidationValue(currentValue, totalBasis))
-    stepDistributionsGross[0].push(currentValue)
-    stepCAGRs[0].push(0)
-
-    for (let step = 1; step <= totalTimeSteps; step++) {
-      const z = normalRandom()
-      const shockMultiplier = crashSchedule ? crashSchedule[step] : 1
-      const adjustedDiffusion = diffusion * shockMultiplier
-      const growthFactor = Math.exp(drift + adjustedDiffusion * z)
-      const growthFactorPreTax = isIncomeTax ? Math.exp(driftPreTax + adjustedDiffusion * z) : 0
-      pureValue = pureValue * growthFactor 
-
+    if (step % periods === 0 || step === totalSteps) {
       if (mode === 'withdrawal') {
-        let stepWithdrawal = currentCashflowPerStep
-
-        if (taxEnabled && taxType !== 'income') {
-            if (taxType === 'tax_deferred') {
-                stepWithdrawal = currentCashflowPerStep
-            } else {
-                const gainFraction = currentValue > totalBasis ? (currentValue - totalBasis) / currentValue : 0
-                let effectiveTaxRate = (taxRate / 100) * gainFraction
-                if (effectiveTaxRate >= 0.99) effectiveTaxRate = 0.99
-                stepWithdrawal = currentCashflowPerStep
-            }
-        }
-
-        if (stepWithdrawal > currentValue) stepWithdrawal = currentValue
-
-        if (taxType !== 'tax_deferred') {
-            if (currentValue > 0) {
-              totalBasis = totalBasis * (1 - (stepWithdrawal / currentValue))
-            }
-        }
-
-        currentValue -= stepWithdrawal
-        currentValue = Math.max(0, currentValue)
-        currentValue = currentValue * growthFactor
-
-        if (isIncomeTax) {
-          let preTaxWithdrawal = stepWithdrawal
-          if (preTaxWithdrawal > preTaxValue) preTaxWithdrawal = preTaxValue
-          preTaxValue -= preTaxWithdrawal
-          preTaxValue = Math.max(0, preTaxValue)
-          preTaxValue = preTaxValue * growthFactorPreTax
-        }
-        
-      } else {
-        currentValue = currentValue * growthFactor
-        currentValue += currentCashflowPerStep
-        totalInvestedSoFar += currentCashflowPerStep
-
-        if (isIncomeTax) {
-          preTaxValue = preTaxValue * growthFactorPreTax
-          preTaxValue += currentCashflowPerStep
-        }
+        yearData.push({
+          year: step / periods,
+          startingBalance: yearStartGross,
+          withdrawals: yearGrossWithdrawals,
+          netIncome: yearNetIncome,
+          taxPaid: yearTax,
+          endingBalance: netLiquidationValue({ balance, basis, taxEnabled: params.taxEnabled, taxType: params.taxType, taxRate: params.taxRate }),
+          isSustainable: allScheduledWithdrawalsFulfilled,
+        })
+        yearStartGross = balance
+        yearGrossWithdrawals = 0
+        yearNetIncome = 0
+        yearTax = 0
       }
-
-      const basisForNet = mode === 'growth' ? totalInvestedSoFar : totalBasis
-      const netValue = getNetLiquidationValue(currentValue, basisForNet)
-
-      if (netValue < lowestValue) lowestValue = netValue
-      if (netValue > peak) peak = netValue
-      if (peak > 0) {
-        const dd = (peak - netValue) / peak
-        if (dd > maxDrawdownForPath) maxDrawdownForPath = dd
-      }
-
-      if (step % recordFrequency === 0) {
-        const recordIndex = step / recordFrequency
-        stepDistributions[recordIndex].push(netValue)
-        stepDistributionsGross[recordIndex].push(currentValue)
-        const timeInYears = step / timeStepsPerYear
-        // Use pureValue for CAGR (matches GPU logic)
-        const cagr = Math.pow(pureValue / initialValue, 1 / timeInYears) - 1
-        stepCAGRs[recordIndex].push(cagr * 100)
-      }
-
-      if (step % timeStepsPerYear === 0 && !excludeInflationAdjustment) {
-        currentCashflowPerStep *= inflationFactor
-      }
-    }
-
-    let finalValueEffective = currentValue
-    let finalValuePreTax = isIncomeTax ? preTaxValue : currentValue 
-
-    if (mode === 'growth' && taxEnabled) {
-        if (taxType === 'capital_gains') {
-            const profit = currentValue - totalInvestedSoFar
-            if (profit > 0) {
-                finalValueEffective = currentValue - (profit * (taxRate / 100))
-            }
-        } else if (taxType === 'tax_deferred') {
-            finalValueEffective = currentValue * (1 - (taxRate / 100))
-        }
-    }
-
-    endingValues.push(finalValueEffective)
-    preTaxEndingValues.push(finalValuePreTax)
-    lowestValues.push(lowestValue)
-    maxDrawdowns.push(maxDrawdownForPath)
-
-    if (portfolioGoal && finalValueEffective >= portfolioGoal) pathsReachingGoal++
-    if (finalValueEffective > totalInvestedSoFar) pathsProfitable++
-    if (finalValueEffective > 0) pathsSolvent++ 
-  }
-
-  // --- SOLVENCY SERIES ---
-  stepDistributions.forEach((stepValues, index) => {
-    const solventCount = stepValues.filter(v => v > 0.01).length 
-    const rate = (solventCount / numPaths) * 100
-    const stepNumber = index * recordFrequency
-    solvencySeries.push({
-      year: stepNumber / timeStepsPerYear,
-      solventRate: rate
-    })
-  })
-
-  // ... (Stats Calculation omitted for brevity) ...
-  const sortedEndingValues = [...endingValues].sort((a, b) => a - b)
-  const sortedPreTaxEndingValues = [...preTaxEndingValues].sort((a, b) => a - b)
-  const annualReturnsData = []
-  
-  for (let i = 1; i <= numRecordedSteps; i++) {
-     const cagrs = stepCAGRs[i]
-     cagrs.sort((a, b) => a - b)
-     const probOf = (threshold: number) => (cagrs.filter(v => v >= threshold).length / numPaths) * 100
-
-     const currentStepNumber = i * recordFrequency
-     const yearValue = currentStepNumber / timeStepsPerYear
-     annualReturnsData.push({
-      year: yearValue,
-      p10: calculatePercentile(cagrs, 0.1),
-      p25: calculatePercentile(cagrs, 0.25),
-      median: calculatePercentile(cagrs, 0.5),
-      p75: calculatePercentile(cagrs, 0.75),
-      p90: calculatePercentile(cagrs, 0.9),
-      prob5: probOf(5), prob8: probOf(8), prob10: probOf(10), prob12: probOf(12), prob15: probOf(15), prob20: probOf(20), prob25: probOf(25), prob30: probOf(30)
-    })
-  }
-
-  // FIXED: Explicitly typed investmentData
-  const investmentData: {
-    year: number
-    initial: number
-    contributions: number
-    total: number
-  }[] = []
-
-  let simInvInitial = initialValue
-  let simInvContrib = 0
-  let simChartCashflow = mode === 'growth' ? cashflowPerStep : 0
-
-  investmentData.push({
-    year: 0,
-    initial: simInvInitial,
-    contributions: 0,
-    total: simInvInitial,
-  })
-
-  for (let step = 1; step <= totalTimeSteps; step++) {
-    simInvContrib += simChartCashflow
-
-    if (step % recordFrequency === 0) {
-      investmentData.push({
-        year: step / timeStepsPerYear,
-        initial: simInvInitial,
-        contributions: simInvContrib,
-        total: simInvInitial + simInvContrib,
-      })
-    }
-    if (step % timeStepsPerYear === 0) {
-      simChartCashflow *= inflationFactor
+      if (!params.excludeInflationAdjustment && step < totalSteps) cashflow *= inflator
     }
   }
 
-  // FIXED: Explicitly typed lossProbData
-  const lossThresholds = [0, 2.5, 5, 10, 15, 20, 30, 50]
-  const lossProbData: {
-    threshold: string
-    endPeriod: number
-    intraPeriod: number
-  }[] = lossThresholds.map((threshold) => {
-    const countEnd = endingValues.filter((val) => {
-      if (val >= initialValue) return false
-      const lossPct = ((initialValue - val) / initialValue) * 100
-      return lossPct >= threshold
-    }).length
-
-    const countIntra = lowestValues.filter((val) => {
-      const lossPct = ((initialValue - val) / initialValue) * 100
-      return lossPct >= threshold
-    }).length
-
-    return {
-      threshold: `>= ${threshold}%`,
-      endPeriod: (countEnd / numPaths) * 100,
-      intraPeriod: (countIntra / numPaths) * 100,
-    }
-  })
-
-  // Tax Drag Calc
-  const mean = endingValues.reduce((sum, val) => sum + val, 0) / numPaths
-  const meanPreTax = preTaxEndingValues.reduce((sum, val) => sum + val, 0) / numPaths
-  let taxDragAmount = 0
-  
-  if (taxEnabled && mode === 'growth') {
-    taxDragAmount = meanPreTax - mean
-  }
-  
-  const median = calculatePercentile(sortedEndingValues, 0.5)
-  const medianGross = calculatePercentile(sortedPreTaxEndingValues, 0.5)
-  const p5 = calculatePercentile(sortedEndingValues, 0.05)
-  const p10 = calculatePercentile(sortedEndingValues, 0.1)
-  const p25 = calculatePercentile(sortedEndingValues, 0.25)
-  const p75 = calculatePercentile(sortedEndingValues, 0.75)
-  const p90 = calculatePercentile(sortedEndingValues, 0.9)
-  const p95 = calculatePercentile(sortedEndingValues, 0.95)
-  const p5Gross = calculatePercentile(sortedPreTaxEndingValues, 0.05)
-  const p10Gross = calculatePercentile(sortedPreTaxEndingValues, 0.1)
-  const p25Gross = calculatePercentile(sortedPreTaxEndingValues, 0.25)
-  const p75Gross = calculatePercentile(sortedPreTaxEndingValues, 0.75)
-  const p90Gross = calculatePercentile(sortedPreTaxEndingValues, 0.9)
-  const p95Gross = calculatePercentile(sortedPreTaxEndingValues, 0.95)
-  const best = sortedEndingValues[numPaths - 1]
-  const worst = sortedEndingValues[0]
-  const bestGross = sortedPreTaxEndingValues[numPaths - 1]
-  const worstGross = sortedPreTaxEndingValues[0]
-
-  const chartData = stepDistributions.map((values, index) => {
-    const sortedPeriodValues = [...values].sort((a, b) => a - b)
-    const stepNumber = index * recordFrequency
-    const yearValue = stepNumber / timeStepsPerYear
-    return {
-      year: yearValue,
-      p10: calculatePercentile(sortedPeriodValues, 0.1),
-      p25: calculatePercentile(sortedPeriodValues, 0.25),
-      p50: calculatePercentile(sortedPeriodValues, 0.5),
-      p75: calculatePercentile(sortedPeriodValues, 0.75),
-      p90: calculatePercentile(sortedPeriodValues, 0.9),
-    }
-  })
-
-  const chartDataGross = stepDistributionsGross.map((values, index) => {
-    const sortedPeriodValues = [...values].sort((a, b) => a - b)
-    const stepNumber = index * recordFrequency
-    const yearValue = stepNumber / timeStepsPerYear
-    return {
-      year: yearValue,
-      p10: calculatePercentile(sortedPeriodValues, 0.1),
-      p25: calculatePercentile(sortedPeriodValues, 0.25),
-      p50: calculatePercentile(sortedPeriodValues, 0.5),
-      p75: calculatePercentile(sortedPeriodValues, 0.75),
-      p90: calculatePercentile(sortedPeriodValues, 0.9),
-    }
-  })
-
-
-  const spreadRatio = p95 > 0 && p5 > 0 ? p95 / p5 : 0
-  const totalRatio = best > 0 && worst > 0 ? best / worst : 0
-  const recommendLogHistogram = spreadRatio > 15 || totalRatio > 50
-  const growthRatio = p90 > 0 && initialValue > 0 ? p90 / initialValue : 0
-  const recommendLogLinear = growthRatio > 20
-  const sortedMaxDrawdowns = [...maxDrawdowns].sort((a, b) => a - b)
-  const medianDrawdown = calculatePercentile(sortedMaxDrawdowns, 0.5)
-  const worstDrawdown = Math.max(...maxDrawdowns)
-  const recommendLogDrawdown = medianDrawdown < 0.1 && worstDrawdown > 0.6
-  const goalProbability = portfolioGoal ? (pathsReachingGoal / numPaths) * 100 : 0
-  const profitableRate = (pathsProfitable / numPaths) * 100
-  const solventRate = (pathsSolvent / numPaths) * 100
-
-  return {
-    endingValues,
-    endingValuesGross: preTaxEndingValues,
-    maxDrawdowns,
-    annualReturnsData,
-    lossProbData,
-    investmentData,
-    chartData,
-    chartDataGross,
-    solvencySeries,
-    deterministicSeries,
-    deterministicSeriesGross,
-    deterministicYearData, 
-    taxDragAmount,
-    totalTaxWithheld: 0,
-    totalTaxDrag: taxDragAmount,
-    totalTaxCost: taxDragAmount,
-    mean,
-    meanGross: meanPreTax,
-    median,
-    medianGross,
-    p5,
-    p5Gross,
-    p10,
-    p10Gross,
-    p25,
-    p25Gross,
-    p75,
-    p75Gross,
-    p90,
-    p90Gross,
-    p95,
-    p95Gross,
-    best,
-    bestGross,
-    worst,
-    worstGross,
-    goalProbability,
-    pathsReachingGoal,
-    profitableRate,
-    solventRate,
-    numPathsUsed: numPaths,
-    recommendLogLinear,
-    recommendLogHistogram,
-    recommendLogDrawdown,
-    portfolioGoalSnapshot: portfolioGoal,
-  }
+  return { netSeries, grossSeries, yearData }
 }
