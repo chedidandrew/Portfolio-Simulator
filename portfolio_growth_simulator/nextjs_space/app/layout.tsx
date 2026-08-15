@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import './mobile-chart-tooltips.css'
 import 'katex/dist/katex.min.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import Script from 'next/script'
