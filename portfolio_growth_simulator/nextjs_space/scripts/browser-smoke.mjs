@@ -97,6 +97,32 @@ try {
     'Mobile chart tooltip must stay within the iPhone-width viewport.',
   )
 
+  const annualReturnDescription = annualReturnCard
+    .locator('p')
+    .filter({ hasText: 'Shows the expected compound annual return' })
+    .first()
+  const probabilityHeading = mobilePage.getByText('Probability of Returns', { exact: true })
+  const probabilityCard = probabilityHeading.locator(
+    'xpath=ancestor::div[.//div[contains(@class, "recharts-responsive-container")]][1]',
+  )
+
+  const [descriptionBox, annualCardBox, probabilityCardBox] = await Promise.all([
+    annualReturnDescription.boundingBox(),
+    annualReturnCard.boundingBox(),
+    probabilityCard.boundingBox(),
+  ])
+  assert.ok(descriptionBox, 'Expected the annual return graph description to be measurable.')
+  assert.ok(annualCardBox, 'Expected the annual return card to be measurable.')
+  assert.ok(probabilityCardBox, 'Expected the probability card to be measurable.')
+  assert.ok(
+    tooltipBox.y + tooltipBox.height <= descriptionBox.y + 1,
+    `Mobile tooltip must sit between chart and description: tooltip bottom=${tooltipBox.y + tooltipBox.height}, description top=${descriptionBox.y}`,
+  )
+  assert.ok(
+    annualCardBox.y + annualCardBox.height <= probabilityCardBox.y + 1,
+    `Adjacent graph cards must not overlap: annual card bottom=${annualCardBox.y + annualCardBox.height}, probability card top=${probabilityCardBox.y}`,
+  )
+
   await mobilePage.mouse.move(4, 4)
 
   await mobilePage.evaluate(() => {
