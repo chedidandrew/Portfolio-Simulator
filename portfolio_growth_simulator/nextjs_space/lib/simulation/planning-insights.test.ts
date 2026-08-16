@@ -132,12 +132,13 @@ test('withdrawal engine records exact depletion timing and horizon survival', ()
     inflationAdjustment: 0,
     numPaths: 10,
   }, 'withdrawal', 'depletion-timing-seed')
+  const finalSolvencyPoint = results.solvencySeries[results.solvencySeries.length - 1]
 
   assert.deepEqual(results.depletionYears, Array(10).fill(2))
   assert.equal(results.medianDepletionYear, 2)
   assert.equal(results.neverDepletedRate, 0)
   assert.equal(results.survivalRate, 0)
-  assert.equal(results.solvencySeries.at(-1)?.solventRate, 0)
+  assert.equal(finalSolvencyPoint?.solventRate, 0)
 })
 
 test('drawdown duration summary separates recovery from unrecovered scenarios', () => {
