@@ -24,6 +24,12 @@ import { validateWithdrawalStateRange } from '@/lib/simulation/deterministic-val
 import { MONTE_CARLO_SWITCH_LABELS } from '@/lib/accessibility-labels'
 import { DEFAULT_WITHDRAWAL_STATE } from '@/lib/default-states'
 import { buildShareUrl as buildVersionedShareUrl, cleanShareDataFromUrl } from '@/lib/share-links'
+import {
+  clearPendingRetirementPlanTransfer,
+  consumePendingRetirementPlanTransfer,
+  subscribeRetirementPlanTransfer,
+  type RetirementPlanTransfer,
+} from '@/lib/retirement-plan-transfer'
 
 export { DEFAULT_WITHDRAWAL_STATE } from '@/lib/default-states'
 
@@ -40,43 +46,33 @@ export function WithdrawalMode({ sharedPayload }: { sharedPayload?: SharePayload
   const [useMonteCarloMode, setUseMonteCarloMode] = useLocalStorage('withdrawal-show-monte-carlo', false)
   const [showFullPrecision, setShowFullPrecision] = useLocalStorage('withdrawal-show-full-precision', false)
 
-  // NEW: MC state restored from URL (passed into MonteCarloSimulator)
   const [initialRngSeed, setInitialRngSeed] = useState<string | null>(null)
   const [initialMCParams, setInitialMCParams] = useState<SimulationParams | undefined>(undefined)
-
   const [initialLogScales, setInitialLogScales] = useState<SharePayload['logScales'] | undefined>(undefined)
   const [initialMCShowFullPrecision, setInitialMCShowFullPrecision] = useState<boolean | undefined>(undefined)
 
   const calculationState = useWithdrawalCalculation(state)
   const calculation = calculationState.result
 
-  // Listen for the event dispatched by app/page.tsx
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const applySharedPayload = (decoded: SharePayload) => {
       if (decoded?.mode !== 'withdrawal') return
 
-      // 1) Restore deterministic params (supports new and old keys)
       const loadedParams = decoded.deterministicParams || decoded.params
       if (loadedParams && 'periodicWithdrawal' in loadedParams) setState(loadedParams)
 
-      // Restore precision toggle if present
-      if (typeof decoded.showFullPrecision === 'boolean') {
-        setShowFullPrecision(decoded.showFullPrecision)
-      }
+      if (typeof decoded.showFullPrecision === 'boolean') setShowFullPrecision(decoded.showFullPrecision)
 
-      // 2) Branch on link type
       if (decoded.type === 'deterministic') {
         setUseMonteCarloMode(false)
       } else {
-        // 3) Monte Carlo link: enable MC and restore MC inputs
         setUseMonteCarloMode(true)
         if (decoded.rngSeed) setInitialRngSeed(decoded.rngSeed)
         if (decoded.mcParams) setInitialMCParams(decoded.mcParams)
       }
-      
-      // Clean URL
+
       window.history.replaceState(null, '', cleanShareDataFromUrl(window.location.href))
     }
 
@@ -86,7 +82,6 @@ export function WithdrawalMode({ sharedPayload }: { sharedPayload?: SharePayload
 
     if (sharedPayload) applySharedPayload(sharedPayload)
 
-    // Check on mount if we already have the payload in URL (direct load)
     try {
       const search = new URLSearchParams(window.location.search)
       const mcParam = search.get('mc')
@@ -101,6 +96,22 @@ export function WithdrawalMode({ sharedPayload }: { sharedPayload?: SharePayload
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sharedPayload, setInitialMCParams, setInitialMCShowFullPrecision, setInitialRngSeed, setInitialLogScales, setShowFullPrecision, setState, setUseMonteCarloMode])
 
+  useEffect(() => {
+    const applyTransfer = (transfer: RetirementPlanTransfer) => {
+      setState(transfer.state)
+      setUseMonteCarloMode(true)
+      setInitialLogScales(undefined)
+      setInitialMCShowFullPrecision(false)
+      setInitialMCParams(transfer.params)
+      setInitialRngSeed(transfer.seed)
+      clearPendingRetirementPlanTransfer(transfer.requestId)
+    }
+
+    const pending = consumePendingRetirementPlanTransfer()
+    if (pending) applyTransfer(pending)
+    return subscribeRetirementPlanTransfer(applyTransfer)
+  }, [setState, setUseMonteCarloMode])
+
   const buildShareUrl = () => {
     if (typeof window === 'undefined') return ''
     const url = new URL(window.location.href)
@@ -109,7 +120,7 @@ export function WithdrawalMode({ sharedPayload }: { sharedPayload?: SharePayload
       mode: 'withdrawal',
       type: useMonteCarloMode ? 'monte-carlo' : 'deterministic',
       deterministicParams: state,
-      params: state, // legacy compatibility
+      params: state,
       showFullPrecision,
     }
 
@@ -124,11 +135,7 @@ export function WithdrawalMode({ sharedPayload }: { sharedPayload?: SharePayload
     try {
       const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
       if (canNativeShare) {
-        await navigator.share({
-          title: 'Portfolio Simulator',
-          text: 'Take a look at my portfolio results',
-          url,
-        })
+        await navigator.share({ title: 'Portfolio Simulator', text: 'Take a look at my portfolio results', url })
         return
       }
 
@@ -157,15 +164,13 @@ export function WithdrawalMode({ sharedPayload }: { sharedPayload?: SharePayload
 
     const { buildWithdrawalWorkbook } = await import('@/lib/export/withdrawal-workbook')
     const workbook = buildWithdrawalWorkbook(state, calculation, getAppCurrency().symbol, getAppCurrency().code)
-
-    // Generate and Download
     const buffer = await workbook.xlsx.writeBuffer()
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url = window.URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     const date = new Date().toISOString().split('T')[0]
     const fileName = `portfolio-withdrawal-deterministic-${date}.xlsx`
-    
+
     anchor.href = url
     anchor.download = fileName
     anchor.click()
@@ -185,9 +190,7 @@ export function WithdrawalMode({ sharedPayload }: { sharedPayload?: SharePayload
         className="text-center space-y-2"
       >
         <h2 className="text-2xl font-bold">Plan Your Retirement Spending</h2>
-        <p className="text-muted-foreground">
-          Calculate how long your portfolio can sustain regular withdrawals
-        </p>
+        <p className="text-muted-foreground">Calculate how long your portfolio can sustain regular withdrawals</p>
       </motion.div>
 
       <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
@@ -199,9 +202,7 @@ export function WithdrawalMode({ sharedPayload }: { sharedPayload?: SharePayload
                   <Dices className="h-4 w-4 text-violet-500" />
                   <Label className="text-base font-semibold">Monte Carlo Simulation</Label>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Model portfolio sustainability with randomized scenarios
-                </p>
+                <p className="text-sm text-muted-foreground">Model portfolio sustainability with randomized scenarios</p>
               </div>
               <Switch
                 id="withdrawal-monte-carlo-mode"
