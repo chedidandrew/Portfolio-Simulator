@@ -28,6 +28,7 @@ import { cleanShareDataFromUrl, readSharePayload } from '@/lib/share-links'
 import { toast } from 'sonner'
 import type { SharePayload } from '@/lib/types'
 import { persistSharedMonteCarloPreferences } from '@/lib/shared-preferences'
+import { subscribeRetirementPlanTransfer } from '@/lib/retirement-plan-transfer'
 
 export default function Home() {
   const { theme, setTheme } = useTheme()
@@ -104,6 +105,15 @@ export default function Home() {
     window.addEventListener('openMonteCarloFromLink', handler)
     return () => window.removeEventListener('openMonteCarloFromLink', handler)
   }, [])
+
+  useEffect(() => subscribeRetirementPlanTransfer(() => {
+    setActiveTab('withdrawal')
+    try {
+      localStorage.setItem('visited', 'true')
+      localStorage.setItem('lastTab', 'withdrawal')
+    } catch {}
+    window.setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0)
+  }), [])
 
   const handleTabChange = (value: string) => {
     const nextTab = value as 'growth' | 'withdrawal' | 'guide'

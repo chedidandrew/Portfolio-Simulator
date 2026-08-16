@@ -1,4 +1,5 @@
 import type { SimulationParams } from '../types'
+import type { DrawdownDurationPoint } from './drawdown-analysis'
 import {
   MAX_CHART_POINTS,
   MAX_RECORDED_VALUES,
@@ -187,6 +188,8 @@ export function performMonteCarloSimulation(
   const endingValues: number[] = []
   const endingValuesGross: number[] = []
   const maxDrawdowns: number[] = []
+  const maxDrawdownDurations: DrawdownDurationPoint[] = []
+  const depletionYears: Array<number | null> = []
   const finalPerformanceValues: number[] = []
   const lowestPerformanceValues: number[] = []
   const totalGrossWithdrawals: number[] = []
@@ -222,8 +225,14 @@ export function performMonteCarloSimulation(
     let currentCashflow = cashflowAmount
     let performanceIndex = 1
     let performancePeak = 1
+    let performancePeakStep = 0
     let performanceLow = 1
     let maxDrawdown = 0
+    let maxDrawdownPeakValue = 1
+    let maxDrawdownPeakStep = 0
+    let maxDrawdownTroughStep = 0
+    let maxDrawdownRecoveryStep: number | null = null
+    let pathDepletionYear: number | null = null
     let grossWithdrawn = 0
     let netSpending = 0
     let taxesPaid = 0
@@ -256,9 +265,29 @@ export function performMonteCarloSimulation(
       const incomeDragDifferenceBefore = isIncomeTax ? preTaxValue - currentValue : 0
 
       performanceIndex *= growthFactor
-      performancePeak = Math.max(performancePeak, performanceIndex)
+      if (
+        maxDrawdown > 1e-12
+        && maxDrawdownRecoveryStep === null
+        && step > maxDrawdownTroughStep
+        && performanceIndex >= maxDrawdownPeakValue
+      ) {
+        maxDrawdownRecoveryStep = step
+      }
       performanceLow = Math.min(performanceLow, performanceIndex)
-      if (performancePeak > 0) maxDrawdown = Math.max(maxDrawdown, (performancePeak - performanceIndex) / performancePeak)
+      if (performanceIndex > performancePeak) {
+        performancePeak = performanceIndex
+        performancePeakStep = step
+      }
+      if (performancePeak > 0) {
+        const drawdown = (performancePeak - performanceIndex) / performancePeak
+        if (drawdown > maxDrawdown) {
+          maxDrawdown = drawdown
+          maxDrawdownPeakValue = performancePeak
+          maxDrawdownPeakStep = performancePeakStep
+          maxDrawdownTroughStep = step
+          maxDrawdownRecoveryStep = null
+        }
+      }
 
       if (mode === 'growth') {
         currentValue *= growthFactor
@@ -273,7 +302,10 @@ export function performMonteCarloSimulation(
       } else {
         const beforeWithdrawal = currentValue
         const grossWithdrawal = Math.min(beforeWithdrawal, currentCashflow)
-        if (grossWithdrawal + 1e-9 < currentCashflow) pathMetAllWithdrawals = false
+        if (grossWithdrawal + 1e-9 < currentCashflow) {
+          pathMetAllWithdrawals = false
+          if (pathDepletionYear === null) pathDepletionYear = Math.ceil(step / periods)
+        }
         let withholding = 0
         if (taxEnabled && taxType === 'tax_deferred') withholding = grossWithdrawal * rate
         if (taxEnabled && taxType === 'capital_gains') {
@@ -333,6 +365,23 @@ export function performMonteCarloSimulation(
     endingValues.push(endingNet)
     endingValuesGross.push(endingGross)
     maxDrawdowns.push(maxDrawdown)
+
+    let drawdownRecovered = true
+    let drawdownDurationSteps = 0
+    if (maxDrawdown > 1e-12) {
+      if (maxDrawdownRecoveryStep !== null) {
+        drawdownDurationSteps = Math.max(0, maxDrawdownRecoveryStep - maxDrawdownPeakStep)
+      } else {
+        drawdownRecovered = false
+        drawdownDurationSteps = Math.max(0, totalSteps - maxDrawdownPeakStep)
+      }
+    }
+    maxDrawdownDurations.push({
+      maxDrawdown,
+      durationYears: drawdownDurationSteps / periods,
+      recovered: drawdownRecovered,
+    })
+    depletionYears.push(mode === 'withdrawal' ? pathDepletionYear : null)
     finalPerformanceValues.push(performanceIndex)
     lowestPerformanceValues.push(performanceLow)
 
@@ -511,6 +560,19 @@ export function performMonteCarloSimulation(
   const spreadRatio = netP.p5 > 0 ? netP.p95 / netP.p5 : 0
   const hasDepletion = chartData.some((point) => point.p10 <= 0 || point.p25 <= 0 || point.p50 <= 0)
   const growthRatio = initialValue > 0 ? netP.p90 / initialValue : 0
+  const depletedYears = mode === 'withdrawal'
+    ? depletionYears.filter((year): year is number => year !== null).sort((left, right) => left - right)
+    : []
+  const medianDepletionYear = depletedYears.length
+    ? calculatePercentile(depletedYears, 0.5)
+    : null
+  const worst10DepletionYear = depletedYears.length
+    ? calculatePercentile(depletedYears, 0.1)
+    : null
+  const neverDepletedRate = mode === 'withdrawal'
+    ? depletionYears.filter((year) => year === null).length / numPaths * 100
+    : 100
+  const survivalRate = pathsSolvent / numPaths * 100
 
   // Retirement cashflow components are also exposed from one actual simulated
   // path: the path whose ending spendable value is closest to the median ending
@@ -555,6 +617,8 @@ export function performMonteCarloSimulation(
     endingValues,
     endingValuesGross,
     maxDrawdowns,
+    maxDrawdownDurations,
+    depletionYears,
     annualReturnsData,
     lossProbData,
     investmentData,
@@ -619,7 +683,12 @@ export function performMonteCarloSimulation(
     endingAtOrAboveGoalProbability: portfolioGoal ? pathsEndingAtOrAboveGoal / numPaths * 100 : 0,
     pathsEndingAtOrAboveGoal,
     profitableRate: mode === 'growth' ? pathsProfitable / numPaths * 100 : 0,
-    solventRate: pathsSolvent / numPaths * 100,
+    solventRate: survivalRate,
+    survivalRate,
+    runningOutProbability: mode === 'withdrawal' ? 100 - survivalRate : 0,
+    medianDepletionYear,
+    worst10DepletionYear,
+    neverDepletedRate,
     numPathsUsed: numPaths,
     recommendLogLinear: !hasDepletion && growthRatio > 20,
     recommendLogHistogram: spreadRatio > 15,
