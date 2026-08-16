@@ -56,6 +56,68 @@ try {
     `Unexpected page-level horizontal overflow: ${dimensions.page}px > ${dimensions.viewport}px`,
   )
 
+  await mobilePage.getByRole('button', { name: 'Open settings' }).click()
+  await mobilePage.getByRole('menuitem', { name: 'Display Currency' }).click()
+
+  const currencyDialog = mobilePage.getByRole('dialog', { name: 'Display Currency' })
+  const currencyList = mobilePage.getByTestId('currency-picker-list')
+  await currencyDialog.waitFor({ state: 'visible' })
+
+  const usdOption = currencyDialog.locator('[data-currency-code="USD"]')
+  await usdOption.waitFor({ state: 'visible' })
+
+  const [currencyDialogBox, currencyListBox, usdOptionBox, currencyListLayout] = await Promise.all([
+    currencyDialog.boundingBox(),
+    currencyList.boundingBox(),
+    usdOption.boundingBox(),
+    currencyList.evaluate((element) => {
+      const style = window.getComputedStyle(element)
+      return {
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        overflowY: style.overflowY,
+      }
+    }),
+  ])
+
+  assert.ok(currencyDialogBox, 'Expected the mobile currency dialog to be measurable.')
+  assert.ok(currencyListBox, 'Expected the mobile currency list to be measurable.')
+  assert.ok(usdOptionBox, 'Expected the selected currency option to be visible.')
+  assert.ok(
+    currencyDialogBox.x >= -1 && currencyDialogBox.x + currencyDialogBox.width <= 391,
+    'Currency dialog must stay inside the iPhone-width viewport.',
+  )
+  assert.ok(
+    currencyDialogBox.y >= -1 && currencyDialogBox.y + currencyDialogBox.height <= 845,
+    'Currency dialog must stay inside the iPhone-height viewport.',
+  )
+  assert.ok(
+    currencyListLayout.scrollHeight > currencyListLayout.clientHeight,
+    'Currency choices should scroll inside the dialog instead of extending off-screen.',
+  )
+  assert.ok(
+    currencyListLayout.overflowY === 'auto' || currencyListLayout.overflowY === 'scroll',
+    `Expected a scrollable currency list, received overflow-y: ${currencyListLayout.overflowY}`,
+  )
+  assert.ok(
+    usdOptionBox.x >= currencyListBox.x - 1
+      && usdOptionBox.x + usdOptionBox.width <= currencyListBox.x + currencyListBox.width + 1,
+    'Currency options must remain within the dialog width.',
+  )
+
+  const lastCurrencyOption = currencyDialog.locator('[data-currency-code]').last()
+  await lastCurrencyOption.scrollIntoViewIfNeeded()
+  const lastCurrencyOptionBox = await lastCurrencyOption.boundingBox()
+  assert.ok(lastCurrencyOptionBox, 'Expected the final currency option to be reachable by scrolling.')
+  assert.ok(
+    lastCurrencyOptionBox.y >= currencyListBox.y - 1
+      && lastCurrencyOptionBox.y + lastCurrencyOptionBox.height <= currencyListBox.y + currencyListBox.height + 1,
+    'The final currency option must remain visible inside the scrollable list.',
+  )
+
+  await currencyDialog.getByRole('button', { name: 'Close dialog' }).click()
+  await currencyDialog.waitFor({ state: 'hidden' })
+
   const annualReturnHeading = mobilePage.getByText('Expected Annual Return (CAGR)', { exact: true })
   await annualReturnHeading.scrollIntoViewIfNeeded()
   const annualReturnCard = annualReturnHeading.locator(
