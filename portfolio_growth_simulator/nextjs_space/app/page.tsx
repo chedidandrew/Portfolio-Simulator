@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Moon, Sun, TrendingUp, TrendingDown, BookOpen, Settings, Check, CreditCard, Heart, RotateCcw } from 'lucide-react'
+import { Moon, Sun, TrendingUp, TrendingDown, BookOpen, Settings, Check, CreditCard, Heart, RotateCcw, ChevronRight } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,6 +20,7 @@ import {
 import { GrowthMode } from '@/components/growth-mode'
 import { WithdrawalMode } from '@/components/withdrawal-mode'
 import { GuideTab } from '@/components/guide-tab'
+import { CurrencyPickerDialog } from '@/components/currency-picker-dialog'
 import { setAppCurrency, CURRENCIES } from '@/lib/utils'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 import { clearPortfolioStorage } from '@/lib/owned-storage'
@@ -35,6 +36,8 @@ export default function Home() {
   const [headerVisible, setHeaderVisible] = useState(true)
   const [currency, setCurrency] = useLocalStorage<string>('portfolio-sim-currency', 'USD')
   const [showDonations, setShowDonations] = useLocalStorage<boolean>('portfolio-sim-show-donations', true)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false)
   const [sharedPayload, setSharedPayload] = useState<SharePayload | null>(null)
   const lastScrollY = useRef(0)
   const scrollThreshold = 10
@@ -137,6 +140,11 @@ export default function Home() {
     }
   }
 
+  const openMobileCurrencyPicker = () => {
+    setSettingsOpen(false)
+    window.setTimeout(() => setCurrencyPickerOpen(true), 0)
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
       <header
@@ -161,74 +169,94 @@ export default function Home() {
             </h1>
           </div>
           {mounted && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-11 w-11 rounded-full" aria-label="Open settings">
-                  <Settings className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Appearance</DropdownMenuLabel>
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    {theme === 'dark' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
-                    <span>Theme</span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    <DropdownMenuItem onClick={() => setTheme?.('light')}>
-                      <Sun className="mr-2 h-4 w-4" />
-                      <span>Light</span>
-                      {theme === 'light' && <Check className="ml-auto h-4 w-4" />}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setTheme?.('dark')}>
-                      <Moon className="mr-2 h-4 w-4" />
-                      <span>Dark</span>
-                      {theme === 'dark' && <Check className="ml-auto h-4 w-4" />}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setTheme?.('system')}>
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>System</span>
-                      {theme === 'system' && <Check className="ml-auto h-4 w-4" />}
-                    </DropdownMenuItem>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
+            <>
+              <DropdownMenu open={settingsOpen} onOpenChange={setSettingsOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-11 w-11 rounded-full" aria-label="Open settings">
+                    <Settings className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" collisionPadding={12} className="w-56 max-w-[calc(100vw-1rem)]">
+                  <DropdownMenuLabel>Appearance</DropdownMenuLabel>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      {theme === 'dark' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
+                      <span>Theme</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent collisionPadding={12}>
+                      <DropdownMenuItem onClick={() => setTheme?.('light')}>
+                        <Sun className="mr-2 h-4 w-4" />
+                        <span>Light</span>
+                        {theme === 'light' && <Check className="ml-auto h-4 w-4" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme?.('dark')}>
+                        <Moon className="mr-2 h-4 w-4" />
+                        <span>Dark</span>
+                        {theme === 'dark' && <Check className="ml-auto h-4 w-4" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme?.('system')}>
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>System</span>
+                        {theme === 'system' && <Check className="ml-auto h-4 w-4" />}
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
 
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Preferences</DropdownMenuLabel>
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Preferences</DropdownMenuLabel>
+                  <DropdownMenuItem
+                    className="sm:hidden"
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      openMobileCurrencyPicker()
+                    }}
+                  >
                     <CreditCard className="mr-2 h-4 w-4" />
                     <span>Display Currency</span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="max-h-[300px] overflow-y-auto">
-                    <DropdownMenuLabel>Display Currency</DropdownMenuLabel>
-                    <p className="px-2 pb-2 text-xs text-muted-foreground">
-                      Changes symbols and formatting only. Values are not converted using exchange rates.
-                    </p>
-                    {CURRENCIES.map((candidate) => (
-                      <DropdownMenuItem key={candidate.code} onClick={() => setCurrency(candidate.code)}>
-                        <span>{candidate.label}</span>
-                        {currency === candidate.code && <Check className="ml-auto h-4 w-4" />}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-                <DropdownMenuCheckboxItem
-                  checked={showDonations}
-                  onCheckedChange={setShowDonations}
-                >
-                  <span className="flex items-center">
-                    <Heart className="mr-2 h-4 w-4" />
-                    Show Donation Card
-                  </span>
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleFactoryReset} className="text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-900/10">
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  <span>Reset</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    <ChevronRight className="ml-auto h-4 w-4" />
+                  </DropdownMenuItem>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="hidden sm:flex">
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      <span>Display Currency</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent collisionPadding={12} className="max-h-[min(70vh,28rem)] w-64 overflow-y-auto">
+                      <DropdownMenuLabel>Display Currency</DropdownMenuLabel>
+                      <p className="px-2 pb-2 text-xs text-muted-foreground">
+                        Changes symbols and formatting only. Values are not converted using exchange rates.
+                      </p>
+                      {CURRENCIES.map((candidate) => (
+                        <DropdownMenuItem key={candidate.code} onClick={() => setCurrency(candidate.code)}>
+                          <span>{candidate.label}</span>
+                          {currency === candidate.code && <Check className="ml-auto h-4 w-4" />}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  <DropdownMenuCheckboxItem
+                    checked={showDonations}
+                    onCheckedChange={setShowDonations}
+                  >
+                    <span className="flex items-center">
+                      <Heart className="mr-2 h-4 w-4" />
+                      Show Donation Card
+                    </span>
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleFactoryReset} className="text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-900/10">
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    <span>Reset</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <CurrencyPickerDialog
+                open={currencyPickerOpen}
+                value={currency}
+                onOpenChange={setCurrencyPickerOpen}
+                onValueChange={setCurrency}
+              />
+            </>
           )}
         </div>
       </header>
