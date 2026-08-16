@@ -10,6 +10,7 @@ import {
   Lightbulb,
   Loader2,
   Share,
+  Sparkles,
   Target,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -30,6 +31,9 @@ import {
 import { SensitivityTable } from '@/components/monte-carlo/sensitivity-table'
 import { CashflowChart } from '@/components/monte-carlo/cashflow-chart'
 import { TaxImpactChart } from '@/components/monte-carlo/tax-impact-chart'
+import { GoalPlanner } from '@/components/monte-carlo/goal-planner'
+import { SustainableWithdrawalEstimator } from '@/components/monte-carlo/sustainable-withdrawal-estimator'
+import { RetirementSurvivalChart } from '@/components/monte-carlo/retirement-survival-chart'
 import { formatCurrency, getAppCurrency, getLargeNumberName } from '@/lib/utils'
 import type { SimulationParams } from '@/lib/types'
 import type { CompletedSimulationResults } from '@/hooks/use-monte-carlo'
@@ -283,6 +287,17 @@ export function MonteCarloResults({
             </div>
           )}
 
+          {mode === 'growth' && (
+            <div className="space-y-3 print:hidden">
+              <Label className="flex items-center gap-2 text-base">
+                <Sparkles className="h-4 w-4 text-blue-500" aria-hidden="true" />
+                Planning Insights
+              </Label>
+              {params.portfolioGoal && <GoalPlanner params={params} results={results} />}
+              <SustainableWithdrawalEstimator params={params} results={results} />
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
@@ -340,6 +355,9 @@ export function MonteCarloResults({
           inflationAdjustment={inflationAdjustment}
           deterministicData={results.deterministicSeries}
         />
+        {mode === 'withdrawal' && (
+          <RetirementSurvivalChart results={results} duration={params.duration} enableAnimation={!isExporting} />
+        )}
         <CashflowChart params={params} mode={mode} investmentData={results.investmentData ?? []} isRealDollars={isRealDollars} />
         {taxEnabled && (
           <TaxImpactChart
@@ -359,6 +377,7 @@ export function MonteCarloResults({
         />
         <MonteCarloMaxDrawdownHistogram
           data={results.maxDrawdowns ?? []}
+          durationData={results.maxDrawdownDurations ?? []}
           logScale={logScales.drawdown}
           onLogScaleChange={(value) => setLogScales({ ...logScales, drawdown: value })}
           enableAnimation={!isExporting}
