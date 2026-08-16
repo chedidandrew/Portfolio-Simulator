@@ -11,6 +11,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
 import { SimulationProgressHost } from '@/components/monte-carlo/simulation-progress-overlay'
 import { MobileChartTooltipLayout } from '@/components/mobile-chart-tooltip-layout'
+import { UrlOnlyShareGuard } from '@/components/url-only-share-guard'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -111,6 +112,7 @@ const jsonLd = {
         <PwaInstallPrompt />
         <SimulationProgressHost />
         <MobileChartTooltipLayout />
+        <UrlOnlyShareGuard />
       </ThemeProvider>
         <Script
           id="register-sw"
