@@ -8,6 +8,7 @@ import {
   validateGrowthStateRange,
 } from './simulation/deterministic-validation'
 import { decodeSharePayload, validateSharePayload } from './share-links'
+import { shareUrlOnly } from './share-url'
 import { buildWithdrawalWorkbook } from './export/withdrawal-workbook'
 
 const baseGrowthState = {
@@ -39,6 +40,36 @@ test('deterministic scenarios reject durations beyond the browser-safe limit', (
 
 test('shared payload decoding rejects oversized encoded input before decompression', () => {
   assert.equal(decodeSharePayload('x'.repeat(MAX_SHARE_PAYLOAD_LENGTH + 1)), null)
+})
+
+test('native sharing sends only the scenario URL so iOS Copy produces a valid address', async () => {
+  const url = 'https://www.portfoliosimulator.org/#mc=example'
+  const calls: Array<{ url: string }> = []
+
+  const result = await shareUrlOnly(url, {
+    share: async (data) => {
+      calls.push(data)
+    },
+  })
+
+  assert.equal(result, 'shared')
+  assert.deepEqual(calls, [{ url }])
+})
+
+test('clipboard sharing fallback copies only the scenario URL', async () => {
+  const url = 'https://www.portfoliosimulator.org/#mc=example'
+  const copied: string[] = []
+
+  const result = await shareUrlOnly(url, {
+    clipboard: {
+      writeText: async (text) => {
+        copied.push(text)
+      },
+    },
+  })
+
+  assert.equal(result, 'copied')
+  assert.deepEqual(copied, [url])
 })
 
 test('canonical state validation rejects tax rates outside the supported UI range', () => {
