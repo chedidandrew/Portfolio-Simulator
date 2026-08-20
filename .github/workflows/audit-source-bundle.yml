@@ -1,0 +1,24 @@
+name: Audit Source Bundle
+
+on:
+  push:
+    branches:
+      - agent/full-site-audit
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Upload website source
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-simulator-source
+          path: portfolio_growth_simulator/nextjs_space
+          include-hidden-files: true
+          retention-days: 1
