@@ -1,0 +1,74 @@
+name: Full Site Audit
+
+on:
+  push:
+    branches:
+      - agent/full-site-audit
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/full-site-audit
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: portfolio_growth_simulator/nextjs_space/package-lock.json
+      - name: Install dependencies
+        working-directory: portfolio_growth_simulator/nextjs_space
+        run: npm ci
+      - name: Run source and validation audit
+        shell: bash
+        run: |
+          set +e
+          APP=portfolio_growth_simulator/nextjs_space
+          REPORT=FULL_SITE_AUDIT_REPORT.txt
+          : > "$REPORT"
+          {
+            echo "Portfolio Simulator full-site audit"
+            echo "Commit: $GITHUB_SHA"
+            echo
+            echo "== Source inventory =="
+            find "$APP" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.mjs' -o -name '*.css' -o -name '*.json' \) | sort
+            echo
+            echo "== Theme usage =="
+            grep -RIn --include='*.ts' --include='*.tsx' "useTheme\|theme === 'dark'\|theme === \"dark\"\|resolvedTheme" "$APP" || true
+            echo
+            echo "== Work markers =="
+            grep -RInE --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' 'TODO|FIXME|HACK|XXX' "$APP" || true
+            echo
+            echo "== Broad unsafe-pattern scan =="
+            grep -RInE --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' 'dangerouslySetInnerHTML|eval\(|new Function\(|target="_blank"|window\.open\(' "$APP" || true
+            echo
+            echo "== Lint =="
+          } >> "$REPORT"
+          (cd "$APP" && npm run lint) >> "$REPORT" 2>&1
+          echo "lint_status=$?" >> "$REPORT"
+          echo >> "$REPORT"
+          echo "== Tests ==" >> "$REPORT"
+          (cd "$APP" && npm test) >> "$REPORT" 2>&1
+          echo "test_status=$?" >> "$REPORT"
+          echo >> "$REPORT"
+          echo "== Typecheck ==" >> "$REPORT"
+          (cd "$APP" && npm run typecheck) >> "$REPORT" 2>&1
+          echo "typecheck_status=$?" >> "$REPORT"
+          echo >> "$REPORT"
+          echo "== Production build ==" >> "$REPORT"
+          (cd "$APP" && npm run build) >> "$REPORT" 2>&1
+          echo "build_status=$?" >> "$REPORT"
+      - name: Commit audit report
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add FULL_SITE_AUDIT_REPORT.txt
+          git commit -m "Record full-site audit report" || exit 0
+          git push origin HEAD:agent/full-site-audit
