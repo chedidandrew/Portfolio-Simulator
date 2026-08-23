@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Moon, Sun, TrendingUp, TrendingDown, BookOpen, Settings, Check, CreditCard, Heart, RotateCcw, ChevronRight } from 'lucide-react'
 import { useTheme } from 'next-themes'
@@ -17,12 +18,10 @@ import {
   DropdownMenuSubContent,
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
-import { GrowthMode } from '@/components/growth-mode'
-import { WithdrawalMode } from '@/components/withdrawal-mode'
-import { GuideTab } from '@/components/guide-tab'
 import { CurrencyPickerDialog } from '@/components/currency-picker-dialog'
-import { setAppCurrency, CURRENCIES } from '@/lib/utils'
+import { CURRENCIES } from '@/lib/utils'
 import { useLocalStorage } from '@/hooks/use-local-storage'
+import { useCurrency } from '@/components/currency-provider'
 import { clearPortfolioStorage } from '@/lib/owned-storage'
 import { cleanShareDataFromUrl, readSharePayload } from '@/lib/share-links'
 import { toast } from 'sonner'
@@ -30,12 +29,16 @@ import type { SharePayload } from '@/lib/types'
 import { persistSharedMonteCarloPreferences } from '@/lib/shared-preferences'
 import { subscribeRetirementPlanTransfer } from '@/lib/retirement-plan-transfer'
 
+const GuideTab = dynamic(() => import('@/components/guide-tab').then((module) => module.GuideTab))
+const GrowthMode = dynamic(() => import('@/components/growth-mode').then((module) => module.GrowthMode))
+const WithdrawalMode = dynamic(() => import('@/components/withdrawal-mode').then((module) => module.WithdrawalMode))
+
 export default function Home() {
   const { theme, setTheme } = useTheme()
+  const { currency, setCurrency } = useCurrency()
   const [activeTab, setActiveTab] = useState<'growth' | 'withdrawal' | 'guide'>('growth')
   const [mounted, setMounted] = useState(false)
   const [headerVisible, setHeaderVisible] = useState(true)
-  const [currency, setCurrency] = useLocalStorage<string>('portfolio-sim-currency', 'USD')
   const [showDonations, setShowDonations] = useLocalStorage<boolean>('portfolio-sim-show-donations', true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false)
@@ -45,12 +48,7 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true)
-    setAppCurrency(currency)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    setAppCurrency(currency)
-  }, [currency])
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -282,17 +280,17 @@ export default function Home() {
       />
 
       <main className="container mx-auto max-w-6xl px-4 py-6 pb-20 print:p-0 print:max-w-none">
-        <Tabs key={currency} value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6 h-auto print:hidden">
-            <TabsTrigger value="guide" className="flex items-center gap-2 py-3">
+            <TabsTrigger value="guide" aria-label="Guide" className="flex items-center gap-2 py-3">
               <BookOpen className="h-4 w-4" />
               <span className="hidden sm:inline">Guide</span>
             </TabsTrigger>
-            <TabsTrigger value="growth" className="flex items-center gap-2 py-3">
+            <TabsTrigger value="growth" aria-label="Growth" className="flex items-center gap-2 py-3">
               <TrendingUp className="h-4 w-4" />
               <span className="hidden sm:inline">Growth</span>
             </TabsTrigger>
-            <TabsTrigger value="withdrawal" className="flex items-center gap-2 py-3">
+            <TabsTrigger value="withdrawal" aria-label="Withdrawal" className="flex items-center gap-2 py-3">
               <TrendingDown className="h-4 w-4" />
               <span className="hidden sm:inline">Withdrawal</span>
             </TabsTrigger>

@@ -19,7 +19,7 @@ import { DonationSection } from '@/components/donation-section'
 import { useGrowthCalculation } from '@/hooks/use-growth-calculation'
 import { CalculationErrorCard } from '@/components/calculation-error-card'
 import { clearSimulatorScenario } from '@/lib/owned-storage'
-import { validateGrowthStateRange } from '@/lib/simulation/deterministic-validation'
+import { isValidGrowthState, validateGrowthStateRange } from '@/lib/simulation/deterministic-validation'
 import { MONTE_CARLO_SWITCH_LABELS } from '@/lib/accessibility-labels'
 import { normalizeGrowthState } from '@/lib/state-normalization'
 import { DEFAULT_GROWTH_STATE } from '@/lib/default-states'
@@ -33,6 +33,7 @@ export function GrowthMode({ sharedPayload }: { sharedPayload?: SharePayload | n
     DEFAULT_GROWTH_STATE,
     {
       normalize: normalizeGrowthState,
+      validatePersisted: isValidGrowthState,
       shouldPersist: (nextState) => validateGrowthStateRange(nextState) === null,
     },
   )

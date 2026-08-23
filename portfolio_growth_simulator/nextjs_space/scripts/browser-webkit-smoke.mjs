@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict'
+import { webkit } from 'playwright'
+
+const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:3000'
+const browser = await webkit.launch()
+
+try {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
+  const page = await context.newPage()
+  await page.goto(baseUrl, { waitUntil: 'networkidle' })
+  await page.getByRole('tab', { name: 'Growth' }).click()
+
+  const startingBalance = page.locator('#starting-balance')
+  await startingBalance.fill('25000')
+  await startingBalance.blur()
+  await page.getByText('Projected Results').waitFor()
+
+  const dimensions = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    page: document.documentElement.scrollWidth,
+  }))
+  assert.ok(
+    dimensions.page <= dimensions.viewport + 2,
+    `Unexpected WebKit page-level horizontal overflow: ${dimensions.page}px > ${dimensions.viewport}px`,
+  )
+
+  await page.getByRole('button', { name: 'Open settings' }).click()
+  await page.getByRole('menuitem', { name: 'Display Currency' }).click()
+  const currencyDialog = page.getByRole('dialog', { name: 'Display Currency' })
+  await currencyDialog.waitFor({ state: 'visible' })
+
+  const dialogBox = await currencyDialog.boundingBox()
+  assert.ok(dialogBox, 'Expected the WebKit currency dialog to be measurable.')
+  assert.ok(dialogBox.x >= -1 && dialogBox.x + dialogBox.width <= 391)
+  assert.ok(dialogBox.y >= -1 && dialogBox.y + dialogBox.height <= 845)
+
+  await currencyDialog.getByRole('button', { name: 'Close dialog' }).click()
+  console.log('WebKit browser smoke tests passed.')
+  await context.close()
+} finally {
+  await browser.close()
+}

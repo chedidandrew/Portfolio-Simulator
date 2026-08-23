@@ -16,16 +16,48 @@ const Card = React.forwardRef<
 ))
 Card.displayName = 'Card'
 
-const CardHeader = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn('flex flex-col space-y-1.5 p-6', className)}
-    {...props}
-  />
-))
+type CardHeaderProps = React.HTMLAttributes<HTMLDivElement> & {
+  type?: string
+}
+
+const CardHeader = React.forwardRef<HTMLDivElement, CardHeaderProps>(
+  ({ className, onKeyDown, role, tabIndex, type: _type, ...props }, ref) => {
+    const isCollapsibleTrigger = props['aria-expanded'] !== undefined
+
+    if (isCollapsibleTrigger) {
+      return (
+        <div
+          ref={ref}
+          role={role ?? 'button'}
+          tabIndex={tabIndex ?? 0}
+          className={cn('flex flex-col space-y-1.5 p-6', className)}
+          onKeyDown={(event) => {
+            onKeyDown?.(event)
+            if (
+              !event.defaultPrevented
+              && (event.key === 'Enter' || event.key === ' ')
+            ) {
+              event.preventDefault()
+              event.currentTarget.click()
+            }
+          }}
+          {...props}
+        />
+      )
+    }
+
+    return (
+      <div
+        ref={ref}
+        role={role}
+        tabIndex={tabIndex}
+        className={cn('flex flex-col space-y-1.5 p-6', className)}
+        onKeyDown={onKeyDown}
+        {...props}
+      />
+    )
+  }
+)
 CardHeader.displayName = 'CardHeader'
 
 const CardTitle = React.forwardRef<

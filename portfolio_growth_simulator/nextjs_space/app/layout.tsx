@@ -4,6 +4,7 @@ import './globals.css'
 import './mobile-chart-tooltips.css'
 import 'katex/dist/katex.min.css'
 import { ThemeProvider } from '@/components/theme-provider'
+import { CurrencyProvider } from '@/components/currency-provider'
 import Script from 'next/script'
 import Image from 'next/image'
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt'
@@ -56,7 +57,7 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-const jsonLd = {
+  const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
     name: 'Portfolio Simulator',
@@ -91,29 +92,30 @@ const jsonLd = {
       </head>
       <body className={inter.className}>
         <ThemeProvider
-        attribute="class"
-        defaultTheme="dark"
-        enableSystem={false}
-        disableTransitionOnChange
-      >
-        {/* Print only header */}
-        <header className="print-header">
-          <Image
-            src="/favicon.png"
-            alt="Portfolio Simulator"
-            width={24}
-            height={24}
-            style={{ borderRadius: 6 }}
-          />
-          <span className="print-header__title">Portfolio Simulator</span>
-        </header>
-        {children}
-        <Toaster />
-        <PwaInstallPrompt />
-        <SimulationProgressHost />
-        <MobileChartTooltipLayout />
-        <UrlOnlyShareGuard />
-      </ThemeProvider>
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <CurrencyProvider>
+            <header className="print-header">
+              <Image
+                src="/favicon.png"
+                alt="Portfolio Simulator"
+                width={24}
+                height={24}
+                style={{ borderRadius: 6 }}
+              />
+              <span className="print-header__title">Portfolio Simulator</span>
+            </header>
+            {children}
+            <Toaster />
+            <PwaInstallPrompt />
+            <SimulationProgressHost />
+            <MobileChartTooltipLayout />
+            <UrlOnlyShareGuard />
+          </CurrencyProvider>
+        </ThemeProvider>
         <Script
           id="register-sw"
           strategy="afterInteractive"

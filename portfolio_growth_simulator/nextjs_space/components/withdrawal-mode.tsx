@@ -20,7 +20,7 @@ import { useWithdrawalCalculation } from '@/hooks/use-withdrawal-calculation'
 import { normalizeWithdrawalState } from '@/lib/state-normalization'
 import { CalculationErrorCard } from '@/components/calculation-error-card'
 import { clearSimulatorScenario } from '@/lib/owned-storage'
-import { validateWithdrawalStateRange } from '@/lib/simulation/deterministic-validation'
+import { isValidWithdrawalState, validateWithdrawalStateRange } from '@/lib/simulation/deterministic-validation'
 import { MONTE_CARLO_SWITCH_LABELS } from '@/lib/accessibility-labels'
 import { DEFAULT_WITHDRAWAL_STATE } from '@/lib/default-states'
 import { buildShareUrl as buildVersionedShareUrl, cleanShareDataFromUrl } from '@/lib/share-links'
@@ -39,6 +39,7 @@ export function WithdrawalMode({ sharedPayload }: { sharedPayload?: SharePayload
     DEFAULT_WITHDRAWAL_STATE,
     {
       normalize: normalizeWithdrawalState,
+      validatePersisted: isValidWithdrawalState,
       shouldPersist: (nextState) => validateWithdrawalStateRange(nextState) === null,
     },
   )

@@ -35,7 +35,4 @@ jobs:
           cache: npm
           cache-dependency-path: portfolio_growth_simulator/nextjs_space/package-lock.json
       - run: npm ci
-      - run: npm run lint
-      - run: npm test
-      - run: npm run typecheck
-      - run: npm run build
+      - run: npm run verify
