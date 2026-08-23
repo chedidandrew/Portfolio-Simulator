@@ -1,17 +1,20 @@
-const CACHE_NAME = 'portfolio-simulator-shell-v6'
+const CACHE_NAME = 'portfolio-simulator-shell-v7'
 const CACHE_PREFIX = 'portfolio-simulator-'
 const SHELL_ASSETS = [
   '/',
+  '/loan',
   '/methodology',
+  '/methodology/loan',
   '/privacy',
   '/manifest.json',
   '/favicon.png',
+  '/favicon.svg',
   '/apple-touch-icon.png',
 ]
 
 const STATIC_PREFIXES = ['/_next/static/', '/icons/', '/images/', '/fonts/']
 const STATIC_FILE_PATTERN = /\.(?:css|js|mjs|png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf)$/i
-const STATIC_ROOT_FILES = new Set(['/manifest.json', '/favicon.png', '/apple-touch-icon.png'])
+const STATIC_ROOT_FILES = new Set(['/manifest.json', '/favicon.png', '/favicon.svg', '/apple-touch-icon.png'])
 
 function isStaticAsset(url) {
   return STATIC_ROOT_FILES.has(url.pathname)

@@ -43,6 +43,26 @@ try {
 
   await currencyDialog.getByRole('button', { name: 'Close dialog' }).click()
 
+  await page.goto(`${baseUrl}/loan`, { waitUntil: 'networkidle' })
+  await page.getByRole('heading', { name: 'Loan & Amortization Calculator', level: 1 }).waitFor()
+  await page.locator('#loan-principal').fill('300000')
+  await page.locator('#loan-extra-monthly').fill('250')
+  await page.getByText('Extra Payment Impact').waitFor()
+  await page.getByTestId('loan-balance-chart').waitFor()
+
+  const loanDimensions = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    page: document.documentElement.scrollWidth,
+  }))
+  assert.ok(
+    loanDimensions.page <= loanDimensions.viewport + 2,
+    `Unexpected loan page horizontal overflow: ${loanDimensions.page}px > ${loanDimensions.viewport}px`,
+  )
+
+  await page.getByRole('button', { name: 'View full monthly schedule' }).click()
+  await page.getByText('Starting Balance', { exact: true }).waitFor()
+  await page.getByRole('navigation', { name: 'Footer navigation' }).waitFor()
+
   await page.goto(`${baseUrl}/privacy`, { waitUntil: 'networkidle' })
   await page.getByRole('heading', { name: 'Privacy', level: 1 }).waitFor()
   await page.getByRole('navigation', { name: 'Footer navigation' }).waitFor()

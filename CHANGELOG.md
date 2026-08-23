@@ -2,6 +2,25 @@
 
 All notable repository and production changes are documented here.
 
+## 2026-08-23 - Loan and amortization calculator
+
+### Added
+
+- Added a dedicated `/loan` Loan & Amortization Calculator without changing the core Guide, Growth, and Withdrawal tab structure.
+- Added deterministic fixed-rate amortization with cent-level payment rounding, exact zero-balance payoff, 0% APR handling, and final-payment adjustment.
+- Added recurring extra-principal payments and up to 24 one-time lump-sum payments.
+- Added baseline versus accelerated payoff comparisons with interest saved and time saved.
+- Added responsive remaining-balance charts, yearly amortization summaries, and an optional full monthly payment schedule.
+- Added versioned, validated loan share links stored in the URL fragment and persisted loan scenarios in simulator-owned browser storage.
+- Added Excel export and browser Print / PDF support for loan scenarios.
+- Added a dedicated loan methodology page covering the payment formula, payment order, rounding conventions, payoff comparisons, and model limitations.
+- Added loan scenarios to the Privacy notice, sitemap, offline application shell, global footer, Chromium browser coverage, WebKit mobile coverage, and real-browser accessibility scans.
+- Added deterministic loan-engine regression tests for standard amortization, 0% loans, extra payments, lump sums, year summaries, and payoff invariants.
+
+### Rollback checkpoint
+
+- Created `backup/pre-loan-calculator-2026-08-23` from production commit `c12f7f3cee59bc5f74f666301fe5960cedf3e51e` before loan development began. If the release is not preferred after deployment, restore the previous Vercel deployment first and revert the loan release commit through a normal pull request.
+
 ## 2026-08-23 - Public experience polish
 
 ### Changed

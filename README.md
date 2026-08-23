@@ -4,7 +4,7 @@
 
 **Live site:** [portfoliosimulator.org](https://portfoliosimulator.org)
 
-A responsive financial planning website for modeling portfolio growth and retirement withdrawals with deterministic and seeded Monte Carlo simulations.
+A responsive financial planning website for modeling portfolio growth, retirement withdrawals, and fixed-rate loan payoff strategies with deterministic and seeded Monte Carlo simulations where appropriate.
 
 ![Portfolio Simulator preview](portfolio_growth_simulator/nextjs_space/public/og-image.png)
 
@@ -12,17 +12,19 @@ A responsive financial planning website for modeling portfolio growth and retire
 
 - Deterministic portfolio growth and withdrawal projections
 - Seeded Monte Carlo simulations with reproducible results
-- Annual, quarterly, monthly, and weekly cash flows
+- Fixed-rate loan and amortization calculator with exact payoff schedules
+- Extra monthly principal and one-time loan payments with interest/time-saved comparisons
+- Annual, quarterly, monthly, and weekly portfolio cash flows
 - Inflation, contribution growth, withdrawals, goals, and multiple tax treatments
 - Gross, spendable, tax-drag, and real-dollar reporting
-- Shareable, versioned, validated scenario links
+- Shareable, versioned, validated portfolio and loan scenario links
 - Excel exports and print/PDF-ready results
 - Dark and light themes, responsive layouts, keyboard support, and PWA installation
 - Local browser storage with validation and safe recovery from malformed saved data
 - Browser-safety limits for deterministic and Monte Carlo workloads
 - Vercel Web Analytics
 
-> Display Currency changes symbols and number formatting only. The simulator does not perform foreign-exchange conversion.
+> Display Currency changes symbols and number formatting only. The site does not perform foreign-exchange conversion.
 
 ## Technology
 
@@ -54,7 +56,7 @@ From `portfolio_growth_simulator/nextjs_space`:
 npm run verify
 ```
 
-The verification command runs linting, financial and regression tests, rendered component tests, TypeScript checking, and the production build. GitHub Actions calls this same command for website pull requests and `main`. A separate browser smoke workflow exercises downloads, Monte Carlo Web Workers, shared links, mobile layout in Chromium and WebKit, and real-browser accessibility checks.
+The verification command runs linting, financial and regression tests, loan-engine tests, rendered component tests, TypeScript checking, and the production build. GitHub Actions calls this same command for website pull requests and `main`. A separate browser smoke workflow exercises downloads, Monte Carlo Web Workers, portfolio and loan share links, mobile layout in Chromium and WebKit, and real-browser accessibility checks.
 
 ## Production
 
@@ -63,7 +65,7 @@ npm run build
 npm start
 ```
 
-The production website is deployed through Vercel from the `main` branch. Application changes should reach `main` only through a pull request after Website CI, Browser Smoke, and CodeQL are green on the final head commit. See `docs/DEPLOYMENT.md` and `AGENTS.md` for the maintained production workflow.
+The production website is deployed through Vercel from the `main` branch. Application changes should reach `main` only through a pull request after Website CI, Browser Smoke, CodeQL, and the required Vercel check are green on the final head commit. See `docs/DEPLOYMENT.md` and `AGENTS.md` for the maintained production workflow.
 
 ## Project structure
 
@@ -75,7 +77,7 @@ Portfolio-Simulator/
 │       ├── app/                       # Next.js routes and global styles
 │       ├── components/                # Calculator and UI components
 │       ├── hooks/                     # State and calculation hooks
-│       ├── lib/                       # Financial engines, validation, and exports
+│       ├── lib/                       # Financial and loan engines, validation, and exports
 │       ├── public/                    # Icons, manifest, and service worker
 │       ├── scripts/                   # Project maintenance/test scripts
 │       ├── package.json
@@ -89,12 +91,13 @@ Portfolio-Simulator/
 
 ## Model boundaries
 
-- Results are educational estimates, not financial, tax, or investment advice.
+- Results are educational estimates, not financial, tax, lending, legal, or investment advice.
 - Monte Carlo results describe modeled scenarios and are not forecasts or guarantees.
 - Tax calculations are simplified and do not represent a complete tax return.
+- The loan calculator models standard fixed-rate monthly amortization and does not include lender-specific daily-interest rules, variable rates, taxes, insurance, PMI, HOA, escrow, points, or closing costs unless explicitly added in a future model.
 - Shared links contain the selected scenario inputs in the URL fragment. Review a link before sharing it publicly.
 - Calculator data is stored locally in the browser unless the user deliberately creates a share link.
-- Detailed formulas, timing rules, and limitations are documented on the website's Methodology page.
+- Detailed formulas, timing rules, and limitations are documented on the website's Methodology pages.
 
 ## Change history
 
