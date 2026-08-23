@@ -35,10 +35,7 @@ export function InvestVsDebtCalculator() {
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <Card className="h-fit">
-          <CardHeader>
-            <CardTitle>Your decision</CardTitle>
-            <CardDescription>Use the same extra monthly cash under both strategies so the comparison stays fair.</CardDescription>
-          </CardHeader>
+          <CardHeader><CardTitle>Your decision</CardTitle><CardDescription>Use the same extra monthly cash under both strategies so the comparison stays fair.</CardDescription></CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Loan balance" suffix={symbol}><Input type="number" min="1" step="1000" value={inputs.loanBalance} onChange={(e) => setInputs({ ...inputs, loanBalance: Number(e.target.value) || 0 })} /></Field>
@@ -66,23 +63,10 @@ export function InvestVsDebtCalculator() {
                 <CardTitle className="text-4xl tracking-tight text-primary sm:text-5xl">{result.probabilityInvestFirstAhead.toFixed(1)}%</CardTitle>
                 <p className="text-sm text-muted-foreground">Across {result.scenarios.toLocaleString()} seeded market scenarios over the remaining loan term.</p>
               </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Metric icon={PiggyBank} label="Median invest-first value" value={formatCurrency(result.medianInvestFirst, true, 2, false)} />
-                  <Metric icon={Landmark} label="Median debt-first value" value={formatCurrency(result.medianDebtFirst, true, 2, false)} />
-                  <Metric icon={ShieldCheck} label="Interest saved debt-first" value={formatCurrency(result.interestSavedByDebtFirst, true, 2, false)} />
-                  <Metric icon={Scale} label="Debt-first payoff" value={`${result.acceleratedPayoffMonths} months`} />
-                </div>
-              </CardContent>
+              <CardContent><div className="grid gap-3 sm:grid-cols-2"><Metric icon={PiggyBank} label="Median invest-first value" value={formatCurrency(result.medianInvestFirst, true, 2, false)} /><Metric icon={Landmark} label="Median debt-first value" value={formatCurrency(result.medianDebtFirst, true, 2, false)} /><Metric icon={ShieldCheck} label="Interest saved debt-first" value={formatCurrency(result.interestSavedByDebtFirst, true, 2, false)} /><Metric icon={Scale} label="Debt-first payoff" value={`${result.acceleratedPayoffMonths} months`} /></div></CardContent>
             </Card>
 
-            <Card>
-              <CardHeader><CardTitle>Deterministic comparison</CardTitle><CardDescription>Uses the entered expected return every year without market randomness.</CardDescription></CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-2">
-                <Plan title="Invest the extra cash" value={result.deterministicInvestFirst} />
-                <Plan title="Pay debt first, then invest" value={result.deterministicDebtFirst} emphasized />
-              </CardContent>
-            </Card>
+            <Card><CardHeader><CardTitle>Deterministic comparison</CardTitle><CardDescription>Uses the entered expected return every year without market randomness.</CardDescription></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2"><Plan title="Invest the extra cash" value={result.deterministicInvestFirst} /><Plan title="Pay debt first, then invest" value={result.deterministicDebtFirst} emphasized /></CardContent></Card>
           </div>
         ) : (
           <Card className="border-dashed"><CardContent className="py-12 text-center text-sm text-muted-foreground">Enter valid loan and investment assumptions to compare the strategies.</CardContent></Card>
@@ -90,25 +74,16 @@ export function InvestVsDebtCalculator() {
       </div>
 
       {result && (
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" />Outcome spread</CardTitle><CardDescription>Difference is invest-first value minus debt-first value at the end of the modeled horizon.</CardDescription></CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-3">
-            <Spread label="10th percentile" value={result.p10Difference} />
-            <Spread label="Median" value={result.medianDifference} />
-            <Spread label="90th percentile" value={result.p90Difference} />
-          </CardContent>
-        </Card>
+        <Card><CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" />Outcome spread</CardTitle><CardDescription>Difference is invest-first value minus debt-first value at the end of the modeled horizon.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-3"><Spread label="10th percentile" value={result.p10Difference} /><Spread label="Median" value={result.medianDifference} /><Spread label="90th percentile" value={result.p90Difference} /></CardContent></Card>
       )}
 
-      <p className="mx-auto max-w-3xl text-center text-xs leading-relaxed text-muted-foreground">
-        Display currency: {currency}. This comparison excludes investment taxes, mortgage-interest deductions, transaction costs, employer matches, and behavioral differences. Paying down fixed-rate debt is modeled as a guaranteed reduction in loan interest; market returns are uncertain.
-      </p>
+      <p className="mx-auto max-w-3xl text-center text-xs leading-relaxed text-muted-foreground">Display currency: {currency}. This comparison excludes investment taxes, mortgage-interest deductions, transaction costs, employer matches, and behavioral differences. Paying down fixed-rate debt is modeled as a guaranteed reduction in loan interest; market returns are uncertain.</p>
     </div>
   )
 }
 
 function Field({ label, suffix, children }: { label: string; suffix?: string; children: React.ReactNode }) {
-  return <div className="space-y-1.5"><div className="flex items-center justify-between"><Label>{label}</Label>{suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}</div>{children}</div>
+  return <Label className="block space-y-1.5 font-normal"><span className="flex items-center justify-between"><span className="font-medium text-foreground">{label}</span>{suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}</span>{children}</Label>
 }
 
 function Metric({ icon: Icon, label, value }: { icon: typeof Scale; label: string; value: string }) {
