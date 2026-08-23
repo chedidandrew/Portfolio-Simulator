@@ -54,7 +54,7 @@ From `portfolio_growth_simulator/nextjs_space`:
 npm run verify
 ```
 
-The verification command runs linting, financial and regression tests, rendered component tests, TypeScript checking, and the production build. GitHub Actions runs the same checks after website changes are pushed to `main`, for pull requests, and on manual dispatch. A separate browser smoke workflow exercises downloads, Monte Carlo Web Workers, shared links, and a mobile viewport in Chromium.
+The verification command runs linting, financial and regression tests, rendered component tests, TypeScript checking, and the production build. GitHub Actions calls this same command for website pull requests and `main`. A separate browser smoke workflow exercises downloads, Monte Carlo Web Workers, shared links, mobile layout in Chromium and WebKit, and real-browser accessibility checks.
 
 ## Production
 
@@ -63,13 +63,13 @@ npm run build
 npm start
 ```
 
-The production website is deployed through Vercel from the `main` branch.
+The production website is deployed through Vercel from the `main` branch. Application changes should reach `main` only through a pull request after Website CI, Browser Smoke, and CodeQL are green on the final head commit. See `docs/DEPLOYMENT.md` and `AGENTS.md` for the maintained production workflow.
 
 ## Project structure
 
 ```text
 Portfolio-Simulator/
-├── .github/workflows/                 # GitHub validation workflow
+├── .github/workflows/                 # GitHub validation and browser workflows
 ├── portfolio_growth_simulator/
 │   └── nextjs_space/
 │       ├── app/                       # Next.js routes and global styles
@@ -80,6 +80,9 @@ Portfolio-Simulator/
 │       ├── scripts/                   # Project maintenance/test scripts
 │       ├── package.json
 │       └── package-lock.json
+├── docs/DEPLOYMENT.md                 # Production release process
+├── AGENTS.md                          # AI-assisted development rules
+├── CHANGELOG.md                       # Repository change history
 ├── LICENSE
 └── README.md
 ```
@@ -92,6 +95,10 @@ Portfolio-Simulator/
 - Shared links contain the selected scenario inputs in the URL fragment. Review a link before sharing it publicly.
 - Calculator data is stored locally in the browser unless the user deliberately creates a share link.
 - Detailed formulas, timing rules, and limitations are documented on the website's Methodology page.
+
+## Change history
+
+Repository and production changes are recorded in `CHANGELOG.md`.
 
 ## License
 
