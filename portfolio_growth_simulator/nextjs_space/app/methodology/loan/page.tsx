@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowLeft, Calculator, CircleDollarSign, Info, Scale } from 'lucide-react'
+import { BlockMath } from 'react-katex'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 
@@ -42,8 +43,11 @@ export default function LoanMethodologyPage() {
             <p>
               For a positive APR, the scheduled payment uses the standard installment-loan formula:
             </p>
-            <div className="overflow-x-auto rounded-lg border bg-muted/20 px-4 py-3 font-mono text-sm text-foreground">
-              Payment = P × [r(1+r)^n] / [(1+r)^n − 1]
+            <div className="space-y-2 rounded-lg border bg-background/50 p-4">
+              <p className="font-semibold text-foreground">Fixed-rate installment formula</p>
+              <div className="overflow-x-auto rounded-md bg-muted/40 px-3 py-2">
+                <BlockMath math={String.raw`\mathrm{Payment}=P\frac{r(1+r)^n}{(1+r)^n-1}`} />
+              </div>
             </div>
             <p>
               <strong className="text-foreground">P</strong> is the original principal, <strong className="text-foreground">r</strong> is APR divided by 12 and by 100, and <strong className="text-foreground">n</strong> is the number of monthly payments. At 0% APR, principal is divided evenly across the term.
