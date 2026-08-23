@@ -8,6 +8,13 @@ try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
   const page = await context.newPage()
   await page.goto(baseUrl, { waitUntil: 'networkidle' })
+
+  for (const label of ['Guide', 'Growth', 'Withdrawal']) {
+    const tab = page.getByRole('tab', { name: label })
+    await tab.waitFor({ state: 'visible' })
+    assert.equal(await tab.getByText(label, { exact: true }).isVisible(), true, `${label} text should be visible on mobile`)
+  }
+
   await page.getByRole('tab', { name: 'Growth' }).click()
 
   const startingBalance = page.locator('#starting-balance')
@@ -35,6 +42,11 @@ try {
   assert.ok(dialogBox.y >= -1 && dialogBox.y + dialogBox.height <= 845)
 
   await currencyDialog.getByRole('button', { name: 'Close dialog' }).click()
+
+  await page.goto(`${baseUrl}/privacy`, { waitUntil: 'networkidle' })
+  await page.getByRole('heading', { name: 'Privacy', level: 1 }).waitFor()
+  await page.getByRole('navigation', { name: 'Footer navigation' }).waitFor()
+
   console.log('WebKit browser smoke tests passed.')
   await context.close()
 } finally {
