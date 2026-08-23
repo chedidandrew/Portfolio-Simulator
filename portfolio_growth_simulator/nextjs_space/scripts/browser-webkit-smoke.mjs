@@ -17,31 +17,22 @@ try {
   await page.getByRole('tabpanel', { name: 'Guide' }).getByRole('link', { name: 'Loan Calculator' }).waitFor({ state: 'visible' })
 
   await page.getByRole('tab', { name: 'Growth' }).click()
-
   const startingBalance = page.locator('#starting-balance')
   await startingBalance.fill('25000')
   await startingBalance.blur()
   await page.getByText('Projected Results').waitFor()
 
-  const dimensions = await page.evaluate(() => ({
-    viewport: document.documentElement.clientWidth,
-    page: document.documentElement.scrollWidth,
-  }))
-  assert.ok(
-    dimensions.page <= dimensions.viewport + 2,
-    `Unexpected WebKit page-level horizontal overflow: ${dimensions.page}px > ${dimensions.viewport}px`,
-  )
+  const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, page: document.documentElement.scrollWidth }))
+  assert.ok(dimensions.page <= dimensions.viewport + 2, `Unexpected WebKit page-level horizontal overflow: ${dimensions.page}px > ${dimensions.viewport}px`)
 
   await page.getByRole('button', { name: 'Open settings' }).click()
   await page.getByRole('menuitem', { name: 'Display Currency' }).click()
   const currencyDialog = page.getByRole('dialog', { name: 'Display Currency' })
   await currencyDialog.waitFor({ state: 'visible' })
-
   const dialogBox = await currencyDialog.boundingBox()
   assert.ok(dialogBox, 'Expected the WebKit currency dialog to be measurable.')
   assert.ok(dialogBox.x >= -1 && dialogBox.x + dialogBox.width <= 391)
   assert.ok(dialogBox.y >= -1 && dialogBox.y + dialogBox.height <= 845)
-
   await currencyDialog.getByRole('button', { name: 'Close dialog' }).click()
 
   await page.setViewportSize({ width: 320, height: 740 })
@@ -53,19 +44,23 @@ try {
   await page.getByText('Extra Payment Impact').waitFor()
   await page.getByTestId('loan-balance-chart').waitFor()
   await page.getByRole('button', { name: 'Toggle theme' }).waitFor()
-
-  const loanDimensions = await page.evaluate(() => ({
-    viewport: document.documentElement.clientWidth,
-    page: document.documentElement.scrollWidth,
-  }))
-  assert.ok(
-    loanDimensions.page <= loanDimensions.viewport + 2,
-    `Unexpected loan page horizontal overflow: ${loanDimensions.page}px > ${loanDimensions.viewport}px`,
-  )
-
+  const loanDimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, page: document.documentElement.scrollWidth }))
+  assert.ok(loanDimensions.page <= loanDimensions.viewport + 2, `Unexpected loan page horizontal overflow: ${loanDimensions.page}px > ${loanDimensions.viewport}px`)
   await page.getByRole('button', { name: 'View full monthly schedule' }).click()
   await page.getByText('Starting Balance', { exact: true }).waitFor()
   await page.getByRole('navigation', { name: 'Footer navigation' }).waitFor()
+
+  for (const [path, heading] of [
+    ['/tools', 'Plan around the portfolio, not just inside it.'],
+    ['/loan/payoff-goal', 'Loan Payoff Goal'],
+    ['/loan/refinance', 'Refinance Comparison'],
+    ['/invest-vs-debt', 'Invest vs. Pay Down Debt'],
+  ]) {
+    await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle' })
+    await page.getByRole('heading', { name: heading, level: 1 }).waitFor()
+    const toolDimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, page: document.documentElement.scrollWidth }))
+    assert.ok(toolDimensions.page <= toolDimensions.viewport + 2, `${path} overflowed in WebKit at 320px: ${toolDimensions.page}px > ${toolDimensions.viewport}px`)
+  }
 
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(`${baseUrl}/privacy`, { waitUntil: 'networkidle' })
