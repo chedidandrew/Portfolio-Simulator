@@ -76,6 +76,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       'Portfolio Growth Calculator',
       'Withdrawal Sustainability Analysis',
       'Sequence of Returns Risk',
+      'Loan and Amortization Calculator',
+      'Target Loan Payoff Planning',
+      'Refinance Cost Comparison',
+      'Invest vs. Debt Payoff Comparison',
     ],
   }
 
