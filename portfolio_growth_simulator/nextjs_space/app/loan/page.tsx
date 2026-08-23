@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 export default function LoanPage() {
   return (
-    <>
+    <div className="loan-page">
       <LoanCalculator />
       <aside className="border-t bg-muted/10 px-4 py-5 print:hidden" aria-label="Loan calculation methodology">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
@@ -31,6 +31,6 @@ export default function LoanPage() {
           </Link>
         </div>
       </aside>
-    </>
+    </div>
   )
 }

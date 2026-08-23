@@ -2,6 +2,20 @@
 
 All notable repository and production changes are documented here.
 
+## 2026-08-23 - Header and loan summary polish
+
+### Changed
+
+- Replaced the green-gradient `Portfolio Simulator` header text with the normal foreground color so the green app mark remains the primary brand accent; this renders white in dark mode and dark in light mode for contrast.
+- Changed the loan summary metrics to a roomier 2-by-2 desktop layout instead of forcing four narrow cards into the results column.
+- Kept loan currency summary values on one line with tabular numerals to prevent awkward cent wrapping or clipping.
+- Tightened the gap between the loan introduction and the primary calculator/results cards by 8 px.
+- Expanded Chromium loan smoke coverage to verify the brand treatment, 2-by-2 summary layout, and non-wrapping currency values.
+
+### Rollback checkpoint
+
+- Created `backup/pre-header-metric-polish-2026-08-23` from production commit `635ec66332ac9cea324b68e0baf4c914d7eb8372` before this visual polish pass. If the revised presentation is not preferred after deployment, restore that Vercel deployment first and revert this release through a normal pull request.
+
 ## 2026-08-23 - Loan polish and hardening
 
 ### Changed

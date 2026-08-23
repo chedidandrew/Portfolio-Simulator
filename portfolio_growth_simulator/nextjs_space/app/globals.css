@@ -107,6 +107,32 @@
   scrollbar-width: none;  /* Firefox */
 }
 
+/* Keep the app mark as the green brand accent while brand text uses the
+   normal foreground color (white in dark mode, dark in light mode). */
+header :is(h1, span)[class~="bg-gradient-to-r"][class~="from-primary"][class~="to-emerald-400"][class~="text-transparent"] {
+  background-image: none;
+  color: hsl(var(--foreground));
+  -webkit-text-fill-color: currentColor;
+}
+
+/* Loan-page presentation polish. Scope these overrides to /loan so the
+   portfolio modes keep their existing result-card layouts. */
+.loan-page main > section:first-child {
+  margin-bottom: -0.5rem;
+}
+
+.loan-page [class~="border-primary/20"][class~="print-section"] [class~="break-words"][class~="text-lg"] {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 1280px) {
+  .loan-page [class~="border-primary/20"][class~="print-section"] [class~="xl:grid-cols-4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* PRINT STYLES                                 */
 /* -------------------------------------------------------------------------- */
