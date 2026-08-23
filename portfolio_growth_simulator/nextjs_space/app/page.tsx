@@ -19,8 +19,9 @@ import {
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
 import { CurrencyPickerDialog } from '@/components/currency-picker-dialog'
-import { setAppCurrency, CURRENCIES } from '@/lib/utils'
+import { CURRENCIES } from '@/lib/utils'
 import { useLocalStorage } from '@/hooks/use-local-storage'
+import { useCurrency } from '@/components/currency-provider'
 import { clearPortfolioStorage } from '@/lib/owned-storage'
 import { cleanShareDataFromUrl, readSharePayload } from '@/lib/share-links'
 import { toast } from 'sonner'
@@ -34,11 +35,10 @@ const WithdrawalMode = dynamic(() => import('@/components/withdrawal-mode').then
 
 export default function Home() {
   const { theme, setTheme } = useTheme()
+  const { currency, setCurrency } = useCurrency()
   const [activeTab, setActiveTab] = useState<'growth' | 'withdrawal' | 'guide'>('growth')
   const [mounted, setMounted] = useState(false)
   const [headerVisible, setHeaderVisible] = useState(true)
-  const [currency, setCurrency] = useLocalStorage<string>('portfolio-sim-currency', 'USD')
-  const [currencyRevision, setCurrencyRevision] = useState(0)
   const [showDonations, setShowDonations] = useLocalStorage<boolean>('portfolio-sim-show-donations', true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false)
@@ -49,11 +49,6 @@ export default function Home() {
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  useEffect(() => {
-    setAppCurrency(currency)
-    setCurrencyRevision((revision) => revision + 1)
-  }, [currency])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -285,7 +280,7 @@ export default function Home() {
       />
 
       <main className="container mx-auto max-w-6xl px-4 py-6 pb-20 print:p-0 print:max-w-none">
-        <Tabs data-currency-revision={currencyRevision} value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6 h-auto print:hidden">
             <TabsTrigger value="guide" className="flex items-center gap-2 py-3">
               <BookOpen className="h-4 w-4" />
