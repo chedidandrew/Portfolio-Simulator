@@ -2,6 +2,27 @@
 
 All notable repository and production changes are documented here.
 
+## 2026-08-23 - Loan polish and hardening
+
+### Changed
+
+- Corrected the yearly amortization summary so scheduled principal and extra principal are reported separately and total payments reconcile without double-counting.
+- Added a print-only Loan Assumptions section so Print / PDF output includes loan amount, APR, term, first payment month, recurring extra principal, currency, and one-time payments.
+- Expanded Excel export with scheduled-versus-accelerated interest totals, clearer scheduled-principal labeling, and a dedicated Extra Payments worksheet when lump-sum payments are present.
+- Hardened loan share links with supported-currency validation, compressed and decompressed size limits, duplicate payment-ID rejection, URL cleanup after loading, and native-share-to-clipboard fallback behavior.
+- Restricted one-time payments to the scheduled loan term and added an in-app warning when a planned payment falls after the accelerated payoff date.
+- Improved narrow-mobile one-time-payment layout and added 320 px Chromium/WebKit coverage.
+- Brought the loan header closer to the main simulator branding and added direct theme and display-currency controls.
+- Added display-currency symbols to loan amount and extra-payment inputs.
+- Replaced the schedule toggle's download icon with a list icon and linked the loan disclaimer directly to the dedicated Loan Methodology page.
+- Added a subtle Loan Calculator entry point from the Guide without changing the core Guide, Growth, and Withdrawal tab structure.
+- Expanded loan regression coverage for same-month lump sums, out-of-term payments, yearly reconciliation, extreme supported inputs, share-link validation, print assumptions, and consumed-share URL cleanup.
+- Updated Loan Methodology to document separate scheduled/extra principal reporting and behavior for payments that occur after projected payoff.
+
+### Rollback checkpoint
+
+- Created `backup/pre-loan-polish-2026-08-23` from production commit `15f6784a64b578d22da055e324616a0454495744` before this polish pass. If the updated loan experience is not preferred after deployment, restore that Vercel deployment first and revert this polish release through a normal pull request.
+
 ## 2026-08-23 - Loan and amortization calculator
 
 ### Added
