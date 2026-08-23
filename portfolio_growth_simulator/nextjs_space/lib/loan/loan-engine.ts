@@ -82,29 +82,44 @@ export function addMonths(value: string, offset: number): string {
 export function getLoanValidationErrors(inputs: LoanInputs): string[] {
   const errors: string[] = []
 
-  if (!Number.isFinite(inputs.principal) || inputs.principal <= 0 || inputs.principal > MAX_PRINCIPAL) {
+  const validPrincipal = Number.isFinite(inputs.principal) && inputs.principal > 0 && inputs.principal <= MAX_PRINCIPAL
+  const validApr = Number.isFinite(inputs.apr) && inputs.apr >= 0 && inputs.apr <= MAX_APR
+  const validTerm = Number.isInteger(inputs.termMonths) && inputs.termMonths >= 1 && inputs.termMonths <= MAX_TERM_MONTHS
+  const validFirstPaymentMonth = isValidMonth(inputs.firstPaymentMonth)
+
+  if (!validPrincipal) {
     errors.push('Loan amount must be greater than 0 and no more than 1,000,000,000.')
   }
-  if (!Number.isFinite(inputs.apr) || inputs.apr < 0 || inputs.apr > MAX_APR) {
+  if (!validApr) {
     errors.push('APR must be between 0% and 100%.')
   }
-  if (!Number.isInteger(inputs.termMonths) || inputs.termMonths < 1 || inputs.termMonths > MAX_TERM_MONTHS) {
+  if (!validTerm) {
     errors.push('Loan term must be between 1 and 600 months.')
   }
-  if (!isValidMonth(inputs.firstPaymentMonth)) {
+  if (!validFirstPaymentMonth) {
     errors.push('Choose a valid first payment month.')
   }
   if (!Number.isFinite(inputs.extraMonthlyPayment) || inputs.extraMonthlyPayment < 0 || inputs.extraMonthlyPayment > MAX_PRINCIPAL) {
     errors.push('Extra monthly payment must be 0 or greater.')
   }
 
+  const firstMonthIndex = validFirstPaymentMonth ? monthIndex(inputs.firstPaymentMonth) : null
+  const lastScheduledMonthIndex = firstMonthIndex !== null && validTerm
+    ? firstMonthIndex + inputs.termMonths - 1
+    : null
+
   for (const payment of inputs.lumpSums) {
     if (!isValidMonth(payment.month)) {
       errors.push('Each one-time payment needs a valid month.')
       continue
     }
-    if (isValidMonth(inputs.firstPaymentMonth) && monthIndex(payment.month) < monthIndex(inputs.firstPaymentMonth)) {
+
+    const paymentMonthIndex = monthIndex(payment.month)
+    if (firstMonthIndex !== null && paymentMonthIndex < firstMonthIndex) {
       errors.push('One-time payments cannot occur before the first payment month.')
+    }
+    if (lastScheduledMonthIndex !== null && paymentMonthIndex > lastScheduledMonthIndex) {
+      errors.push('One-time payments must fall within the scheduled loan term.')
     }
     if (!Number.isFinite(payment.amount) || payment.amount <= 0 || payment.amount > MAX_PRINCIPAL) {
       errors.push('Each one-time payment must be greater than 0.')
@@ -228,7 +243,7 @@ export function summarizeLoanByYear(schedule: LoanPayment[]): LoanYearSummary[] 
         year,
         startingBalance: payment.startingBalance,
         totalPayments: payment.totalPayment,
-        principal: roundLoanMoney(payment.principal + payment.extraPrincipal),
+        principal: payment.principal,
         interest: payment.interest,
         extraPrincipal: payment.extraPrincipal,
         endingBalance: payment.endingBalance,
@@ -237,7 +252,7 @@ export function summarizeLoanByYear(schedule: LoanPayment[]): LoanYearSummary[] 
     }
 
     existing.totalPayments = roundLoanMoney(existing.totalPayments + payment.totalPayment)
-    existing.principal = roundLoanMoney(existing.principal + payment.principal + payment.extraPrincipal)
+    existing.principal = roundLoanMoney(existing.principal + payment.principal)
     existing.interest = roundLoanMoney(existing.interest + payment.interest)
     existing.extraPrincipal = roundLoanMoney(existing.extraPrincipal + payment.extraPrincipal)
     existing.endingBalance = payment.endingBalance
