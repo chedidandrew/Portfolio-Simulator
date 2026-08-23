@@ -31,9 +31,12 @@ try {
   await page.getByText('Extra Payment Impact').waitFor()
   await page.getByText('$2,212.24', { exact: true }).first().waitFor()
 
-  const interestMetric = page.getByText('Total interest', { exact: true }).locator('xpath=..')
-  const totalPaidMetric = page.getByText('Total paid', { exact: true }).locator('xpath=..')
-  const payoffMetric = page.getByText('Payoff', { exact: true }).locator('xpath=..')
+  const summaryCard = page
+    .getByText('Required monthly payment', { exact: true })
+    .locator('xpath=ancestor::div[contains(@class,"print-section")][1]')
+  const interestMetric = summaryCard.getByText('Total interest', { exact: true }).locator('xpath=..')
+  const totalPaidMetric = summaryCard.getByText('Total paid', { exact: true }).locator('xpath=..')
+  const payoffMetric = summaryCard.getByText('Payoff', { exact: true }).locator('xpath=..')
   const interestBox = await interestMetric.boundingBox()
   const totalPaidBox = await totalPaidMetric.boundingBox()
   const payoffBox = await payoffMetric.boundingBox()
