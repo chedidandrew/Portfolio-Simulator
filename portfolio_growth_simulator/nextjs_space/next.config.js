@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: { ignoreBuildErrors: false },
-  images: { unoptimized: true },
   outputFileTracingRoot: __dirname,
   poweredByHeader: false,
   async headers() {
