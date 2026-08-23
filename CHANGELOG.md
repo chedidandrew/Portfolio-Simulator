@@ -7,6 +7,7 @@ All notable repository and production changes are documented here.
 ### Changed
 
 - Replaced the generic header icon with the Portfolio Simulator app mark for a more consistent product identity.
+- Switched the header brand mark from the raster `favicon.png` asset to the existing vector `favicon.svg` so it renders sharply on high-density displays.
 - Kept Guide, Growth, and Withdrawal labels visible on mobile while preserving their explicit accessible tab names.
 - Tightened the simulator shell spacing on small screens without changing calculator behavior or financial results.
 - Simplified the support card and donation dialog so support remains available without visually competing with portfolio results.
