@@ -2,6 +2,19 @@
 
 All notable repository and production changes are documented here.
 
+## 2026-08-23 - Loan chart and formula polish
+
+### Changed
+
+- Restyled the Remaining Balance chart tooltip to use the active theme's popover surface, readable foreground text, rounded app-card treatment, and tabular numeric values instead of Recharts' default light tooltip.
+- Reduced loan-chart grid and hover-cursor emphasis so the balance curve remains the visual focus in dark and light themes.
+- Replaced the plain monospaced loan payment formula with the same centered KaTeX formula-card treatment used by the Growth Phase methodology.
+- Expanded Chromium loan smoke coverage to verify themed tooltip styling, quiet chart grid treatment, and rendered loan methodology math.
+
+### Rollback checkpoint
+
+- Created `backup/pre-loan-chart-polish-2026-08-23` from production commit `69058e5f16dddad59045d8cfa6e91a5b19ff19fc` before this presentation pass. If the revised chart or formula treatment is not preferred after deployment, restore that Vercel deployment first and revert this release through a normal pull request.
+
 ## 2026-08-23 - Header and loan summary polish
 
 ### Changed
