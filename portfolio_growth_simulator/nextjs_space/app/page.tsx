@@ -282,15 +282,15 @@ export default function Home() {
       <main className="container mx-auto max-w-6xl px-4 py-6 pb-20 print:p-0 print:max-w-none">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6 h-auto print:hidden">
-            <TabsTrigger value="guide" className="flex items-center gap-2 py-3">
+            <TabsTrigger value="guide" aria-label="Guide" className="flex items-center gap-2 py-3">
               <BookOpen className="h-4 w-4" />
               <span className="hidden sm:inline">Guide</span>
             </TabsTrigger>
-            <TabsTrigger value="growth" className="flex items-center gap-2 py-3">
+            <TabsTrigger value="growth" aria-label="Growth" className="flex items-center gap-2 py-3">
               <TrendingUp className="h-4 w-4" />
               <span className="hidden sm:inline">Growth</span>
             </TabsTrigger>
-            <TabsTrigger value="withdrawal" className="flex items-center gap-2 py-3">
+            <TabsTrigger value="withdrawal" aria-label="Withdrawal" className="flex items-center gap-2 py-3">
               <TrendingDown className="h-4 w-4" />
               <span className="hidden sm:inline">Withdrawal</span>
             </TabsTrigger>
