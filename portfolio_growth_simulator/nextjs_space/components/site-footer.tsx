@@ -6,8 +6,8 @@ export function SiteFooter() {
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-6 text-xs text-muted-foreground sm:flex-row">
         <p>Portfolio Simulator is an educational scenario modeling tool.</p>
         <nav aria-label="Footer navigation" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-          <Link href="/loan" className="transition-colors hover:text-foreground">
-            Loan Calculator
+          <Link href="/tools" className="transition-colors hover:text-foreground">
+            Tools
           </Link>
           <Link href="/methodology" className="transition-colors hover:text-foreground">
             Methodology
