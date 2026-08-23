@@ -26,6 +26,10 @@ For the 2026-08-23 public-experience polish release, `backup/pre-public-polish-2
 
 Do not force-push `main` backward. Use a revert pull request so the rollback is reviewable, tested, and preserved in history.
 
+## Dependency maintenance
+
+Dependabot keeps minor and patch production updates in small logical groups instead of one large production bundle. Framework packages, Radix UI packages, and UI utility packages are tested independently so a compatibility failure can be isolated before merge. Major updates remain manual review items.
+
 ## Local validation
 
 From `portfolio_growth_simulator/nextjs_space`:
