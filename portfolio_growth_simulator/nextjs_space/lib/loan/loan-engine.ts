@@ -187,13 +187,14 @@ export function calculateLoan(inputs: LoanInputs): LoanProjection {
   const totalPrincipal = roundLoanMoney(
     schedule.reduce((sum, payment) => sum + payment.principal + payment.extraPrincipal, 0),
   )
+  const finalPayment = schedule.length > 0 ? schedule[schedule.length - 1] : undefined
 
   return {
     scheduledPayment,
     totalInterest,
     totalPaid,
     totalPrincipal,
-    payoffMonth: schedule.at(-1)?.month ?? inputs.firstPaymentMonth,
+    payoffMonth: finalPayment?.month ?? inputs.firstPaymentMonth,
     paymentCount: schedule.length,
     schedule,
   }
