@@ -6,8 +6,30 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      production-dependencies:
+      framework-dependencies:
         dependency-type: production
+        patterns:
+          - next
+          - react
+          - react-dom
+          - next-themes
+        update-types:
+          - minor
+          - patch
+      radix-ui-dependencies:
+        dependency-type: production
+        patterns:
+          - "@radix-ui/*"
+        update-types:
+          - minor
+          - patch
+      ui-utility-dependencies:
+        dependency-type: production
+        patterns:
+          - class-variance-authority
+          - katex
+          - lucide-react
+          - sonner
         update-types:
           - minor
           - patch
