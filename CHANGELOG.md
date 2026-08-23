@@ -9,8 +9,8 @@ All notable repository and production changes are documented here.
 - Enabled the existing System theme option in `next-themes`.
 - Restored the default Next.js image optimization pipeline.
 - Lazy-loaded the Guide, Growth, and Withdrawal top-level bundles.
-- Removed currency-driven remounting of the entire calculator tree while preserving display-currency refreshes.
-- Moved simulator-specific persisted-state validator selection out of the generic local-storage hook into a dedicated validation module while preserving malformed-state recovery.
+- Centralized display-currency state in a React context so currency changes refresh formatting without remounting calculator state.
+- Made `useLocalStorage` generic by passing Growth and Withdrawal persisted-state validators explicitly at their call sites while preserving malformed-state recovery.
 - Consolidated Website CI around the single `npm run verify` source of truth.
 - Pinned Playwright in `devDependencies` and regenerated the npm lockfile from GitHub Actions.
 - Removed the unlocked runtime Playwright install from browser CI.
