@@ -46,8 +46,8 @@ export function getInvestVsDebtValidationErrors(inputs: InvestVsDebtInputs): str
   if (!Number.isInteger(inputs.remainingMonths) || inputs.remainingMonths < 1 || inputs.remainingMonths > MAX_MONTHS) {
     errors.push('Remaining term must be between 1 and 600 months.')
   }
-  if (!Number.isFinite(inputs.extraMonthlyCash) || inputs.extraMonthlyCash < 0 || inputs.extraMonthlyCash > MAX_AMOUNT) {
-    errors.push('Extra monthly cash must be 0 or greater.')
+  if (!Number.isFinite(inputs.extraMonthlyCash) || inputs.extraMonthlyCash <= 0 || inputs.extraMonthlyCash > MAX_AMOUNT) {
+    errors.push('Extra monthly cash must be greater than 0.')
   }
   if (!Number.isFinite(inputs.expectedReturn) || inputs.expectedReturn <= -100 || inputs.expectedReturn > 100) {
     errors.push('Expected investment return must be greater than -100% and no more than 100%.')
@@ -91,10 +91,7 @@ function contributionSchedules(inputs: InvestVsDebtInputs) {
   for (let index = 0; index < inputs.remainingMonths; index += 1) {
     const scheduledActual = baseline.schedule[index]?.totalPayment ?? 0
     const debtActual = debtFirst.schedule[index]?.totalPayment ?? 0
-
-    investFirstContributions.push(roundLoanMoney(
-      inputs.extraMonthlyCash + Math.max(0, scheduledPayment - scheduledActual),
-    ))
+    investFirstContributions.push(roundLoanMoney(inputs.extraMonthlyCash + Math.max(0, scheduledPayment - scheduledActual)))
     debtFirstContributions.push(roundLoanMoney(Math.max(0, monthlyBudget - debtActual)))
   }
 
@@ -116,15 +113,8 @@ export function compareInvestVsDebt(inputs: InvestVsDebtInputs): InvestVsDebtRes
   if (errors.length > 0) throw new Error(errors[0])
 
   const schedules = contributionSchedules(inputs)
-  const deterministicInvestFirst = deterministicFutureValue(
-    schedules.investFirstContributions,
-    inputs.expectedReturn,
-  )
-  const deterministicDebtFirst = deterministicFutureValue(
-    schedules.debtFirstContributions,
-    inputs.expectedReturn,
-  )
-
+  const deterministicInvestFirst = deterministicFutureValue(schedules.investFirstContributions, inputs.expectedReturn)
+  const deterministicDebtFirst = deterministicFutureValue(schedules.debtFirstContributions, inputs.expectedReturn)
   const annual = inputs.expectedReturn / 100
   const drift = Math.log1p(annual) / 12
   const diffusion = (inputs.volatility / 100) * Math.sqrt(1 / 12)
