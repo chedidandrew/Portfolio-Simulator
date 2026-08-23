@@ -171,7 +171,7 @@ export default function Home() {
         >
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/15 bg-primary/5 shadow-sm">
-              <Image src="/favicon.png" alt="" width={24} height={24} className="rounded-md" priority />
+              <Image src="/favicon.svg" alt="" width={24} height={24} className="rounded-md" priority />
             </div>
             <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-primary to-emerald-400 bg-clip-text text-transparent">
               Portfolio Simulator
