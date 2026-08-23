@@ -51,6 +51,7 @@ jobs:
           cat /tmp/portfolio-simulator.log
           exit 1
       - run: npm run test:browser:chromium
+      - run: npm run test:browser:loan
       - run: npm run test:browser:a11y
       - name: Show server log on failure
         if: failure()
