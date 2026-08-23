@@ -6,14 +6,17 @@ Production is hosted by Vercel and connected to this GitHub repository. The prod
 
 1. Create a short-lived branch.
 2. Open a pull request into `main`.
-3. Wait for Website CI, Browser Smoke, and CodeQL to pass on the final head commit.
-4. Merge only after the checks are green.
-5. Vercel deploys the merged `main` commit through the existing Git integration.
-6. Verify the live production URL after deployment.
+3. Wait for Website CI, Browser Smoke, CodeQL, and the configured Vercel status check to pass on the final head commit.
+4. Ensure the branch is up to date with `main` and all review conversations are resolved.
+5. Merge only after the required checks are green.
+6. Vercel deploys the merged `main` commit through the existing Git integration.
+7. Verify the live production URL after deployment.
 
 ## Repository protection
 
-GitHub settings should protect `main` against force pushes and direct application pushes and require Website CI and Browser Smoke before merge. Branch protection is a repository setting rather than source code. If administrative tooling is unavailable, the PR-first rule in `AGENTS.md` remains mandatory until protection can be enabled in GitHub Settings.
+`main` is protected by an active GitHub ruleset. The ruleset requires pull requests, required status checks, an up-to-date branch before merge, and resolved review conversations. It also restricts branch deletion and blocks force pushes. The bypass list is intentionally empty.
+
+The repository does not require human approvals, which keeps the workflow compatible with AI-assisted maintenance while preserving automated quality gates.
 
 ## Local validation
 
