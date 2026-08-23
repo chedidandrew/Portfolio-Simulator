@@ -14,7 +14,7 @@ try {
   await page.goto(`${baseUrl}/loan`, { waitUntil: 'networkidle' })
   await page.getByRole('heading', { name: 'Loan & Amortization Calculator', level: 1 }).waitFor()
 
-  const brandText = page.getByText('Portfolio Simulator', { exact: true }).first()
+  const brandText = page.locator('header').getByText('Portfolio Simulator', { exact: true })
   await brandText.waitFor({ state: 'visible' })
   const brandStyles = await brandText.evaluate((element) => ({
     backgroundImage: getComputedStyle(element).backgroundImage,
