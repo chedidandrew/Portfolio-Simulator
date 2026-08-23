@@ -45,6 +45,14 @@ export function PayoffGoalCalculator() {
   })
   const [targetMonth, setTargetMonth] = useState(() => addMonths(firstPayment, 179))
 
+  const lastScheduledMonth = useMemo(() => {
+    try {
+      return addMonths(inputs.firstPaymentMonth, Math.max(0, inputs.termMonths - 1))
+    } catch {
+      return ''
+    }
+  }, [inputs.firstPaymentMonth, inputs.termMonths])
+
   const estimate = useMemo(() => {
     try {
       return estimatePayoffGoal(inputs, targetMonth)
@@ -61,15 +69,9 @@ export function PayoffGoalCalculator() {
     }
   }, [inputs])
 
-  const totalMonthly = estimate && baseline
-    ? baseline.scheduledPayment + estimate.requiredExtraMonthlyPayment
-    : 0
-  const interestSaved = estimate && baseline
-    ? Math.max(0, baseline.totalInterest - estimate.projected.totalInterest)
-    : 0
-  const monthsSaved = estimate && baseline
-    ? Math.max(0, baseline.paymentCount - estimate.projected.paymentCount)
-    : 0
+  const totalMonthly = estimate && baseline ? baseline.scheduledPayment + estimate.requiredExtraMonthlyPayment : 0
+  const interestSaved = estimate && baseline ? Math.max(0, baseline.totalInterest - estimate.projected.totalInterest) : 0
+  const monthsSaved = estimate && baseline ? Math.max(0, baseline.paymentCount - estimate.projected.paymentCount) : 0
 
   const applyToLoan = () => {
     if (!estimate) return
@@ -89,34 +91,14 @@ export function PayoffGoalCalculator() {
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Loan balance" suffix={symbol}>
-              <Input type="number" min="1" step="1000" value={inputs.principal} onChange={(event) => setInputs({ ...inputs, principal: Number(event.target.value) || 0 })} />
-            </Field>
-            <Field label="APR" suffix="%">
-              <Input type="number" min="0" max="100" step="0.01" value={inputs.apr} onChange={(event) => setInputs({ ...inputs, apr: Number(event.target.value) || 0 })} />
-            </Field>
-            <Field label="Remaining term" suffix="years">
-              <Input type="number" min="1" max="50" step="0.5" value={inputs.termMonths / 12} onChange={(event) => setInputs({ ...inputs, termMonths: Math.max(1, Math.round((Number(event.target.value) || 0) * 12)) })} />
-            </Field>
-            <Field label="First payment month">
-              <Input type="month" value={inputs.firstPaymentMonth} onChange={(event) => setInputs({ ...inputs, firstPaymentMonth: event.target.value })} />
-            </Field>
-            <Field label="Target payoff month">
-              <Input
-                type="month"
-                min={inputs.firstPaymentMonth}
-                max={addMonths(inputs.firstPaymentMonth, Math.max(0, inputs.termMonths - 1))}
-                value={targetMonth}
-                onChange={(event) => setTargetMonth(event.target.value)}
-              />
-            </Field>
-            <Field label="Already paying extra" suffix={symbol}>
-              <Input type="number" min="0" step="50" value={inputs.extraMonthlyPayment} onChange={(event) => setInputs({ ...inputs, extraMonthlyPayment: Number(event.target.value) || 0 })} />
-            </Field>
+            <Field label="Loan balance" suffix={symbol}><Input type="number" min="1" step="1000" value={inputs.principal} onChange={(event) => setInputs({ ...inputs, principal: Number(event.target.value) || 0 })} /></Field>
+            <Field label="APR" suffix="%"><Input type="number" min="0" max="100" step="0.01" value={inputs.apr} onChange={(event) => setInputs({ ...inputs, apr: Number(event.target.value) || 0 })} /></Field>
+            <Field label="Remaining term" suffix="years"><Input type="number" min="1" max="50" step="0.5" value={inputs.termMonths / 12} onChange={(event) => setInputs({ ...inputs, termMonths: Math.max(1, Math.round((Number(event.target.value) || 0) * 12)) })} /></Field>
+            <Field label="First payment month"><Input type="month" value={inputs.firstPaymentMonth} onChange={(event) => setInputs({ ...inputs, firstPaymentMonth: event.target.value })} /></Field>
+            <Field label="Target payoff month"><Input type="month" min={inputs.firstPaymentMonth || undefined} max={lastScheduledMonth || undefined} value={targetMonth} onChange={(event) => setTargetMonth(event.target.value)} /></Field>
+            <Field label="Already paying extra" suffix={symbol}><Input type="number" min="0" step="50" value={inputs.extraMonthlyPayment} onChange={(event) => setInputs({ ...inputs, extraMonthlyPayment: Number(event.target.value) || 0 })} /></Field>
           </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            This planner solves recurring monthly extra principal. One-time lump sums remain available in the full Loan Calculator.
-          </p>
+          <p className="text-xs leading-relaxed text-muted-foreground">This planner solves recurring monthly extra principal. One-time lump sums remain available in the full Loan Calculator.</p>
         </CardContent>
       </Card>
 
@@ -125,12 +107,8 @@ export function PayoffGoalCalculator() {
           <Card className="border-primary/25">
             <CardHeader className="pb-3">
               <CardDescription>Required recurring extra payment</CardDescription>
-              <CardTitle className="text-4xl tracking-tight text-primary sm:text-5xl">
-                {formatCurrency(estimate.requiredExtraMonthlyPayment, true, 2, false)}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Total planned monthly outflow: <strong className="text-foreground">{formatCurrency(totalMonthly, true, 2, false)}</strong>
-              </p>
+              <CardTitle className="text-4xl tracking-tight text-primary sm:text-5xl">{formatCurrency(estimate.requiredExtraMonthlyPayment, true, 2, false)}</CardTitle>
+              <p className="text-sm text-muted-foreground">Total planned monthly outflow: <strong className="text-foreground">{formatCurrency(totalMonthly, true, 2, false)}</strong></p>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -141,15 +119,11 @@ export function PayoffGoalCalculator() {
               </div>
             </CardContent>
           </Card>
-          <Button type="button" size="lg" className="w-full sm:w-auto" onClick={applyToLoan}>
-            Use this payment in Loan Calculator
-          </Button>
+          <Button type="button" size="lg" className="w-full sm:w-auto" onClick={applyToLoan}>Use this payment in Loan Calculator</Button>
           <p className="text-xs text-muted-foreground">Display currency: {currency}. Symbols change only; values are not converted using exchange rates.</p>
         </div>
       ) : (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">Enter a target month inside the scheduled loan term.</CardContent>
-        </Card>
+        <Card className="border-dashed"><CardContent className="py-12 text-center text-sm text-muted-foreground">Enter a target month inside the scheduled loan term.</CardContent></Card>
       )}
     </div>
   )
@@ -157,21 +131,13 @@ export function PayoffGoalCalculator() {
 
 function Field({ label, suffix, children }: { label: string; suffix?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <Label>{label}</Label>
-        {suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}
-      </div>
+    <Label className="block space-y-1.5 font-normal">
+      <span className="flex items-center justify-between gap-2"><span className="font-medium text-foreground">{label}</span>{suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}</span>
       {children}
-    </div>
+    </Label>
   )
 }
 
 function Metric({ icon: Icon, label, value }: { icon: typeof Gauge; label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-muted/35 p-4">
-      <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-4 w-4" /> {label}</div>
-      <p className="text-lg font-semibold leading-tight tabular-nums">{value}</p>
-    </div>
-  )
+  return <div className="rounded-xl bg-muted/35 p-4"><div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-4 w-4" /> {label}</div><p className="text-lg font-semibold leading-tight tabular-nums">{value}</p></div>
 }
