@@ -16,6 +16,7 @@ All notable repository and production changes are documented here.
 - Removed the unlocked runtime Playwright install from browser CI.
 - Added WebKit mobile smoke coverage.
 - Added real-browser Axe accessibility checks, including color contrast.
+- Fixed Guide collapsible headers so Radix `aria-expanded` and `aria-controls` are applied to an element with button semantics and keyboard activation.
 - Scoped browser-smoke concurrency by Git ref so unrelated branches do not cancel one another.
 - Removed the duplicate nested license file; the root BSD-3-Clause license remains authoritative.
 
