@@ -22,7 +22,10 @@ The PR-first rule in `AGENTS.md` remains mandatory for automated contributors ev
 
 For an urgent presentation or behavior rollback, restore the previous known-good Vercel deployment first so the public site can recover quickly. Then create a GitHub revert pull request for the release commit so `main` and production return to the same source state.
 
-For the 2026-08-23 public-experience polish release, `backup/pre-public-polish-2026-08-23` preserves the production source state from immediately before the polish branch was created.
+Release checkpoints:
+
+- `backup/pre-loan-calculator-2026-08-23` preserves production commit `c12f7f3cee59bc5f74f666301fe5960cedf3e51e` from immediately before the Loan & Amortization Calculator release.
+- `backup/pre-public-polish-2026-08-23` preserves the production source state from immediately before the public-experience polish release.
 
 Do not force-push `main` backward. Use a revert pull request so the rollback is reviewable, tested, and preserved in history.
 
@@ -45,6 +48,6 @@ Playwright is pinned in `devDependencies`, so browser CI uses the lockfile inste
 
 The Browser Smoke workflow covers:
 
-- Chromium end-to-end behavior, including exports, Monte Carlo workers, share links, mobile layout, chart tooltips, and simulation progress UI.
-- WebKit mobile layout, visible mode navigation, settings behavior, and public trust routes.
-- Real-browser Axe accessibility checks, including color contrast, on the application, methodology, and privacy routes.
+- Chromium end-to-end behavior, including exports, Monte Carlo workers, share links, mobile layout, chart tooltips, simulation progress UI, and the loan calculator share/export path.
+- WebKit mobile layout, visible mode navigation, settings behavior, public trust routes, and the responsive loan calculator/amortization schedule.
+- Real-browser Axe accessibility checks, including color contrast, on the application, loan calculator, methodology, loan methodology, and privacy routes.
