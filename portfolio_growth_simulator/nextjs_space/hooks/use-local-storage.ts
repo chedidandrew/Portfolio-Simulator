@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { getDefaultPersistedValidator } from '@/lib/storage-validation'
 
 interface LocalStorageOptions<T> {
   normalize?: (value: T, persistedValue: unknown | null) => T
@@ -18,9 +17,8 @@ export function useLocalStorage<T>(
   normalizeRef.current = options.normalize
   const shouldPersistRef = useRef(options.shouldPersist)
   shouldPersistRef.current = options.shouldPersist
-  const defaultValidator = getDefaultPersistedValidator(key, initialValue)
-  const validatePersistedRef = useRef(options.validatePersisted ?? defaultValidator)
-  validatePersistedRef.current = options.validatePersisted ?? defaultValidator
+  const validatePersistedRef = useRef(options.validatePersisted)
+  validatePersistedRef.current = options.validatePersisted
 
   const normalizeValue = useCallback(
     (value: T, persistedValue: unknown | null) =>
