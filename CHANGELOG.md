@@ -2,6 +2,35 @@
 
 All notable repository and production changes are documented here.
 
+## 2026-08-23 - Financial planning tools expansion
+
+### Added
+
+- Added a `/tools` hub so debt-planning tools can grow without adding more tabs to the core Guide, Growth, and Withdrawal simulator.
+- Added `/loan/payoff-goal`, which solves for the minimum recurring extra payment needed to reach a selected target payoff month and can apply that result back to the main Loan Calculator.
+- Added `/loan/refinance`, comparing current and proposed fixed-rate loans with closing costs, financed-cost handling, payment savings, payoff timing, break-even estimate, remaining interest, and lifetime cost.
+- Added `/invest-vs-debt`, which compares investing extra monthly cash with accelerating fixed-rate debt payoff using equal monthly cash commitments, deterministic projections, and reproducible seeded market scenarios.
+- Added dedicated refinance and invest-vs-debt methodology pages documenting cash-flow rules, scenario assumptions, and exclusions.
+- Added custom 404 and application-error experiences consistent with the Portfolio Simulator visual system.
+- Added deterministic regression coverage for payoff-goal solving, refinance math, and invest-vs-debt comparisons plus dedicated Chromium, WebKit mobile, and Axe coverage for the new routes.
+
+### Changed
+
+- Added related Payoff Goal, Refinance, and Invest vs. Debt links below the main Loan Calculator while keeping the calculator itself focused on amortization.
+- Changed the global footer from a single Loan Calculator link to a Financial Tools entry point.
+- Expanded SoftwareApplication structured data and the sitemap to include the new financial-planning capabilities and routes.
+- Expanded the PWA offline shell to cache the new tool and methodology routes.
+- PWA install-prompt dismissal is now remembered for 30 days instead of potentially reappearing on each eligible visit.
+- Updated repository documentation and validation scripts for the expanded financial-tool suite.
+
+### Rollback checkpoint
+
+- Created `backup/pre-financial-tools-expansion-2026-08-23` from production commit `2040b6b12205fa619f91c59636ea526bf3200549` before this expansion. If the broader tools experience is not preferred after deployment, restore that Vercel deployment first and revert this release through a normal pull request.
+
+### Deferred security maintenance
+
+- The announced Next.js August 26, 2026 security release is not available as of this release date. The project remains on Next.js 15.5.22 until the patched 15.5 build is published, at which point it should be upgraded through the normal protected PR and browser-validation workflow.
+
 ## 2026-08-23 - Loan chart and formula polish
 
 ### Changed
@@ -67,7 +96,7 @@ All notable repository and production changes are documented here.
 
 ### Rollback checkpoint
 
-- Created `backup/pre-loan-calculator-2026-08-23` from production commit `c12f7f3cee59bc5f74f666301fe5960cedf3e51e` before loan development began. If the release is not preferred after deployment, restore the previous Vercel deployment first and revert the loan release commit through a normal pull request.
+- Created `backup/pre-loan-calculator-2026-08-23` from production commit `c12f7f3cee59bc5f74f666301fe5960cedf3e51e` before loan development began. If the release is not preferred after deployment, restore the previous Vercel production deployment first and revert the loan release commit through a normal pull request.
 
 ## 2026-08-23 - Public experience polish
 

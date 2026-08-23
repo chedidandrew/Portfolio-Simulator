@@ -41,10 +41,10 @@ export default function PrivacyPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
             <p>
-              Growth, withdrawal, loan, display, and simulation preferences are processed in your browser. Portfolio Simulator uses browser local storage so your calculator settings can persist between visits.
+              Growth, withdrawal, loan, payoff-goal, refinance, invest-versus-debt, display, and simulation inputs are processed in your browser. Portfolio Simulator uses browser local storage for selected calculator settings and preferences so they can persist between visits; focused comparison tools can also operate only in the current page session unless you deliberately transfer a result into a saved calculator scenario.
             </p>
             <p>
-              The application does not require a user account and does not maintain an application database of your portfolio or loan scenarios. The Reset option in Settings clears simulator-owned browser storage from your device, and individual tools can also provide their own reset control.
+              The application does not require a user account and does not maintain an application database of your portfolio, loan, refinance, or comparison scenarios. The Reset option in Settings clears simulator-owned browser storage from your device, and individual tools can also provide their own reset control.
             </p>
           </CardContent>
         </Card>
@@ -67,9 +67,7 @@ export default function PrivacyPage() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <h2 className="text-lg font-semibold">Hosting and analytics</h2>
-          </CardHeader>
+          <CardHeader className="pb-3"><h2 className="text-lg font-semibold">Hosting and analytics</h2></CardHeader>
           <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
             <p>
               Portfolio Simulator is hosted by Vercel and uses Vercel Web Analytics. As part of providing hosting and analytics services, Vercel may process ordinary traffic and service data such as IP address, browser or device information, approximate location derived from IP address, pages viewed, timestamps, and related telemetry.
@@ -77,12 +75,7 @@ export default function PrivacyPage() {
             <p>
               Calculator scenario values are not intentionally sent to Vercel Analytics by Portfolio Simulator. Standard web hosting requests and service logs are still handled by Vercel.
             </p>
-            <a
-              href="https://vercel.com/legal/privacy-notice"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 font-medium text-foreground underline-offset-4 hover:underline"
-            >
+            <a href="https://vercel.com/legal/privacy-notice" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-medium text-foreground underline-offset-4 hover:underline">
               Read Vercel&apos;s Privacy Notice
               <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
             </a>
@@ -90,21 +83,15 @@ export default function PrivacyPage() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <h2 className="text-lg font-semibold">External support services</h2>
-          </CardHeader>
+          <CardHeader className="pb-3"><h2 className="text-lg font-semibold">External support services</h2></CardHeader>
           <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
-            <p>
-              Support links can open third-party services such as Buy Me a Coffee, Venmo, Cash App, PayPal, or a Bitcoin wallet. If you choose to use one of those services, its own privacy policy and terms apply.
-            </p>
+            <p>Support links can open third-party services such as Buy Me a Coffee, Venmo, Cash App, PayPal, or a Bitcoin wallet. If you choose to use one of those services, its own privacy policy and terms apply.</p>
           </CardContent>
         </Card>
 
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="pt-6 text-sm leading-relaxed text-muted-foreground">
-            <p>
-              Portfolio Simulator is an educational modeling tool. It does not ask for login credentials, brokerage credentials, bank account numbers, loan account numbers, or government identification numbers. Avoid entering information that you would not want stored locally on your device or included in a shared scenario link.
-            </p>
+            <p>Portfolio Simulator is an educational modeling tool. It does not ask for login credentials, brokerage credentials, bank account numbers, loan account numbers, or government identification numbers. Avoid entering information that you would not want stored locally on your device or included in a shared scenario link.</p>
           </CardContent>
         </Card>
       </div>
