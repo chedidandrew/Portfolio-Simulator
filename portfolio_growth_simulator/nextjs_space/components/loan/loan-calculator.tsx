@@ -3,19 +3,23 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
+import { useTheme } from 'next-themes'
 import {
+  AlertTriangle,
   ArrowLeft,
   CalendarDays,
   Clock3,
-  Download,
   FileSpreadsheet,
   Gauge,
   Landmark,
+  List,
+  Moon,
   Plus,
   Printer,
   RotateCcw,
   Share2,
   Sparkles,
+  Sun,
   Trash2,
   WalletCards,
 } from 'lucide-react'
@@ -37,7 +41,7 @@ import { Label } from '@/components/ui/label'
 import { CurrencyPickerDialog } from '@/components/currency-picker-dialog'
 import { useCurrency } from '@/components/currency-provider'
 import { useLocalStorage } from '@/hooks/use-local-storage'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getAppCurrency } from '@/lib/utils'
 import {
   addMonths,
   compareLoanPlans,
@@ -46,7 +50,11 @@ import {
   type LoanInputs,
   type LoanLumpSum,
 } from '@/lib/loan/loan-engine'
-import { buildLoanShareUrl, readLoanSharePayload } from '@/lib/loan/loan-share'
+import {
+  buildLoanShareUrl,
+  cleanLoanShareDataFromUrl,
+  readLoanSharePayload,
+} from '@/lib/loan/loan-share'
 
 const STORAGE_KEY = 'portfolio-sim-loan-state'
 
@@ -80,10 +88,19 @@ function isPersistedLoanInputs(value: unknown): value is LoanInputs {
     || candidate.lumpSums.length > 24
   ) return false
 
+  const seenIds = new Set<string>()
   for (const item of candidate.lumpSums) {
     if (typeof item !== 'object' || item === null || Array.isArray(item)) return false
     const payment = item as Record<string, unknown>
-    if (typeof payment.id !== 'string' || typeof payment.month !== 'string' || typeof payment.amount !== 'number') return false
+    if (
+      typeof payment.id !== 'string'
+      || payment.id.length === 0
+      || payment.id.length > 80
+      || seenIds.has(payment.id)
+      || typeof payment.month !== 'string'
+      || typeof payment.amount !== 'number'
+    ) return false
+    seenIds.add(payment.id)
   }
 
   return getLoanValidationErrors(candidate as unknown as LoanInputs).length === 0
@@ -111,22 +128,33 @@ function numberValue(value: string): number {
 
 export function LoanCalculator() {
   const { currency, setCurrency } = useCurrency()
+  const { resolvedTheme, setTheme } = useTheme()
   const defaults = useMemo(() => defaultLoanInputs(), [])
   const [inputs, setInputs] = useLocalStorage<LoanInputs>(STORAGE_KEY, defaults, {
     validatePersisted: isPersistedLoanInputs,
   })
   const [currencyOpen, setCurrencyOpen] = useState(false)
   const [showMonthlySchedule, setShowMonthlySchedule] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.location.hash.startsWith('#loan=')) return
     const shared = readLoanSharePayload(window.location)
+    const cleanUrl = cleanLoanShareDataFromUrl(window.location.href)
+
     if (!shared) {
       window.setTimeout(() => toast.error('This shared loan scenario could not be loaded.'), 50)
+      window.history.replaceState(null, '', cleanUrl)
       return
     }
+
     setInputs(shared.loan)
     if (shared.displayCurrency) setCurrency(shared.displayCurrency)
+    window.history.replaceState(null, '', cleanUrl)
   }, [setCurrency, setInputs])
 
   const validationErrors = useMemo(() => getLoanValidationErrors(inputs), [inputs])
@@ -145,6 +173,21 @@ export function LoanCalculator() {
   )
 
   const hasAcceleration = inputs.extraMonthlyPayment > 0 || inputs.lumpSums.length > 0
+  const currencySymbol = getAppCurrency().symbol
+  const lastScheduledMonth = useMemo(() => {
+    if (!Number.isInteger(inputs.termMonths) || inputs.termMonths < 1 || inputs.termMonths > 600) return undefined
+    try {
+      return addMonths(inputs.firstPaymentMonth, inputs.termMonths - 1)
+    } catch {
+      return undefined
+    }
+  }, [inputs.firstPaymentMonth, inputs.termMonths])
+
+  const unappliedLumpSums = useMemo(() => {
+    if (!comparison) return []
+    return inputs.lumpSums.filter((payment) => payment.month > comparison.accelerated.payoffMonth)
+  }, [comparison, inputs.lumpSums])
+
   const chartData = useMemo(() => {
     if (!comparison) return []
     return comparison.baseline.schedule.map((baseline, index) => ({
@@ -159,12 +202,13 @@ export function LoanCalculator() {
   }
 
   const addLumpSum = () => {
+    if (inputs.lumpSums.length >= 24 || !lastScheduledMonth) return
     const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
-      : `payment-${Date.now()}`
+      : `payment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const payment: LoanLumpSum = {
       id,
-      month: addMonths(inputs.firstPaymentMonth, Math.min(12, Math.max(1, inputs.termMonths - 1))),
+      month: addMonths(inputs.firstPaymentMonth, Math.min(12, Math.max(0, inputs.termMonths - 1))),
       amount: 5_000,
     }
     updateInput('lumpSums', [...inputs.lumpSums, payment])
@@ -180,18 +224,34 @@ export function LoanCalculator() {
 
   const handleShare = async () => {
     if (typeof window === 'undefined' || !comparison) return
-    const url = buildLoanShareUrl(inputs, currency, window.location.href)
+
+    let url: string
     try {
-      if (navigator.clipboard) {
+      url = buildLoanShareUrl(inputs, currency, window.location.href)
+    } catch {
+      toast.error('This scenario is too large to share in a browser link.')
+      return
+    }
+
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title: 'Loan & Amortization Calculator', url })
+        return
+      } catch (error: unknown) {
+        const name = error instanceof DOMException || error instanceof Error ? error.name : undefined
+        if (name === 'AbortError') return
+      }
+    }
+
+    try {
+      if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url)
         toast.success('Loan link copied')
         return
       }
-      if (navigator.share) {
-        await navigator.share({ title: 'Loan & Amortization Calculator', url })
-      }
+      toast('Copy not supported on this browser')
     } catch {
-      toast.error('Could not share this scenario.')
+      toast.error('Could not share or copy this scenario.')
     }
   }
 
@@ -204,7 +264,7 @@ export function LoanCalculator() {
       workbook.created = new Date()
 
       const summary = workbook.addWorksheet('Summary')
-      summary.columns = [{ width: 30 }, { width: 24 }]
+      summary.columns = [{ width: 32 }, { width: 24 }]
       summary.addRows([
         ['Loan & Amortization Calculator'],
         ['Display Currency', currency],
@@ -214,6 +274,7 @@ export function LoanCalculator() {
         ['First Payment Month', inputs.firstPaymentMonth],
         ['Required Monthly Payment', comparison.baseline.scheduledPayment],
         ['Extra Monthly Payment', inputs.extraMonthlyPayment],
+        ['Scheduled Total Interest', comparison.baseline.totalInterest],
         ['Accelerated Total Interest', comparison.accelerated.totalInterest],
         ['Accelerated Total Paid', comparison.accelerated.totalPaid],
         ['Accelerated Payoff Month', comparison.accelerated.payoffMonth],
@@ -221,7 +282,36 @@ export function LoanCalculator() {
         ['Months Saved', comparison.monthsSaved],
       ])
       summary.getRow(1).font = { bold: true, size: 16 }
-      for (const row of [3, 7, 8, 9, 10, 12]) summary.getCell(`B${row}`).numFmt = '#,##0.00'
+      const moneyLabels = new Set([
+        'Loan Amount',
+        'Required Monthly Payment',
+        'Extra Monthly Payment',
+        'Scheduled Total Interest',
+        'Accelerated Total Interest',
+        'Accelerated Total Paid',
+        'Interest Saved',
+      ])
+      for (let rowNumber = 2; rowNumber <= summary.rowCount; rowNumber += 1) {
+        if (moneyLabels.has(String(summary.getCell(`A${rowNumber}`).value ?? ''))) {
+          summary.getCell(`B${rowNumber}`).numFmt = '#,##0.00'
+        }
+      }
+
+      if (inputs.lumpSums.length > 0) {
+        const extraPayments = workbook.addWorksheet('Extra Payments')
+        extraPayments.columns = [
+          { header: 'Month', key: 'month', width: 16 },
+          { header: 'Requested Extra Principal', key: 'amount', width: 28 },
+        ]
+        extraPayments.getRow(1).font = { bold: true }
+        extraPayments.addRows(
+          [...inputs.lumpSums]
+            .sort((a, b) => a.month.localeCompare(b.month))
+            .map((payment) => ({ month: payment.month, amount: payment.amount })),
+        )
+        extraPayments.getColumn(2).numFmt = '#,##0.00'
+        extraPayments.views = [{ state: 'frozen', ySplit: 1 }]
+      }
 
       const scheduleSheet = workbook.addWorksheet('Amortization')
       scheduleSheet.columns = [
@@ -229,7 +319,7 @@ export function LoanCalculator() {
         { header: 'Month', key: 'month', width: 14 },
         { header: 'Starting Balance', key: 'startingBalance', width: 20 },
         { header: 'Scheduled Payment', key: 'scheduledPayment', width: 20 },
-        { header: 'Principal', key: 'principal', width: 18 },
+        { header: 'Scheduled Principal', key: 'principal', width: 20 },
         { header: 'Interest', key: 'interest', width: 18 },
         { header: 'Extra Principal', key: 'extraPrincipal', width: 18 },
         { header: 'Total Payment', key: 'totalPayment', width: 18 },
@@ -259,26 +349,44 @@ export function LoanCalculator() {
     setInputs(defaultLoanInputs())
     setShowMonthlySchedule(false)
     if (typeof window !== 'undefined' && window.location.hash.startsWith('#loan=')) {
-      window.history.replaceState(null, '', '/loan')
+      window.history.replaceState(null, '', cleanLoanShareDataFromUrl(window.location.href))
     }
+  }
+
+  const toggleTheme = () => {
+    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 print:bg-white">
       <header className="border-b bg-background/95 backdrop-blur print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-          <Link href="/" className="flex min-w-0 items-center gap-2" aria-label="Portfolio Simulator home">
-            <Image src="/favicon.svg" alt="" width={32} height={32} className="rounded-lg" />
-            <span className="truncate font-semibold">Portfolio Simulator</span>
+          <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label="Portfolio Simulator home">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/5 shadow-sm">
+              <Image src="/favicon.svg" alt="" width={24} height={24} className="rounded-md" priority />
+            </div>
+            <span className="hidden truncate text-lg font-bold tracking-tight bg-gradient-to-r from-primary to-emerald-400 bg-clip-text text-transparent sm:inline">
+              Portfolio Simulator
+            </span>
           </Link>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setCurrencyOpen(true)}>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-full"
+              aria-label="Toggle theme"
+              onClick={toggleTheme}
+            >
+              {mounted && resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setCurrencyOpen(true)} aria-label={`Display currency: ${currency}`}>
               {currency}
             </Button>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Simulator
+              <Link href="/" aria-label="Back to Portfolio Simulator">
+                <ArrowLeft className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Simulator</span>
               </Link>
             </Button>
           </div>
@@ -305,6 +413,12 @@ export function LoanCalculator() {
           </div>
         </section>
 
+        {comparison && (
+          <div className="hidden print:block">
+            <LoanAssumptions inputs={inputs} currency={currency} />
+          </div>
+        )}
+
         <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <Card className="h-fit print:hidden">
             <CardHeader>
@@ -313,11 +427,13 @@ export function LoanCalculator() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Loan amount" htmlFor="loan-principal">
+                <Field label="Loan amount" htmlFor="loan-principal" suffix={currencySymbol}>
                   <Input
                     id="loan-principal"
                     type="number"
+                    inputMode="decimal"
                     min="1"
+                    max="1000000000"
                     step="1000"
                     value={inputs.principal}
                     onChange={(event) => updateInput('principal', numberValue(event.target.value))}
@@ -327,6 +443,7 @@ export function LoanCalculator() {
                   <Input
                     id="loan-apr"
                     type="number"
+                    inputMode="decimal"
                     min="0"
                     max="100"
                     step="0.01"
@@ -338,6 +455,7 @@ export function LoanCalculator() {
                   <Input
                     id="loan-term"
                     type="number"
+                    inputMode="decimal"
                     min="1"
                     max="50"
                     step="0.5"
@@ -365,11 +483,13 @@ export function LoanCalculator() {
                     <p className="text-xs text-muted-foreground">Optional. Extra principal is applied after each scheduled payment.</p>
                   </div>
                 </div>
-                <Field label="Extra every month" htmlFor="loan-extra-monthly">
+                <Field label="Extra every month" htmlFor="loan-extra-monthly" suffix={currencySymbol}>
                   <Input
                     id="loan-extra-monthly"
                     type="number"
+                    inputMode="decimal"
                     min="0"
+                    max="1000000000"
                     step="50"
                     value={inputs.extraMonthlyPayment}
                     onChange={(event) => updateInput('extraMonthlyPayment', numberValue(event.target.value))}
@@ -382,27 +502,30 @@ export function LoanCalculator() {
                       <p className="text-sm font-medium">One-time principal payments</p>
                       <p className="text-xs text-muted-foreground">Bonuses, windfalls, or other lump sums.</p>
                     </div>
-                    <Button type="button" size="sm" variant="outline" onClick={addLumpSum} disabled={inputs.lumpSums.length >= 24}>
+                    <Button type="button" size="sm" variant="outline" onClick={addLumpSum} disabled={inputs.lumpSums.length >= 24 || !lastScheduledMonth}>
                       <Plus className="mr-1.5 h-4 w-4" /> Add
                     </Button>
                   </div>
 
                   {inputs.lumpSums.map((payment) => (
-                    <div key={payment.id} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
+                    <div key={payment.id} className="grid gap-2 rounded-lg border bg-background/60 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end sm:border-0 sm:bg-transparent sm:p-0">
                       <Field label="Month" htmlFor={`loan-lump-month-${payment.id}`}>
                         <Input
                           id={`loan-lump-month-${payment.id}`}
                           type="month"
                           min={inputs.firstPaymentMonth}
+                          max={lastScheduledMonth}
                           value={payment.month}
                           onChange={(event) => updateLumpSum(payment.id, { month: event.target.value })}
                         />
                       </Field>
-                      <Field label="Amount" htmlFor={`loan-lump-amount-${payment.id}`}>
+                      <Field label="Amount" htmlFor={`loan-lump-amount-${payment.id}`} suffix={currencySymbol}>
                         <Input
                           id={`loan-lump-amount-${payment.id}`}
                           type="number"
+                          inputMode="decimal"
                           min="1"
+                          max="1000000000"
                           step="100"
                           value={payment.amount}
                           onChange={(event) => updateLumpSum(payment.id, { amount: numberValue(event.target.value) })}
@@ -412,6 +535,7 @@ export function LoanCalculator() {
                         type="button"
                         size="icon"
                         variant="ghost"
+                        className="justify-self-end sm:justify-self-auto"
                         aria-label="Remove one-time payment"
                         onClick={() => removeLumpSum(payment.id)}
                       >
@@ -419,6 +543,15 @@ export function LoanCalculator() {
                       </Button>
                     </div>
                   ))}
+
+                  {unappliedLumpSums.length > 0 && (
+                    <div role="status" className="flex gap-2 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-muted-foreground">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                      <span>
+                        {unappliedLumpSums.length === 1 ? 'One payment occurs' : `${unappliedLumpSums.length} payments occur`} after the projected accelerated payoff date and will not be applied unless the payoff plan changes.
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -568,7 +701,7 @@ export function LoanCalculator() {
                     className="print:hidden"
                     onClick={() => setShowMonthlySchedule((current) => !current)}
                   >
-                    <Download className="mr-2 h-4 w-4" />
+                    <List className="mr-2 h-4 w-4" />
                     {showMonthlySchedule ? 'Show yearly summary' : 'View full monthly schedule'}
                   </Button>
                 </div>
@@ -579,7 +712,7 @@ export function LoanCalculator() {
                     <table className="w-full min-w-[860px] text-sm">
                       <thead>
                         <tr className="border-b text-left text-xs text-muted-foreground">
-                          <TableHead>#</TableHead><TableHead>Month</TableHead><TableHead>Starting Balance</TableHead><TableHead>Payment</TableHead><TableHead>Principal</TableHead><TableHead>Interest</TableHead><TableHead>Extra</TableHead><TableHead>Ending Balance</TableHead>
+                          <TableHead>#</TableHead><TableHead>Month</TableHead><TableHead>Starting Balance</TableHead><TableHead>Payment</TableHead><TableHead>Scheduled Principal</TableHead><TableHead>Interest</TableHead><TableHead>Extra</TableHead><TableHead>Ending Balance</TableHead>
                         </tr>
                       </thead>
                       <tbody>
@@ -598,10 +731,10 @@ export function LoanCalculator() {
                       </tbody>
                     </table>
                   ) : (
-                    <table className="w-full min-w-[760px] text-sm">
+                    <table className="w-full min-w-[780px] text-sm">
                       <thead>
                         <tr className="border-b text-left text-xs text-muted-foreground">
-                          <TableHead>Year</TableHead><TableHead>Starting Balance</TableHead><TableHead>Total Payments</TableHead><TableHead>Principal</TableHead><TableHead>Interest</TableHead><TableHead>Extra Principal</TableHead><TableHead>Ending Balance</TableHead>
+                          <TableHead>Year</TableHead><TableHead>Starting Balance</TableHead><TableHead>Total Payments</TableHead><TableHead>Scheduled Principal</TableHead><TableHead>Interest</TableHead><TableHead>Extra Principal</TableHead><TableHead>Ending Balance</TableHead>
                         </tr>
                       </thead>
                       <tbody>
@@ -626,9 +759,50 @@ export function LoanCalculator() {
         )}
 
         <p className="mx-auto max-w-3xl text-center text-xs leading-relaxed text-muted-foreground print:hidden">
-          Fixed-rate educational model. It does not include taxes, insurance, PMI, HOA fees, origination fees, points, escrow, variable rates, or lender-specific daily-interest conventions. See <Link href="/methodology" className="underline underline-offset-4 hover:text-foreground">Methodology</Link> for assumptions.
+          Fixed-rate educational model. It does not include taxes, insurance, PMI, HOA fees, origination fees, points, escrow, variable rates, or lender-specific daily-interest conventions. See <Link href="/methodology/loan" className="underline underline-offset-4 hover:text-foreground">Loan Methodology</Link> for assumptions.
         </p>
       </main>
+    </div>
+  )
+}
+
+function LoanAssumptions({ inputs, currency }: { inputs: LoanInputs; currency: string }) {
+  return (
+    <Card className="print-section">
+      <CardHeader className="pb-3">
+        <CardTitle>Loan Assumptions</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <PrintFact label="Display currency" value={currency} />
+          <PrintFact label="Loan amount" value={formatCurrency(inputs.principal, true, 2, false)} />
+          <PrintFact label="APR" value={`${inputs.apr}%`} />
+          <PrintFact label="Term" value={`${inputs.termMonths} months`} />
+          <PrintFact label="First payment" value={formatMonth(inputs.firstPaymentMonth)} />
+          <PrintFact label="Extra every month" value={formatCurrency(inputs.extraMonthlyPayment, true, 2, false)} />
+        </dl>
+        {inputs.lumpSums.length > 0 && (
+          <div className="mt-4 border-t pt-3 text-sm">
+            <p className="font-medium">One-time principal payments</p>
+            <ul className="mt-2 space-y-1 text-muted-foreground">
+              {[...inputs.lumpSums]
+                .sort((a, b) => a.month.localeCompare(b.month))
+                .map((payment) => (
+                  <li key={payment.id}>{formatMonth(payment.month)}: {formatCurrency(payment.amount, true, 2, false)}</li>
+                ))}
+            </ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function PrintFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="font-medium text-foreground">{value}</dd>
     </div>
   )
 }

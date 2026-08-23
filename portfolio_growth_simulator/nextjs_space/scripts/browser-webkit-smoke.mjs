@@ -14,6 +14,7 @@ try {
     await tab.waitFor({ state: 'visible' })
     assert.equal(await tab.getByText(label, { exact: true }).isVisible(), true, `${label} text should be visible on mobile`)
   }
+  await page.getByRole('tabpanel', { name: 'Guide' }).getByRole('link', { name: 'Loan Calculator' }).waitFor({ state: 'visible' })
 
   await page.getByRole('tab', { name: 'Growth' }).click()
 
@@ -43,12 +44,15 @@ try {
 
   await currencyDialog.getByRole('button', { name: 'Close dialog' }).click()
 
+  await page.setViewportSize({ width: 320, height: 740 })
   await page.goto(`${baseUrl}/loan`, { waitUntil: 'networkidle' })
   await page.getByRole('heading', { name: 'Loan & Amortization Calculator', level: 1 }).waitFor()
   await page.locator('#loan-principal').fill('300000')
   await page.locator('#loan-extra-monthly').fill('250')
+  await page.getByRole('button', { name: 'Add' }).click()
   await page.getByText('Extra Payment Impact').waitFor()
   await page.getByTestId('loan-balance-chart').waitFor()
+  await page.getByRole('button', { name: 'Toggle theme' }).waitFor()
 
   const loanDimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
@@ -63,6 +67,7 @@ try {
   await page.getByText('Starting Balance', { exact: true }).waitFor()
   await page.getByRole('navigation', { name: 'Footer navigation' }).waitFor()
 
+  await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(`${baseUrl}/privacy`, { waitUntil: 'networkidle' })
   await page.getByRole('heading', { name: 'Privacy', level: 1 }).waitFor()
   await page.getByRole('navigation', { name: 'Footer navigation' }).waitFor()

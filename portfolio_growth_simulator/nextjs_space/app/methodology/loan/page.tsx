@@ -66,7 +66,7 @@ export default function LoanMethodologyPage() {
               Currency amounts are rounded to cents at each payment step. The final scheduled payment is adjusted when necessary so the ending balance is exactly zero instead of leaving a fraction-of-a-cent residual.
             </p>
             <p>
-              Extra principal is capped at the remaining balance, so the model never reports negative principal or an overpayment beyond payoff.
+              Extra principal is capped at the remaining balance, so the model never reports negative principal or an overpayment beyond payoff. The yearly table reports scheduled principal and extra principal separately so its total-payment columns reconcile without double-counting extra payments.
             </p>
           </CardContent>
         </Card>
@@ -80,7 +80,10 @@ export default function LoanMethodologyPage() {
               The scheduled plan removes every extra payment and calculates the original amortization schedule. The accelerated plan uses the same loan terms plus your recurring and one-time extra principal. Interest saved is the scheduled plan&apos;s total interest minus the accelerated plan&apos;s total interest. Time saved is the difference in payment counts.
             </p>
             <p>
-              The first payment month is treated as the first amortization period shown in the schedule. One-time payments are matched to their selected calendar month.
+              The first payment month is treated as the first amortization period shown in the schedule. One-time payments must fall within the original scheduled loan term and are matched to their selected calendar month.
+            </p>
+            <p>
+              If recurring or earlier extra payments cause the loan to be paid off before a later one-time payment is reached, that later payment is not applied. The calculator flags those planned payments so you can move or remove them if desired.
             </p>
           </CardContent>
         </Card>
