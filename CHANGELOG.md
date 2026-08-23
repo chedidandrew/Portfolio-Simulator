@@ -17,6 +17,7 @@ All notable repository and production changes are documented here.
 - Added WebKit mobile smoke coverage.
 - Added real-browser Axe accessibility checks, including color contrast.
 - Fixed Guide collapsible headers so Radix `aria-expanded` and `aria-controls` are applied to an element with button semantics and keyboard activation.
+- Added explicit accessible names to the icon-only mobile Guide, Growth, and Withdrawal tabs for consistent Chromium, WebKit, and screen-reader behavior.
 - Scoped browser-smoke concurrency by Git ref so unrelated branches do not cancel one another.
 - Removed the duplicate nested license file; the root BSD-3-Clause license remains authoritative.
 
