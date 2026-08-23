@@ -2,6 +2,16 @@
 
 All notable repository and production changes are documented here.
 
+## 2026-08-23 - Dependency update workflow
+
+### Changed
+
+- Split Dependabot production updates into smaller logical groups for framework dependencies, Radix UI dependencies, and UI utility dependencies instead of one large production dependency bundle.
+- Left unmatched production dependencies to update independently so failures are easier to isolate.
+- Kept development dependency updates grouped separately.
+- Closed the oversized 19-package production dependency pull request after it exposed independent compatibility failures in `next-themes` and the JSDOM test environment.
+- Enabled an active GitHub ruleset protecting `main` with pull-request, required-status-check, up-to-date-branch, conversation-resolution, deletion, and force-push protections.
+
 ## 2026-08-22 - Production hardening and maintainability
 
 ### Changed
@@ -29,4 +39,4 @@ All notable repository and production changes are documented here.
 
 ### Deployment note
 
-The code-level production workflow is now documented and enforced procedurally for automated contributors. GitHub branch protection itself is an account/repository setting and cannot be changed through the repository source tree; it should require the Website CI and Browser Smoke checks and disallow force pushes to `main` when repository-administration access is available.
+The code-level production workflow is documented for automated contributors. GitHub now also enforces the protected `main` workflow through an active repository ruleset requiring the configured status checks and blocking destructive branch operations.
