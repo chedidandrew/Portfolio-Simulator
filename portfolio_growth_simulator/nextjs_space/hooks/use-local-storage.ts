@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { isValidGrowthState, isValidWithdrawalState } from '@/lib/simulation/deterministic-validation'
 
 interface LocalStorageOptions<T> {
   normalize?: (value: T, persistedValue: unknown | null) => T
@@ -18,16 +17,8 @@ export function useLocalStorage<T>(
   normalizeRef.current = options.normalize
   const shouldPersistRef = useRef(options.shouldPersist)
   shouldPersistRef.current = options.shouldPersist
-  const initialRecord = typeof initialValue === 'object' && initialValue !== null && !Array.isArray(initialValue)
-    ? initialValue as Record<string, unknown>
-    : null
-  const defaultValidator = key === 'growth-mode-state' && initialRecord && 'periodicAddition' in initialRecord
-    ? isValidGrowthState
-    : key === 'withdrawal-mode-state' && initialRecord && 'periodicWithdrawal' in initialRecord
-      ? isValidWithdrawalState
-      : undefined
-  const validatePersistedRef = useRef(options.validatePersisted ?? defaultValidator)
-  validatePersistedRef.current = options.validatePersisted ?? defaultValidator
+  const validatePersistedRef = useRef(options.validatePersisted)
+  validatePersistedRef.current = options.validatePersisted
 
   const normalizeValue = useCallback(
     (value: T, persistedValue: unknown | null) =>
