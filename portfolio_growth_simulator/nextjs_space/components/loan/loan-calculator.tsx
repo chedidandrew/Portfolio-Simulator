@@ -202,7 +202,7 @@ export function LoanCalculator() {
   }
 
   const addLumpSum = () => {
-    if (inputs.lumpSums.length >= 24) return
+    if (inputs.lumpSums.length >= 24 || !lastScheduledMonth) return
     const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `payment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -502,7 +502,7 @@ export function LoanCalculator() {
                       <p className="text-sm font-medium">One-time principal payments</p>
                       <p className="text-xs text-muted-foreground">Bonuses, windfalls, or other lump sums.</p>
                     </div>
-                    <Button type="button" size="sm" variant="outline" onClick={addLumpSum} disabled={inputs.lumpSums.length >= 24}>
+                    <Button type="button" size="sm" variant="outline" onClick={addLumpSum} disabled={inputs.lumpSums.length >= 24 || !lastScheduledMonth}>
                       <Plus className="mr-1.5 h-4 w-4" /> Add
                     </Button>
                   </div>
