@@ -1,10 +1,16 @@
-const CACHE_NAME = 'portfolio-simulator-shell-v7'
+const CACHE_NAME = 'portfolio-simulator-shell-v8'
 const CACHE_PREFIX = 'portfolio-simulator-'
 const SHELL_ASSETS = [
   '/',
+  '/tools',
   '/loan',
+  '/loan/payoff-goal',
+  '/loan/refinance',
+  '/invest-vs-debt',
   '/methodology',
   '/methodology/loan',
+  '/methodology/refinance',
+  '/methodology/invest-vs-debt',
   '/privacy',
   '/manifest.json',
   '/favicon.png',
