@@ -56,6 +56,33 @@ try {
     `Loan summary value should fit without clipping: ${valueLayout.scrollWidth}px > ${valueLayout.clientWidth}px`,
   )
 
+  const chart = page.getByTestId('loan-balance-chart')
+  await chart.scrollIntoViewIfNeeded()
+  const chartBox = await chart.boundingBox()
+  assert.ok(chartBox, 'Expected the remaining-balance chart to be measurable.')
+  await page.mouse.move(chartBox.x + chartBox.width * 0.55, chartBox.y + chartBox.height * 0.55)
+  const tooltip = chart.locator('.recharts-default-tooltip').first()
+  await tooltip.waitFor({ state: 'visible' })
+  const tooltipStyles = await tooltip.evaluate((element) => {
+    const probe = document.createElement('div')
+    probe.className = 'bg-popover'
+    document.body.appendChild(probe)
+    const expectedBackground = getComputedStyle(probe).backgroundColor
+    probe.remove()
+    const styles = getComputedStyle(element)
+    return {
+      backgroundColor: styles.backgroundColor,
+      borderRadius: Number.parseFloat(styles.borderRadius),
+      expectedBackground,
+    }
+  })
+  assert.equal(tooltipStyles.backgroundColor, tooltipStyles.expectedBackground, 'Loan chart tooltip should use the current theme popover background.')
+  assert.ok(tooltipStyles.borderRadius >= 8, 'Loan chart tooltip should use the rounded app-card treatment.')
+  assert.match(await tooltip.locator('.recharts-tooltip-label').innerText(), /^Payment \d+$/, 'Loan chart tooltip should show a readable payment label.')
+
+  const gridOpacity = await chart.locator('.recharts-cartesian-grid line').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).strokeOpacity))
+  assert.ok(gridOpacity <= 0.13, `Loan chart grid should remain visually quiet, got opacity ${gridOpacity}.`)
+
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Excel' }).click()
   const download = await downloadPromise
@@ -65,6 +92,10 @@ try {
   await page.getByText('Loan link copied').waitFor({ timeout: 10_000 })
   const sharedUrl = await page.evaluate(() => navigator.clipboard.readText())
   assert.ok(sharedUrl.includes('/loan#loan='), 'Expected a versioned loan share link in the URL fragment.')
+
+  await page.goto(`${baseUrl}/methodology/loan`, { waitUntil: 'networkidle' })
+  await page.getByText('Fixed-rate installment formula', { exact: true }).waitFor()
+  await page.locator('.katex-display').first().waitFor({ state: 'visible' })
   await context.close()
 
   const sharedContext = await browser.newContext({ viewport: { width: 320, height: 740 } })
