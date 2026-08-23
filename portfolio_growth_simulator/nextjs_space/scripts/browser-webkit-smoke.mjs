@@ -14,7 +14,7 @@ try {
     await tab.waitFor({ state: 'visible' })
     assert.equal(await tab.getByText(label, { exact: true }).isVisible(), true, `${label} text should be visible on mobile`)
   }
-  await page.getByRole('link', { name: 'Loan Calculator' }).waitFor({ state: 'visible' })
+  await page.getByRole('tabpanel', { name: 'Guide' }).getByRole('link', { name: 'Loan Calculator' }).waitFor({ state: 'visible' })
 
   await page.getByRole('tab', { name: 'Growth' }).click()
 
