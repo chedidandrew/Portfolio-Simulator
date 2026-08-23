@@ -14,6 +14,15 @@ try {
   await page.goto(`${baseUrl}/loan`, { waitUntil: 'networkidle' })
   await page.getByRole('heading', { name: 'Loan & Amortization Calculator', level: 1 }).waitFor()
 
+  const brandText = page.getByText('Portfolio Simulator', { exact: true }).first()
+  await brandText.waitFor({ state: 'visible' })
+  const brandStyles = await brandText.evaluate((element) => ({
+    backgroundImage: getComputedStyle(element).backgroundImage,
+    color: getComputedStyle(element).color,
+  }))
+  assert.equal(brandStyles.backgroundImage, 'none', 'Header brand text should not render the old green gradient.')
+  assert.notEqual(brandStyles.color, 'rgba(0, 0, 0, 0)', 'Header brand text should use a visible foreground color.')
+
   await page.locator('#loan-principal').fill('350000')
   await page.locator('#loan-apr').fill('6.5')
   await page.locator('#loan-term').fill('30')
@@ -21,6 +30,28 @@ try {
   await page.getByRole('button', { name: 'Add' }).click()
   await page.getByText('Extra Payment Impact').waitFor()
   await page.getByText('$2,212.24', { exact: true }).first().waitFor()
+
+  const interestMetric = page.getByText('Total interest', { exact: true }).locator('xpath=..')
+  const totalPaidMetric = page.getByText('Total paid', { exact: true }).locator('xpath=..')
+  const payoffMetric = page.getByText('Payoff', { exact: true }).locator('xpath=..')
+  const interestBox = await interestMetric.boundingBox()
+  const totalPaidBox = await totalPaidMetric.boundingBox()
+  const payoffBox = await payoffMetric.boundingBox()
+  assert.ok(interestBox && totalPaidBox && payoffBox, 'Expected loan summary metrics to be measurable.')
+  assert.ok(Math.abs(interestBox.y - totalPaidBox.y) <= 2, 'Total interest and total paid should share the first summary row.')
+  assert.ok(payoffBox.y > interestBox.y + 8, 'Payoff should move to the second summary row on desktop for more room.')
+
+  const interestValue = interestMetric.locator('p').last()
+  const valueLayout = await interestValue.evaluate((element) => ({
+    whiteSpace: getComputedStyle(element).whiteSpace,
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }))
+  assert.equal(valueLayout.whiteSpace, 'nowrap', 'Loan currency summary values should stay on one line.')
+  assert.ok(
+    valueLayout.scrollWidth <= valueLayout.clientWidth + 1,
+    `Loan summary value should fit without clipping: ${valueLayout.scrollWidth}px > ${valueLayout.clientWidth}px`,
+  )
 
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Excel' }).click()
