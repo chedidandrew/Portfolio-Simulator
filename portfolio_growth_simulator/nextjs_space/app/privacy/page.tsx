@@ -41,10 +41,10 @@ export default function PrivacyPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
             <p>
-              Growth, withdrawal, display, and simulation preferences are processed in your browser. Portfolio Simulator uses browser local storage so your simulator settings can persist between visits.
+              Growth, withdrawal, loan, display, and simulation preferences are processed in your browser. Portfolio Simulator uses browser local storage so your calculator settings can persist between visits.
             </p>
             <p>
-              The application does not require a user account and does not maintain an application database of your portfolio scenarios. The Reset option in Settings clears simulator-owned browser storage from your device.
+              The application does not require a user account and does not maintain an application database of your portfolio or loan scenarios. The Reset option in Settings clears simulator-owned browser storage from your device, and individual tools can also provide their own reset control.
             </p>
           </CardContent>
         </Card>
@@ -58,10 +58,10 @@ export default function PrivacyPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
             <p>
-              When you deliberately create a share link, the selected scenario inputs are encoded into the URL fragment after the # symbol. URL fragments are normally not sent to the web server as part of an HTTP request, but they can be read by code running in the browser.
+              When you deliberately create a share link, the selected portfolio or loan scenario inputs are encoded into the URL fragment after the # symbol. URL fragments are normally not sent to the web server as part of an HTTP request, but they can be read by code running in the browser.
             </p>
             <p>
-              A share link is not encrypted. Anyone who receives the complete link can decode the scenario values it contains, so review a link before posting it publicly and do not put sensitive identifiers such as account numbers or Social Security numbers into a scenario.
+              A share link is not encrypted. Anyone who receives the complete link can decode the scenario values it contains, so review a link before posting it publicly and do not put sensitive identifiers such as account numbers, loan account numbers, or Social Security numbers into a scenario.
             </p>
           </CardContent>
         </Card>
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="pt-6 text-sm leading-relaxed text-muted-foreground">
             <p>
-              Portfolio Simulator is an educational modeling tool. It does not ask for login credentials, brokerage credentials, bank account numbers, or government identification numbers. Avoid entering information that you would not want stored locally on your device or included in a shared scenario link.
+              Portfolio Simulator is an educational modeling tool. It does not ask for login credentials, brokerage credentials, bank account numbers, loan account numbers, or government identification numbers. Avoid entering information that you would not want stored locally on your device or included in a shared scenario link.
             </p>
           </CardContent>
         </Card>
