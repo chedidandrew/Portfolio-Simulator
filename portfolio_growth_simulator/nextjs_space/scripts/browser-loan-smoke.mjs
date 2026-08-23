@@ -60,7 +60,7 @@ try {
   await assumptionsCard.getByText('One-time principal payments', { exact: true }).waitFor({ state: 'visible' })
   await sharedPage.emulateMedia({ media: 'screen' })
 
-  await sharedPage.getByRole('link', { name: 'Loan Methodology' }).waitFor()
+  await sharedPage.locator('a[href="/methodology/loan"]').first().waitFor({ state: 'visible' })
   await sharedContext.close()
   console.log('Loan browser smoke tests passed.')
 } finally {
