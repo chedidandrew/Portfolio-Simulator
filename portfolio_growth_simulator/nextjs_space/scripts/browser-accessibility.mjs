@@ -16,6 +16,20 @@ try {
     const blockers = report.violations.filter(
       (violation) => violation.impact === 'serious' || violation.impact === 'critical',
     )
+
+    if (blockers.length > 0) {
+      const details = blockers.map((violation) => ({
+        id: violation.id,
+        help: violation.help,
+        nodes: violation.nodes.map((node) => ({
+          target: node.target,
+          html: node.html,
+          failureSummary: node.failureSummary,
+        })),
+      }))
+      console.error(`Accessibility violations on ${path}:\n${JSON.stringify(details, null, 2)}`)
+    }
+
     assert.deepEqual(
       blockers.map((violation) => violation.id),
       [],
