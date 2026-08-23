@@ -9,7 +9,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
   const page = await context.newPage()
 
-  for (const path of ['/', '/methodology', '/privacy']) {
+  for (const path of ['/', '/loan', '/methodology', '/methodology/loan', '/privacy']) {
     await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle' })
     await page.addScriptTag({ content: axe.source })
     const report = await page.evaluate(async () => window.axe.run(document.body))
