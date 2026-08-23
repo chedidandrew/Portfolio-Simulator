@@ -2,6 +2,24 @@
 
 All notable repository and production changes are documented here.
 
+## 2026-08-23 - Public experience polish
+
+### Changed
+
+- Replaced the generic header icon with the Portfolio Simulator app mark for a more consistent product identity.
+- Kept Guide, Growth, and Withdrawal labels visible on mobile while preserving their explicit accessible tab names.
+- Tightened the simulator shell spacing on small screens without changing calculator behavior or financial results.
+- Simplified the support card and donation dialog so support remains available without visually competing with portfolio results.
+- Added a compact global footer with Methodology, Privacy, and Support links.
+- Added a Privacy page describing local browser storage, share-link behavior, Vercel hosting and analytics, and third-party support services.
+- Added the Privacy route to the sitemap, offline application shell, and real-browser accessibility coverage.
+- Extended WebKit mobile smoke tests to verify visible tab labels, the Privacy route, footer navigation, and no page-level overflow.
+- Split future production dependency updates into smaller framework, Radix UI, and UI utility groups so failures are easier to isolate and review.
+
+### Rollback checkpoint
+
+- Created `backup/pre-public-polish-2026-08-23` from the production `main` branch before this polish work began. The release can be reverted in GitHub and the prior Vercel production deployment can be restored if the new presentation is not preferred.
+
 ## 2026-08-22 - Production hardening and maintainability
 
 ### Changed

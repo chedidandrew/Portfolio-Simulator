@@ -1,8 +1,9 @@
-const CACHE_NAME = 'portfolio-simulator-shell-v5'
+const CACHE_NAME = 'portfolio-simulator-shell-v6'
 const CACHE_PREFIX = 'portfolio-simulator-'
 const SHELL_ASSETS = [
   '/',
   '/methodology',
+  '/privacy',
   '/manifest.json',
   '/favicon.png',
   '/apple-touch-icon.png',

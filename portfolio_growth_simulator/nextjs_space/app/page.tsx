@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
+import Image from 'next/image'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Moon, Sun, TrendingUp, TrendingDown, BookOpen, Settings, Check, CreditCard, Heart, RotateCcw, ChevronRight } from 'lucide-react'
 import { useTheme } from 'next-themes'
@@ -168,11 +169,11 @@ export default function Home() {
             headerVisible ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <TrendingUp className="h-5 w-5 text-primary" />
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/15 bg-primary/5 shadow-sm">
+              <Image src="/favicon.png" alt="" width={24} height={24} className="rounded-md" priority />
             </div>
-            <h1 className="text-lg font-bold bg-gradient-to-r from-primary to-emerald-400 bg-clip-text text-transparent">
+            <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-primary to-emerald-400 bg-clip-text text-transparent">
               Portfolio Simulator
             </h1>
           </div>
@@ -247,7 +248,7 @@ export default function Home() {
                   >
                     <span className="flex items-center">
                       <Heart className="mr-2 h-4 w-4" />
-                      Show Donation Card
+                      Show Support Card
                     </span>
                   </DropdownMenuCheckboxItem>
                   <DropdownMenuSeparator />
@@ -279,20 +280,20 @@ export default function Home() {
         style={{ height: 'calc(env(safe-area-inset-top, 0px) + 60px)' }}
       />
 
-      <main className="container mx-auto max-w-6xl px-4 py-6 pb-20 print:p-0 print:max-w-none">
+      <main className="container mx-auto max-w-6xl px-4 py-4 pb-16 sm:py-6 sm:pb-20 print:p-0 print:max-w-none">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6 h-auto print:hidden">
-            <TabsTrigger value="guide" aria-label="Guide" className="flex items-center gap-2 py-3">
+          <TabsList className="grid w-full grid-cols-3 mb-4 h-auto sm:mb-6 print:hidden">
+            <TabsTrigger value="guide" aria-label="Guide" className="flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] sm:flex-row sm:gap-2 sm:py-3 sm:text-sm">
               <BookOpen className="h-4 w-4" />
-              <span className="hidden sm:inline">Guide</span>
+              <span>Guide</span>
             </TabsTrigger>
-            <TabsTrigger value="growth" aria-label="Growth" className="flex items-center gap-2 py-3">
+            <TabsTrigger value="growth" aria-label="Growth" className="flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] sm:flex-row sm:gap-2 sm:py-3 sm:text-sm">
               <TrendingUp className="h-4 w-4" />
-              <span className="hidden sm:inline">Growth</span>
+              <span>Growth</span>
             </TabsTrigger>
-            <TabsTrigger value="withdrawal" aria-label="Withdrawal" className="flex items-center gap-2 py-3">
+            <TabsTrigger value="withdrawal" aria-label="Withdrawal" className="flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] sm:flex-row sm:gap-2 sm:py-3 sm:text-sm">
               <TrendingDown className="h-4 w-4" />
-              <span className="hidden sm:inline">Withdrawal</span>
+              <span>Withdrawal</span>
             </TabsTrigger>
           </TabsList>
 

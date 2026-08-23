@@ -13,6 +13,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { SimulationProgressHost } from '@/components/monte-carlo/simulation-progress-overlay'
 import { MobileChartTooltipLayout } from '@/components/mobile-chart-tooltip-layout'
 import { UrlOnlyShareGuard } from '@/components/url-only-share-guard'
+import { SiteFooter } from '@/components/site-footer'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -109,6 +110,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="print-header__title">Portfolio Simulator</span>
             </header>
             {children}
+            <SiteFooter />
             <Toaster />
             <PwaInstallPrompt />
             <SimulationProgressHost />
