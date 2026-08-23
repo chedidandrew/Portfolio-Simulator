@@ -14,6 +14,9 @@
     "currencies:update": "node scripts/update-currencies.mjs",
     "test": "tsx --tsconfig tsconfig.test.json --test lib/simulation/financial.test.ts lib/simulation/timeline-refinement.test.ts lib/simulation/planning-insights.test.ts lib/regression.test.ts lib/hardening.test.ts && npm run test:components",
     "test:components": "node scripts/run-component-tests.mjs",
+    "test:browser:chromium": "node scripts/browser-smoke.mjs",
+    "test:browser:webkit": "node scripts/browser-webkit-smoke.mjs",
+    "test:browser:a11y": "node scripts/browser-accessibility.mjs",
     "typecheck": "tsc --noEmit",
     "verify": "npm run lint && npm run test && npm run typecheck && npm run build"
   },
@@ -33,6 +36,7 @@
     "eslint-plugin-prettier": "5.5.6",
     "eslint-plugin-react-hooks": "4.6.2",
     "jsdom": "^26.1.0",
+    "playwright": "1.62.0",
     "postcss": "8.5.26",
     "tailwind-merge": "2.6.1",
     "tailwindcss": "3.4.19",
