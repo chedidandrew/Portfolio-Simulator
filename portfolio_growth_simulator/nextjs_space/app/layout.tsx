@@ -56,7 +56,7 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-const jsonLd = {
+  const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
     name: 'Portfolio Simulator',
@@ -91,29 +91,28 @@ const jsonLd = {
       </head>
       <body className={inter.className}>
         <ThemeProvider
-        attribute="class"
-        defaultTheme="dark"
-        enableSystem={false}
-        disableTransitionOnChange
-      >
-        {/* Print only header */}
-        <header className="print-header">
-          <Image
-            src="/favicon.png"
-            alt="Portfolio Simulator"
-            width={24}
-            height={24}
-            style={{ borderRadius: 6 }}
-          />
-          <span className="print-header__title">Portfolio Simulator</span>
-        </header>
-        {children}
-        <Toaster />
-        <PwaInstallPrompt />
-        <SimulationProgressHost />
-        <MobileChartTooltipLayout />
-        <UrlOnlyShareGuard />
-      </ThemeProvider>
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <header className="print-header">
+            <Image
+              src="/favicon.png"
+              alt="Portfolio Simulator"
+              width={24}
+              height={24}
+              style={{ borderRadius: 6 }}
+            />
+            <span className="print-header__title">Portfolio Simulator</span>
+          </header>
+          {children}
+          <Toaster />
+          <PwaInstallPrompt />
+          <SimulationProgressHost />
+          <MobileChartTooltipLayout />
+          <UrlOnlyShareGuard />
+        </ThemeProvider>
         <Script
           id="register-sw"
           strategy="afterInteractive"
