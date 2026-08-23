@@ -1,0 +1,99 @@
+name: Apply Production Hardening V2
+
+on:
+  push:
+    branches:
+      - ai/production-hardening-2026-08-22
+    paths:
+      - '.github/workflows/apply-production-hardening-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ai/production-hardening-2026-08-22
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: portfolio_growth_simulator/nextjs_space/package-lock.json
+      - name: Apply source and workflow hardening
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          root = Path('.')
+          app = root / 'portfolio_growth_simulator' / 'nextjs_space'
+
+          def replace(path, old, new):
+              text = path.read_text()
+              if old not in text:
+                  raise SystemExit(f'Expected text not found in {path}: {old[:100]!r}')
+              path.write_text(text.replace(old, new))
+
+          page = app / 'app' / 'page.tsx'
+          replace(page, "import { useState, useEffect, useRef } from 'react'\n", "import { useState, useEffect, useRef } from 'react'\nimport dynamic from 'next/dynamic'\n")
+          replace(page, "import { GrowthMode } from '@/components/growth-mode'\nimport { WithdrawalMode } from '@/components/withdrawal-mode'\nimport { GuideTab } from '@/components/guide-tab'\n", "")
+          marker = "import { subscribeRetirementPlanTransfer } from '@/lib/retirement-plan-transfer'\n"
+          replace(page, marker, marker + "\nconst GuideTab = dynamic(() => import('@/components/guide-tab').then((module) => module.GuideTab))\nconst GrowthMode = dynamic(() => import('@/components/growth-mode').then((module) => module.GrowthMode))\nconst WithdrawalMode = dynamic(() => import('@/components/withdrawal-mode').then((module) => module.WithdrawalMode))\n")
+          replace(page, "  const [currency, setCurrency] = useLocalStorage<string>('portfolio-sim-currency', 'USD')\n", "  const [currency, setCurrency] = useLocalStorage<string>('portfolio-sim-currency', 'USD')\n  const [currencyRevision, setCurrencyRevision] = useState(0)\n")
+          replace(page, "  useEffect(() => {\n    setMounted(true)\n    setAppCurrency(currency)\n  }, []) // eslint-disable-line react-hooks/exhaustive-deps\n\n  useEffect(() => {\n    setAppCurrency(currency)\n  }, [currency])\n", "  useEffect(() => {\n    setMounted(true)\n  }, [])\n\n  useEffect(() => {\n    setAppCurrency(currency)\n    setCurrencyRevision((revision) => revision + 1)\n  }, [currency])\n")
+          replace(page, "        <Tabs key={currency} value={activeTab} onValueChange={handleTabChange} className=\"w-full\">", "        <Tabs data-currency-revision={currencyRevision} value={activeTab} onValueChange={handleTabChange} className=\"w-full\">")
+
+          growth = app / 'components' / 'growth-mode.tsx'
+          replace(growth, "import { validateGrowthStateRange } from '@/lib/simulation/deterministic-validation'", "import { isValidGrowthState, validateGrowthStateRange } from '@/lib/simulation/deterministic-validation'")
+          replace(growth, "      normalize: normalizeGrowthState,\n      shouldPersist:", "      normalize: normalizeGrowthState,\n      validatePersisted: isValidGrowthState,\n      shouldPersist:")
+
+          withdrawal = app / 'components' / 'withdrawal-mode.tsx'
+          replace(withdrawal, "import { validateWithdrawalStateRange } from '@/lib/simulation/deterministic-validation'", "import { isValidWithdrawalState, validateWithdrawalStateRange } from '@/lib/simulation/deterministic-validation'")
+          replace(withdrawal, "      normalize: normalizeWithdrawalState,\n      shouldPersist:", "      normalize: normalizeWithdrawalState,\n      validatePersisted: isValidWithdrawalState,\n      shouldPersist:")
+
+          (app / 'scripts' / 'browser-webkit-smoke.mjs').write_text("""import assert from 'node:assert/strict'\nimport { webkit } from 'playwright'\n\nconst baseUrl = process.env.BASE_URL || 'http://127.0.0.1:3000'\nconst browser = await webkit.launch()\n\ntry {\n  const context = await browser.newContext({ viewport: { width: 390, height: 844 } })\n  const page = await context.newPage()\n  await page.goto(baseUrl, { waitUntil: 'networkidle' })\n  await page.getByRole('tab', { name: 'Growth' }).click()\n  const startingBalance = page.locator('#starting-balance')\n  await startingBalance.fill('25000')\n  await startingBalance.blur()\n  await page.getByText('Projected Results').waitFor()\n  const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, page: document.documentElement.scrollWidth }))\n  assert.ok(dimensions.page <= dimensions.viewport + 2, `Unexpected WebKit horizontal overflow: ${dimensions.page}px > ${dimensions.viewport}px`)\n  await page.getByRole('button', { name: 'Open settings' }).click()\n  await page.getByRole('menuitem', { name: 'Display Currency' }).click()\n  const dialog = page.getByRole('dialog', { name: 'Display Currency' })\n  await dialog.waitFor({ state: 'visible' })\n  const box = await dialog.boundingBox()\n  assert.ok(box)\n  assert.ok(box.x >= -1 && box.x + box.width <= 391)\n  assert.ok(box.y >= -1 && box.y + box.height <= 845)\n  await dialog.getByRole('button', { name: 'Close dialog' }).click()\n  console.log('WebKit browser smoke tests passed.')\n  await context.close()\n} finally {\n  await browser.close()\n}\n""")
+
+          (app / 'scripts' / 'browser-accessibility.mjs').write_text("""import assert from 'node:assert/strict'\nimport axe from 'axe-core'\nimport { chromium } from 'playwright'\n\nconst baseUrl = process.env.BASE_URL || 'http://127.0.0.1:3000'\nconst browser = await chromium.launch()\n\ntry {\n  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })\n  const page = await context.newPage()\n  for (const path of ['/', '/methodology']) {\n    await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle' })\n    await page.addScriptTag({ content: axe.source })\n    const report = await page.evaluate(async () => window.axe.run(document.body))\n    const blockers = report.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical')\n    assert.deepEqual(blockers.map((violation) => violation.id), [], `Serious or critical accessibility violations on ${path}`)\n  }\n  console.log('Real-browser accessibility checks passed.')\n  await context.close()\n} finally {\n  await browser.close()\n}\n""")
+
+          (root / '.github' / 'workflows' / 'web-ci.yml').write_text("""name: Website CI\n\non:\n  workflow_dispatch:\n  push:\n    branches:\n      - main\n    paths:\n      - 'portfolio_growth_simulator/nextjs_space/**'\n      - '.github/workflows/web-ci.yml'\n  pull_request:\n    paths:\n      - 'portfolio_growth_simulator/nextjs_space/**'\n      - '.github/workflows/web-ci.yml'\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: website-ci-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  verify:\n    runs-on: ubuntu-latest\n    timeout-minutes: 30\n    defaults:\n      run:\n        working-directory: portfolio_growth_simulator/nextjs_space\n    steps:\n      - uses: actions/checkout@v6\n      - uses: actions/setup-node@v7\n        with:\n          node-version: '24.x'\n          cache: npm\n          cache-dependency-path: portfolio_growth_simulator/nextjs_space/package-lock.json\n      - run: npm ci\n      - run: npm run verify\n""")
+
+          (root / '.github' / 'workflows' / 'browser-smoke.yml').write_text("""name: Browser Smoke\n\non:\n  workflow_dispatch:\n  pull_request:\n    paths:\n      - 'portfolio_growth_simulator/nextjs_space/**'\n      - '.github/workflows/browser-smoke.yml'\n  push:\n    branches:\n      - main\n    paths:\n      - 'portfolio_growth_simulator/nextjs_space/**'\n      - '.github/workflows/browser-smoke.yml'\n  schedule:\n    - cron: '37 7 * * 1'\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: browser-smoke-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  chromium:\n    runs-on: ubuntu-latest\n    timeout-minutes: 30\n    defaults:\n      run:\n        working-directory: portfolio_growth_simulator/nextjs_space\n    steps:\n      - uses: actions/checkout@v6\n      - uses: actions/setup-node@v7\n        with:\n          node-version: '24.x'\n          cache: npm\n          cache-dependency-path: portfolio_growth_simulator/nextjs_space/package-lock.json\n      - run: npm ci\n      - run: npx playwright install --with-deps chromium\n      - run: npm run build\n      - name: Start application\n        run: |\n          npm start > /tmp/portfolio-simulator.log 2>&1 &\n          for attempt in $(seq 1 60); do\n            if curl --fail --silent http://127.0.0.1:3000 > /dev/null; then exit 0; fi\n            sleep 2\n          done\n          cat /tmp/portfolio-simulator.log\n          exit 1\n      - run: npm run test:browser:chromium\n      - run: npm run test:browser:a11y\n      - name: Show server log on failure\n        if: failure()\n        run: cat /tmp/portfolio-simulator.log || true\n\n  webkit:\n    runs-on: ubuntu-latest\n    timeout-minutes: 30\n    defaults:\n      run:\n        working-directory: portfolio_growth_simulator/nextjs_space\n    steps:\n      - uses: actions/checkout@v6\n      - uses: actions/setup-node@v7\n        with:\n          node-version: '24.x'\n          cache: npm\n          cache-dependency-path: portfolio_growth_simulator/nextjs_space/package-lock.json\n      - run: npm ci\n      - run: npx playwright install --with-deps webkit\n      - run: npm run build\n      - name: Start application\n        run: |\n          npm start > /tmp/portfolio-simulator-webkit.log 2>&1 &\n          for attempt in $(seq 1 60); do\n            if curl --fail --silent http://127.0.0.1:3000 > /dev/null; then exit 0; fi\n            sleep 2\n          done\n          cat /tmp/portfolio-simulator-webkit.log\n          exit 1\n      - run: npm run test:browser:webkit\n      - name: Show server log on failure\n        if: failure()\n        run: cat /tmp/portfolio-simulator-webkit.log || true\n""")
+
+          duplicate = app / 'LICENSE'
+          if duplicate.exists(): duplicate.unlink()
+
+          (root / 'AGENTS.md').write_text("""# AI Development Rules\n\nThis repository is maintained with AI-assisted development. Automated contributors must follow these rules.\n\n1. Never push application changes directly to `main`. Use a short-lived branch and pull request.\n2. Merge only after Website CI, Browser Smoke, and CodeQL are green.\n3. Run `npm run verify` for every application change. Browser-facing changes must pass Playwright smoke tests.\n4. Do not add user-visible features or content unless explicitly requested.\n5. Preserve deterministic calculations, seeded Monte Carlo reproducibility, stored-state compatibility, and share-link compatibility unless a migration is documented.\n6. Update `CHANGELOG.md` and relevant documentation with every code change.\n7. Do not weaken TypeScript, lint, security, accessibility, or test gates to make a change pass.\n8. Keep Vercel production deployment tied to reviewed `main` changes.\n\nSee `docs/DEPLOYMENT.md` for the release process.\n""")
+
+          docs = root / 'docs'
+          docs.mkdir(exist_ok=True)
+          (docs / 'DEPLOYMENT.md').write_text("""# Production Deployment\n\nProduction is hosted by Vercel and connected to this GitHub repository. The production branch is `main`.\n\n## Required workflow\n\n1. Create a short-lived branch.\n2. Open a pull request into `main`.\n3. Wait for Website CI, Browser Smoke, and CodeQL to pass.\n4. Merge only after checks are green.\n5. Vercel deploys the merged `main` commit through the existing Git integration.\n6. Verify the live production URL after deployment.\n\n## Repository protection\n\nGitHub settings should protect `main` against force pushes and direct application pushes and require Website CI and Browser Smoke before merge. Branch protection is a repository setting, not source code. If administrative tooling is unavailable, the PR-first rule in `AGENTS.md` remains mandatory until protection is enabled in GitHub Settings.\n\n## Local validation\n\nFrom `portfolio_growth_simulator/nextjs_space`:\n\n```bash\nnpm ci\nnpm run verify\n```\n\nPlaywright is pinned in `devDependencies`, so browser CI uses the lockfile instead of an ad hoc install.\n""")
+
+          (root / 'CHANGELOG.md').write_text("""# Changelog\n\nAll notable repository and production changes are documented here.\n\n## 2026-08-22 - Production hardening and maintainability\n\n### Changed\n- Enabled the existing System theme option.\n- Restored the default Next.js image optimization pipeline.\n- Lazy-loaded Guide, Growth, and Withdrawal top-level bundles.\n- Removed currency-driven remounting of the calculator tree while preserving display-currency refreshes.\n- Made `useLocalStorage` generic by moving Growth and Withdrawal validation to explicit call sites.\n- Consolidated Website CI around `npm run verify`.\n- Pinned Playwright in `devDependencies` and removed the unlocked runtime install from browser CI.\n- Added WebKit mobile smoke coverage and real-browser Axe accessibility checks including color contrast.\n- Scoped browser-smoke concurrency by Git ref.\n- Removed the duplicate nested license file; the root BSD-3-Clause license remains authoritative.\n\n### Process\n- Added `AGENTS.md` with mandatory AI development and documentation rules.\n- Added `docs/DEPLOYMENT.md` documenting the PR-first GitHub-to-Vercel production workflow and branch-protection requirements.\n- Retained the current application directory because changing Vercel's configured root without hosting-admin access would create unnecessary production risk.\n""")
+
+          readme = root / 'README.md'
+          text = readme.read_text()
+          text = text.replace('The verification command runs linting, financial and regression tests, rendered component tests, TypeScript checking, and the production build. GitHub Actions runs the same checks after website changes are pushed to `main`, for pull requests, and on manual dispatch. A separate browser smoke workflow exercises downloads, Monte Carlo Web Workers, shared links, and a mobile viewport in Chromium.', 'The verification command runs linting, financial and regression tests, rendered component tests, TypeScript checking, and the production build. GitHub Actions calls this same command for website pull requests and `main`. A separate browser smoke workflow exercises downloads, Monte Carlo Web Workers, shared links, mobile layout in Chromium and WebKit, and real-browser accessibility checks.')
+          text = text.replace('The production website is deployed through Vercel from the `main` branch.', 'The production website is deployed through Vercel from the `main` branch. Application changes should reach `main` only through a pull request after Website CI, Browser Smoke, and CodeQL are green. See `docs/DEPLOYMENT.md` and `AGENTS.md`.')
+          text = text.replace('├── .github/workflows/                 # GitHub validation workflow', '├── .github/workflows/                 # GitHub validation and browser workflows')
+          text = text.replace('├── LICENSE\n└── README.md', '├── docs/DEPLOYMENT.md                 # Production release process\n├── AGENTS.md                          # AI-assisted development rules\n├── CHANGELOG.md                       # Repository change history\n├── LICENSE\n└── README.md')
+          readme.write_text(text)
+
+          for helper in [root / '.github/workflows/apply-production-hardening.yml', root / '.github/workflows/apply-production-hardening-v2.yml', root / '.github/workflows/lockfile-refresh.yml']:
+              if helper.exists(): helper.unlink()
+          PY
+
+          cd portfolio_growth_simulator/nextjs_space
+          npm ci
+          npm run verify
+
+      - name: Commit verified changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: harden production workflow and client architecture"
+          git push origin HEAD:ai/production-hardening-2026-08-22
