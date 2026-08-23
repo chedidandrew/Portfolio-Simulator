@@ -55,32 +55,18 @@ export function RefinanceCalculator() {
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Remaining balance" suffix={symbol}>
-              <Input type="number" min="1" step="1000" value={inputs.balance} onChange={(e) => setInputs({ ...inputs, balance: Number(e.target.value) || 0 })} />
-            </Field>
-            <Field label="Current APR" suffix="%">
-              <Input type="number" min="0" max="100" step="0.01" value={inputs.currentApr} onChange={(e) => setInputs({ ...inputs, currentApr: Number(e.target.value) || 0 })} />
-            </Field>
-            <Field label="Remaining term" suffix="years">
-              <Input type="number" min="1" max="50" step="0.5" value={inputs.remainingMonths / 12} onChange={(e) => setInputs({ ...inputs, remainingMonths: Math.max(1, Math.round((Number(e.target.value) || 0) * 12)) })} />
-            </Field>
-            <Field label="First payment month">
-              <Input type="month" value={inputs.firstPaymentMonth} onChange={(e) => setInputs({ ...inputs, firstPaymentMonth: e.target.value })} />
-            </Field>
+            <Field label="Remaining balance" suffix={symbol}><Input type="number" min="1" step="1000" value={inputs.balance} onChange={(e) => setInputs({ ...inputs, balance: Number(e.target.value) || 0 })} /></Field>
+            <Field label="Current APR" suffix="%"><Input type="number" min="0" max="100" step="0.01" value={inputs.currentApr} onChange={(e) => setInputs({ ...inputs, currentApr: Number(e.target.value) || 0 })} /></Field>
+            <Field label="Remaining term" suffix="years"><Input type="number" min="1" max="50" step="0.5" value={inputs.remainingMonths / 12} onChange={(e) => setInputs({ ...inputs, remainingMonths: Math.max(1, Math.round((Number(e.target.value) || 0) * 12)) })} /></Field>
+            <Field label="First payment month"><Input type="month" value={inputs.firstPaymentMonth} onChange={(e) => setInputs({ ...inputs, firstPaymentMonth: e.target.value })} /></Field>
           </div>
 
           <div className="rounded-xl border bg-muted/20 p-4">
             <p className="mb-4 font-medium">Proposed refinance</p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="New APR" suffix="%">
-                <Input type="number" min="0" max="100" step="0.01" value={inputs.newApr} onChange={(e) => setInputs({ ...inputs, newApr: Number(e.target.value) || 0 })} />
-              </Field>
-              <Field label="New term" suffix="years">
-                <Input type="number" min="1" max="50" step="0.5" value={inputs.newTermMonths / 12} onChange={(e) => setInputs({ ...inputs, newTermMonths: Math.max(1, Math.round((Number(e.target.value) || 0) * 12)) })} />
-              </Field>
-              <Field label="Closing costs" suffix={symbol}>
-                <Input type="number" min="0" step="500" value={inputs.closingCosts} onChange={(e) => setInputs({ ...inputs, closingCosts: Number(e.target.value) || 0 })} />
-              </Field>
+              <Field label="New APR" suffix="%"><Input type="number" min="0" max="100" step="0.01" value={inputs.newApr} onChange={(e) => setInputs({ ...inputs, newApr: Number(e.target.value) || 0 })} /></Field>
+              <Field label="New term" suffix="years"><Input type="number" min="1" max="50" step="0.5" value={inputs.newTermMonths / 12} onChange={(e) => setInputs({ ...inputs, newTermMonths: Math.max(1, Math.round((Number(e.target.value) || 0) * 12)) })} /></Field>
+              <Field label="Closing costs" suffix={symbol}><Input type="number" min="0" step="500" value={inputs.closingCosts} onChange={(e) => setInputs({ ...inputs, closingCosts: Number(e.target.value) || 0 })} /></Field>
               <div className="flex items-end pb-1">
                 <div className="flex w-full items-center justify-between gap-3 rounded-lg border bg-background/60 px-3 py-2.5">
                   <div><Label htmlFor="finance-costs">Finance costs</Label><p className="text-xs text-muted-foreground">Add costs to the new balance</p></div>
@@ -97,9 +83,7 @@ export function RefinanceCalculator() {
           <Card className={result.lifetimeSavings >= 0 ? 'border-emerald-500/25' : 'border-amber-500/25'}>
             <CardHeader className="pb-3">
               <CardDescription>Estimated lifetime savings after closing costs</CardDescription>
-              <CardTitle className={`text-4xl tracking-tight sm:text-5xl ${result.lifetimeSavings >= 0 ? 'text-emerald-500' : 'text-amber-500'}`}>
-                {formatCurrency(result.lifetimeSavings, true, 2, false)}
-              </CardTitle>
+              <CardTitle className={`text-4xl tracking-tight sm:text-5xl ${result.lifetimeSavings >= 0 ? 'text-emerald-500' : 'text-amber-500'}`}>{formatCurrency(result.lifetimeSavings, true, 2, false)}</CardTitle>
               <p className="text-sm text-muted-foreground">A negative value means the refinance costs more over the modeled remaining life.</p>
             </CardHeader>
             <CardContent>
@@ -114,12 +98,7 @@ export function RefinanceCalculator() {
 
           <Card>
             <CardHeader><CardTitle>Side-by-side cost</CardTitle><CardDescription>Closing costs are included in the refinance total whether paid upfront or financed.</CardDescription></CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Plan title="Keep current loan" payment={result.current.scheduledPayment} total={result.currentRemainingCost} interest={result.current.totalInterest} payoff={result.currentPayoffMonth} />
-                <Plan title="Refinance" payment={result.refinanced.scheduledPayment} total={result.refinancedRemainingCost} interest={result.refinanced.totalInterest} payoff={result.refinancedPayoffMonth} emphasized />
-              </div>
-            </CardContent>
+            <CardContent><div className="grid gap-4 sm:grid-cols-2"><Plan title="Keep current loan" payment={result.current.scheduledPayment} total={result.currentRemainingCost} interest={result.current.totalInterest} payoff={result.currentPayoffMonth} /><Plan title="Refinance" payment={result.refinanced.scheduledPayment} total={result.refinancedRemainingCost} interest={result.refinanced.totalInterest} payoff={result.refinancedPayoffMonth} emphasized /></div></CardContent>
           </Card>
           <p className="text-xs text-muted-foreground">Display currency: {currency}. Break-even is closing costs divided by monthly payment savings and does not model time value, tax effects, or equity differences.</p>
         </div>
@@ -131,7 +110,7 @@ export function RefinanceCalculator() {
 }
 
 function Field({ label, suffix, children }: { label: string; suffix?: string; children: React.ReactNode }) {
-  return <div className="space-y-1.5"><div className="flex items-center justify-between"><Label>{label}</Label>{suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}</div>{children}</div>
+  return <Label className="block space-y-1.5 font-normal"><span className="flex items-center justify-between"><span className="font-medium text-foreground">{label}</span>{suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}</span>{children}</Label>
 }
 
 function Metric({ icon: Icon, label, value }: { icon: typeof Gauge; label: string; value: string }) {
