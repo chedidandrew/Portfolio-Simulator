@@ -1,0 +1,72 @@
+name: Apply Storage Validation Refactor
+
+on:
+  push:
+    branches:
+      - ai/production-hardening-2026-08-22
+    paths:
+      - '.github/workflows/apply-storage-validation-refactor.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ai/production-hardening-2026-08-22
+      - name: Move simulator validation to call sites
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          root = Path('portfolio_growth_simulator/nextjs_space')
+
+          growth = root / 'components/growth-mode.tsx'
+          text = growth.read_text()
+          old = "import { validateGrowthStateRange } from '@/lib/simulation/deterministic-validation'"
+          new = "import { isValidGrowthState, validateGrowthStateRange } from '@/lib/simulation/deterministic-validation'"
+          if old not in text:
+              raise SystemExit('Growth validation import not found')
+          text = text.replace(old, new)
+          old = "      normalize: normalizeGrowthState,\n      shouldPersist:"
+          new = "      normalize: normalizeGrowthState,\n      validatePersisted: isValidGrowthState,\n      shouldPersist:"
+          if old not in text:
+              raise SystemExit('Growth storage options not found')
+          growth.write_text(text.replace(old, new))
+
+          withdrawal = root / 'components/withdrawal-mode.tsx'
+          text = withdrawal.read_text()
+          old = "import { validateWithdrawalStateRange } from '@/lib/simulation/deterministic-validation'"
+          new = "import { isValidWithdrawalState, validateWithdrawalStateRange } from '@/lib/simulation/deterministic-validation'"
+          if old not in text:
+              raise SystemExit('Withdrawal validation import not found')
+          text = text.replace(old, new)
+          old = "      normalize: normalizeWithdrawalState,\n      shouldPersist:"
+          new = "      normalize: normalizeWithdrawalState,\n      validatePersisted: isValidWithdrawalState,\n      shouldPersist:"
+          if old not in text:
+              raise SystemExit('Withdrawal storage options not found')
+          withdrawal.write_text(text.replace(old, new))
+
+          hook = root / 'hooks/use-local-storage.ts'
+          text = hook.read_text()
+          text = text.replace("import { getDefaultPersistedValidator } from '@/lib/storage-validation'\n", '')
+          old = "  const defaultValidator = getDefaultPersistedValidator(key, initialValue)\n  const validatePersistedRef = useRef(options.validatePersisted ?? defaultValidator)\n  validatePersistedRef.current = options.validatePersisted ?? defaultValidator\n"
+          new = "  const validatePersistedRef = useRef(options.validatePersisted)\n  validatePersistedRef.current = options.validatePersisted\n"
+          if old not in text:
+              raise SystemExit('Hook validator block not found')
+          hook.write_text(text.replace(old, new))
+
+          validation_helper = root / 'lib/storage-validation.ts'
+          if validation_helper.exists():
+              validation_helper.unlink()
+          PY
+      - name: Commit refactor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: pass storage validators explicitly"
+          git push origin HEAD:ai/production-hardening-2026-08-22
