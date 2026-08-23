@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
+import Link from 'next/link'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Moon, Sun, TrendingUp, TrendingDown, BookOpen, Settings, Check, CreditCard, Heart, RotateCcw, ChevronRight } from 'lucide-react'
+import { Moon, Sun, TrendingUp, TrendingDown, BookOpen, Settings, Check, CreditCard, Heart, RotateCcw, ChevronRight, Landmark } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
 import {
@@ -298,6 +299,15 @@ export default function Home() {
           </TabsList>
 
           <TabsContent value="guide" className="mt-0">
+            <div className="mb-4 flex items-center justify-end gap-2 print:hidden sm:mb-6">
+              <span className="hidden text-xs text-muted-foreground sm:inline">More financial tools</span>
+              <Button asChild variant="outline" size="sm" className="rounded-xl">
+                <Link href="/loan">
+                  <Landmark className="mr-2 h-4 w-4" />
+                  Loan Calculator
+                </Link>
+              </Button>
+            </div>
             <GuideTab onLaunchMode={(mode) => handleTabChange(mode)} />
           </TabsContent>
 
