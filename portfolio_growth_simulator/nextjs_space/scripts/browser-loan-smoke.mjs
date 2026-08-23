@@ -54,8 +54,10 @@ try {
   await sharedPage.getByText('Scheduled Principal', { exact: true }).first().waitFor()
 
   await sharedPage.emulateMedia({ media: 'print' })
-  await sharedPage.getByRole('heading', { name: 'Loan Assumptions' }).waitFor({ state: 'visible' })
-  await sharedPage.getByText('One-time principal payments', { exact: true }).waitFor({ state: 'visible' })
+  const assumptionsHeading = sharedPage.getByRole('heading', { name: 'Loan Assumptions' })
+  await assumptionsHeading.waitFor({ state: 'visible' })
+  const assumptionsCard = assumptionsHeading.locator('xpath=ancestor::div[contains(@class,"print-section")]')
+  await assumptionsCard.getByText('One-time principal payments', { exact: true }).waitFor({ state: 'visible' })
   await sharedPage.emulateMedia({ media: 'screen' })
 
   await sharedPage.getByRole('link', { name: 'Loan Methodology' }).waitFor()
