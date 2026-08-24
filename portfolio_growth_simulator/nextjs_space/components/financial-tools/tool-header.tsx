@@ -16,6 +16,12 @@ export function FinancialToolHeader({ backHref = '/tools', backLabel = 'Tools' }
 
   return (
     <>
+      <div
+        data-testid="financial-tool-safe-area"
+        aria-hidden="true"
+        className="bg-black print:hidden"
+        style={{ height: 'var(--safe-area-top, env(safe-area-inset-top, 0px))' }}
+      />
       <header className="border-b bg-background/95 backdrop-blur print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
           <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label="Portfolio Simulator home">
