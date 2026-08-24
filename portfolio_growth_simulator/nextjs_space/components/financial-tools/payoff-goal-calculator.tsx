@@ -5,6 +5,7 @@ import { CalendarCheck2, CheckCircle2, Gauge, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
 import { useCurrency } from '@/components/currency-provider'
 import { formatCurrency, getAppCurrency } from '@/lib/utils'
@@ -73,6 +74,25 @@ export function PayoffGoalCalculator() {
   const interestSaved = estimate && baseline ? Math.max(0, baseline.totalInterest - estimate.projected.totalInterest) : 0
   const monthsSaved = estimate && baseline ? Math.max(0, baseline.paymentCount - estimate.projected.paymentCount) : 0
 
+  const updateTermYears = (years: number) => {
+    const termMonths = Math.max(1, Math.min(600, Math.round(years * 12)))
+    setInputs((current) => ({ ...current, termMonths }))
+    if (!inputs.firstPaymentMonth) return
+    try {
+      const maximum = addMonths(inputs.firstPaymentMonth, termMonths - 1)
+      setTargetMonth((current) => current > maximum ? maximum : current)
+    } catch {}
+  }
+
+  const updateFirstPaymentMonth = (value: string) => {
+    setInputs((current) => ({ ...current, firstPaymentMonth: value }))
+    if (!value) return
+    try {
+      const maximum = addMonths(value, Math.max(0, inputs.termMonths - 1))
+      setTargetMonth((current) => current < value ? value : current > maximum ? maximum : current)
+    } catch {}
+  }
+
   const applyToLoan = () => {
     if (!estimate) return
     const scenario: LoanInputs = { ...inputs, extraMonthlyPayment: estimate.requiredExtraMonthlyPayment }
@@ -91,12 +111,24 @@ export function PayoffGoalCalculator() {
         </CardHeader>
         <CardContent className="min-w-0 space-y-5">
           <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-            <Field label="Loan balance" suffix={symbol}><Input className="min-w-0" type="number" min="1" step="1000" value={inputs.principal} onChange={(event) => setInputs({ ...inputs, principal: Number(event.target.value) || 0 })} /></Field>
-            <Field label="APR" suffix="%"><Input className="min-w-0" type="number" min="0" max="100" step="0.01" value={inputs.apr} onChange={(event) => setInputs({ ...inputs, apr: Number(event.target.value) || 0 })} /></Field>
-            <Field label="Remaining term" suffix="years"><Input className="min-w-0" type="number" min="1" max="50" step="0.5" value={inputs.termMonths / 12} onChange={(event) => setInputs({ ...inputs, termMonths: Math.max(1, Math.round((Number(event.target.value) || 0) * 12)) })} /></Field>
-            <Field label="First payment month"><Input className="min-w-0" type="month" value={inputs.firstPaymentMonth} onChange={(event) => setInputs({ ...inputs, firstPaymentMonth: event.target.value })} /></Field>
-            <Field label="Target payoff month"><Input className="min-w-0" type="month" min={inputs.firstPaymentMonth || undefined} max={lastScheduledMonth || undefined} value={targetMonth} onChange={(event) => setTargetMonth(event.target.value)} /></Field>
-            <Field label="Already paying extra" suffix={symbol}><Input className="min-w-0" type="number" min="0" step="50" value={inputs.extraMonthlyPayment} onChange={(event) => setInputs({ ...inputs, extraMonthlyPayment: Number(event.target.value) || 0 })} /></Field>
+            <Field label="Loan balance" suffix={symbol}>
+              <NumericInput className="min-w-0" min={1} max={1_000_000_000} step={1000} value={inputs.principal} onChange={(value) => setInputs((current) => ({ ...current, principal: value }))} />
+            </Field>
+            <Field label="APR" suffix="%">
+              <NumericInput className="min-w-0" min={0} max={100} step={0.01} value={inputs.apr} onChange={(value) => setInputs((current) => ({ ...current, apr: value }))} />
+            </Field>
+            <Field label="Remaining term" suffix="years">
+              <NumericInput className="min-w-0" min={1} max={50} step={0.5} value={inputs.termMonths / 12} onChange={updateTermYears} />
+            </Field>
+            <Field label="First payment month">
+              <Input className="min-w-0" type="month" value={inputs.firstPaymentMonth} onChange={(event) => updateFirstPaymentMonth(event.target.value)} />
+            </Field>
+            <Field label="Target payoff month">
+              <Input className="min-w-0" type="month" min={inputs.firstPaymentMonth || undefined} max={lastScheduledMonth || undefined} value={targetMonth} onChange={(event) => setTargetMonth(event.target.value)} />
+            </Field>
+            <Field label="Already paying extra" suffix={symbol}>
+              <NumericInput className="min-w-0" min={0} max={1_000_000_000} step={50} value={inputs.extraMonthlyPayment} onChange={(value) => setInputs((current) => ({ ...current, extraMonthlyPayment: value }))} />
+            </Field>
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">This planner solves recurring monthly extra principal. One-time lump sums remain available in the full Loan Calculator.</p>
         </CardContent>

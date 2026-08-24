@@ -37,6 +37,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
 import { CurrencyPickerDialog } from '@/components/currency-picker-dialog'
 import { useCurrency } from '@/components/currency-provider'
@@ -119,11 +120,6 @@ function formatMonthsSaved(months: number): string {
   if (years === 0) return `${remainder} ${remainder === 1 ? 'month' : 'months'}`
   if (remainder === 0) return `${years} ${years === 1 ? 'year' : 'years'}`
   return `${years} ${years === 1 ? 'year' : 'years'} ${remainder} ${remainder === 1 ? 'month' : 'months'}`
-}
-
-function numberValue(value: string): number {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : 0
 }
 
 export function LoanCalculator() {
@@ -428,39 +424,33 @@ export function LoanCalculator() {
             <CardContent className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Loan amount" htmlFor="loan-principal" suffix={currencySymbol}>
-                  <Input
+                  <NumericInput
                     id="loan-principal"
-                    type="number"
-                    inputMode="decimal"
-                    min="1"
-                    max="1000000000"
-                    step="1000"
+                    min={1}
+                    max={1_000_000_000}
+                    step={1000}
                     value={inputs.principal}
-                    onChange={(event) => updateInput('principal', numberValue(event.target.value))}
+                    onChange={(value) => updateInput('principal', value)}
                   />
                 </Field>
                 <Field label="APR" htmlFor="loan-apr" suffix="%">
-                  <Input
+                  <NumericInput
                     id="loan-apr"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    max="100"
-                    step="0.01"
+                    min={0}
+                    max={100}
+                    step={0.01}
                     value={inputs.apr}
-                    onChange={(event) => updateInput('apr', numberValue(event.target.value))}
+                    onChange={(value) => updateInput('apr', value)}
                   />
                 </Field>
                 <Field label="Loan term" htmlFor="loan-term" suffix="years">
-                  <Input
+                  <NumericInput
                     id="loan-term"
-                    type="number"
-                    inputMode="decimal"
-                    min="1"
-                    max="50"
-                    step="0.5"
+                    min={1}
+                    max={50}
+                    step={0.5}
                     value={inputs.termMonths / 12}
-                    onChange={(event) => updateInput('termMonths', Math.round(numberValue(event.target.value) * 12))}
+                    onChange={(years) => updateInput('termMonths', Math.max(1, Math.min(600, Math.round(years * 12))))}
                   />
                 </Field>
                 <Field label="First payment month" htmlFor="loan-start-month">
@@ -484,15 +474,13 @@ export function LoanCalculator() {
                   </div>
                 </div>
                 <Field label="Extra every month" htmlFor="loan-extra-monthly" suffix={currencySymbol}>
-                  <Input
+                  <NumericInput
                     id="loan-extra-monthly"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    max="1000000000"
-                    step="50"
+                    min={0}
+                    max={1_000_000_000}
+                    step={50}
                     value={inputs.extraMonthlyPayment}
-                    onChange={(event) => updateInput('extraMonthlyPayment', numberValue(event.target.value))}
+                    onChange={(value) => updateInput('extraMonthlyPayment', value)}
                   />
                 </Field>
 
@@ -520,15 +508,13 @@ export function LoanCalculator() {
                         />
                       </Field>
                       <Field label="Amount" htmlFor={`loan-lump-amount-${payment.id}`} suffix={currencySymbol}>
-                        <Input
+                        <NumericInput
                           id={`loan-lump-amount-${payment.id}`}
-                          type="number"
-                          inputMode="decimal"
-                          min="1"
-                          max="1000000000"
-                          step="100"
+                          min={1}
+                          max={1_000_000_000}
+                          step={100}
                           value={payment.amount}
-                          onChange={(event) => updateLumpSum(payment.id, { amount: numberValue(event.target.value) })}
+                          onChange={(value) => updateLumpSum(payment.id, { amount: value })}
                         />
                       </Field>
                       <Button

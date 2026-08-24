@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { compareRefinance, type RefinanceInputs } from './refinance'
-import { compareInvestVsDebt, type InvestVsDebtInputs } from './invest-vs-debt'
+import { compareInvestVsDebt, getInvestVsDebtValidationErrors, type InvestVsDebtInputs } from './invest-vs-debt'
 import { estimatePayoffGoal } from './payoff-goal'
 import type { LoanInputs } from '../loan/loan-engine'
 
@@ -83,6 +83,25 @@ test('invest versus debt comparison is deterministic for the same seed', () => {
   assert.ok(first.probabilityInvestFirstAhead >= 0 && first.probabilityInvestFirstAhead <= 100)
   assert.ok(first.acceleratedPayoffMonths < inputs.remainingMonths)
   assert.ok(first.interestSavedByDebtFirst > 0)
+})
+
+test('invest versus debt accepts up to 100,000 scenarios and rejects larger runs', () => {
+  const inputs: InvestVsDebtInputs = {
+    loanBalance: 300_000,
+    loanApr: 6.5,
+    remainingMonths: 300,
+    extraMonthlyCash: 500,
+    expectedReturn: 8,
+    volatility: 18,
+    scenarios: 100_000,
+    seed: 'scenario-limit-test',
+  }
+
+  assert.equal(getInvestVsDebtValidationErrors(inputs).length, 0)
+  assert.ok(
+    getInvestVsDebtValidationErrors({ ...inputs, scenarios: 100_001 })
+      .some((error) => error.includes('100000')),
+  )
 })
 
 test('zero volatility makes the Monte Carlo median agree closely with deterministic paths', () => {

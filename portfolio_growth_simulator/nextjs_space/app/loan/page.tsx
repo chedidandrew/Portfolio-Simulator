@@ -18,6 +18,12 @@ export const metadata: Metadata = {
 export default function LoanPage() {
   return (
     <div className="loan-page">
+      <div
+        data-testid="financial-tool-safe-area"
+        aria-hidden="true"
+        className="bg-black print:hidden"
+        style={{ height: 'var(--safe-area-top, env(safe-area-inset-top, 0px))' }}
+      />
       <LoanCalculator />
       <section className="border-t bg-background px-4 py-5 print:hidden" aria-label="Related loan planning tools">
         <div className="mx-auto grid max-w-6xl gap-3 sm:grid-cols-3">

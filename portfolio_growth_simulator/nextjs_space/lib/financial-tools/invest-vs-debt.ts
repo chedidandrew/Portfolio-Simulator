@@ -33,7 +33,7 @@ const MAX_APR = 100
 const MAX_MONTHS = 600
 const MAX_VOLATILITY = 200
 const MIN_SCENARIOS = 100
-const MAX_SCENARIOS = 5_000
+const MAX_SCENARIOS = 100_000
 
 export function getInvestVsDebtValidationErrors(inputs: InvestVsDebtInputs): string[] {
   const errors: string[] = []

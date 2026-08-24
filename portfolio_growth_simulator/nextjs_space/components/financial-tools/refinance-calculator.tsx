@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { CalendarDays, CircleDollarSign, Gauge, Scale } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useCurrency } from '@/components/currency-provider'
@@ -55,22 +56,36 @@ export function RefinanceCalculator() {
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Remaining balance" suffix={symbol}><Input type="number" min="1" step="1000" value={inputs.balance} onChange={(e) => setInputs({ ...inputs, balance: Number(e.target.value) || 0 })} /></Field>
-            <Field label="Current APR" suffix="%"><Input type="number" min="0" max="100" step="0.01" value={inputs.currentApr} onChange={(e) => setInputs({ ...inputs, currentApr: Number(e.target.value) || 0 })} /></Field>
-            <Field label="Remaining term" suffix="years"><Input type="number" min="1" max="50" step="0.5" value={inputs.remainingMonths / 12} onChange={(e) => setInputs({ ...inputs, remainingMonths: Math.max(1, Math.round((Number(e.target.value) || 0) * 12)) })} /></Field>
-            <Field label="First payment month"><Input type="month" value={inputs.firstPaymentMonth} onChange={(e) => setInputs({ ...inputs, firstPaymentMonth: e.target.value })} /></Field>
+            <Field label="Remaining balance" suffix={symbol}>
+              <NumericInput min={1} max={1_000_000_000} step={1000} value={inputs.balance} onChange={(value) => setInputs((current) => ({ ...current, balance: value }))} />
+            </Field>
+            <Field label="Current APR" suffix="%">
+              <NumericInput min={0} max={100} step={0.01} value={inputs.currentApr} onChange={(value) => setInputs((current) => ({ ...current, currentApr: value }))} />
+            </Field>
+            <Field label="Remaining term" suffix="years">
+              <NumericInput min={1} max={50} step={0.5} value={inputs.remainingMonths / 12} onChange={(years) => setInputs((current) => ({ ...current, remainingMonths: Math.max(1, Math.min(600, Math.round(years * 12))) }))} />
+            </Field>
+            <Field label="First payment month">
+              <Input type="month" value={inputs.firstPaymentMonth} onChange={(event) => setInputs((current) => ({ ...current, firstPaymentMonth: event.target.value }))} />
+            </Field>
           </div>
 
           <div className="rounded-xl border bg-muted/20 p-4">
             <p className="mb-4 font-medium">Proposed refinance</p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="New APR" suffix="%"><Input type="number" min="0" max="100" step="0.01" value={inputs.newApr} onChange={(e) => setInputs({ ...inputs, newApr: Number(e.target.value) || 0 })} /></Field>
-              <Field label="New term" suffix="years"><Input type="number" min="1" max="50" step="0.5" value={inputs.newTermMonths / 12} onChange={(e) => setInputs({ ...inputs, newTermMonths: Math.max(1, Math.round((Number(e.target.value) || 0) * 12)) })} /></Field>
-              <Field label="Closing costs" suffix={symbol}><Input type="number" min="0" step="500" value={inputs.closingCosts} onChange={(e) => setInputs({ ...inputs, closingCosts: Number(e.target.value) || 0 })} /></Field>
+              <Field label="New APR" suffix="%">
+                <NumericInput min={0} max={100} step={0.01} value={inputs.newApr} onChange={(value) => setInputs((current) => ({ ...current, newApr: value }))} />
+              </Field>
+              <Field label="New term" suffix="years">
+                <NumericInput min={1} max={50} step={0.5} value={inputs.newTermMonths / 12} onChange={(years) => setInputs((current) => ({ ...current, newTermMonths: Math.max(1, Math.min(600, Math.round(years * 12))) }))} />
+              </Field>
+              <Field label="Closing costs" suffix={symbol}>
+                <NumericInput min={0} max={1_000_000_000} step={500} value={inputs.closingCosts} onChange={(value) => setInputs((current) => ({ ...current, closingCosts: value }))} />
+              </Field>
               <div className="flex items-end pb-1">
                 <div className="flex w-full items-center justify-between gap-3 rounded-lg border bg-background/60 px-3 py-2.5">
                   <div><Label htmlFor="finance-costs">Finance costs</Label><p className="text-xs text-muted-foreground">Add costs to the new balance</p></div>
-                  <Switch id="finance-costs" checked={inputs.financeClosingCosts} onCheckedChange={(checked) => setInputs({ ...inputs, financeClosingCosts: checked })} />
+                  <Switch id="finance-costs" checked={inputs.financeClosingCosts} onCheckedChange={(checked) => setInputs((current) => ({ ...current, financeClosingCosts: checked }))} />
                 </div>
               </div>
             </div>
