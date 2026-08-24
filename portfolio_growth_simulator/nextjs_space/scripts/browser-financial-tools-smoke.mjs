@@ -14,6 +14,22 @@ async function replaceNumber(page, labelText, value) {
   return field
 }
 
+async function selectCurrency(page, code, expectedSymbol) {
+  await page.getByRole('button', { name: /^Display currency:/ }).click()
+  await page.locator(`[data-currency-code="${code}"]`).click()
+  await page.getByRole('button', { name: `Display currency: ${code}` }).waitFor()
+
+  const payoffValue = page
+    .getByText('Required recurring extra payment', { exact: true })
+    .locator('xpath=..')
+    .locator('h3')
+  await payoffValue.waitFor()
+  assert.ok(
+    (await payoffValue.innerText()).startsWith(expectedSymbol),
+    `Payoff result should use ${expectedSymbol} immediately when the header shows ${code}.`,
+  )
+}
+
 try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
   const page = await context.newPage()
@@ -34,6 +50,18 @@ try {
   await page.getByText('Required recurring extra payment', { exact: true }).waitFor()
   const payoffAmount = await page.getByText('Required recurring extra payment', { exact: true }).locator('xpath=..').locator('h3').innerText()
   assert.match(payoffAmount, /[$€£¥]/, 'Payoff goal should show a currency result.')
+
+  // Currency code, input suffixes, and formatCurrency output must change together.
+  // This specifically guards against the formatter bridge being one selection behind.
+  await selectCurrency(page, 'EUR', '€')
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: 'Display currency: EUR' }).waitFor()
+  assert.ok(
+    (await page.getByText('Required recurring extra payment', { exact: true }).locator('xpath=..').locator('h3').innerText()).startsWith('€'),
+    'Persisted EUR should hydrate with EUR formatting on the same render.',
+  )
+  await selectCurrency(page, 'JPY', '¥')
+  await selectCurrency(page, 'USD', '$')
 
   const apr = await replaceNumber(page, 'APR', '8')
   assert.equal(await apr.inputValue(), '8', 'APR should commit as 8, not 08 or 0.')
