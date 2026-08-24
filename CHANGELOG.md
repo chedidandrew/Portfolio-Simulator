@@ -2,6 +2,26 @@
 
 All notable repository and production changes are documented here.
 
+## 2026-08-24 - Financial tool correctness and cross-tool decisions
+
+### Fixed
+
+- Payoff Goal now includes saved one-time principal payments when solving the minimum recurring extra payment, so an existing bonus or windfall cannot be silently ignored when determining whether a target month is achievable.
+- Payoff Goal now waits for the shared financial profile to hydrate before creating a default target month, preventing saved future-dated loans from inheriting a stale target based on temporary defaults.
+- Refinance now compares the proposed loan against the user's actual saved current payoff plan, including recurring extra principal and one-time payments, while still showing the contractual required-payment comparison separately.
+- Refinance now rejects financed closing costs that would push the new principal above the supported loan ceiling and reports no artificial upfront break-even when closing costs are financed.
+- Refinance month validation now reuses the loan engine's real calendar-month validation instead of accepting malformed month numbers that only matched the `YYYY-MM` shape.
+- Added a cent-level guard for unrealistically tiny loan/term combinations whose required monthly payment would round below one cent.
+
+### Changed
+
+- Invest vs. Debt now compares recurring extra cash, saved one-time cash events, or both using the same dates and equal household cash commitments under the invest-first and debt-first strategies.
+- Moved Invest vs. Debt Monte Carlo execution into a Web Worker so simulation work cannot block the browser UI; 50,000- and 100,000-scenario runs now start explicitly and report progress, while smaller runs continue updating automatically.
+- Renamed the Invest vs. Debt return input to `Median geometric return assumption` so the UI matches the lognormal model's actual drift interpretation and the Growth/Withdrawal Monte Carlo terminology.
+- Added direct handoffs from Payoff Goal and the Loan Calculator to Invest vs. Debt so the same recurring and one-time extra-payment plan can be compared against investing without re-entering the loan assumptions.
+- Changed the phone-sized yearly amortization summary from a clipped wide table into stacked key/value cards while retaining intentional horizontal scrolling for the full payment-by-payment monthly schedule.
+- Expanded deterministic and browser regression coverage for payoff targets with lump sums, accelerated-current-plan refinance comparisons, financed-cost limits, one-time Invest vs. Debt cash, background-worker behavior, high-scenario manual runs, cross-tool handoffs, tiny-loan validation, and mobile amortization layout.
+
 ## 2026-08-23 - Financial tool continuity and mobile navigation
 
 ### Changed

@@ -1,11 +1,21 @@
-import { calculateLoan, calculateScheduledPayment, compareLoanPlans, roundLoanMoney } from '../loan/loan-engine'
+import {
+  addMonths,
+  calculateLoan,
+  calculateScheduledPayment,
+  compareLoanPlans,
+  getLoanValidationErrors,
+  roundLoanMoney,
+  type LoanLumpSum,
+} from '../loan/loan-engine'
 import { calculatePercentile, createSeededRandom, normalRandom } from '../simulation/financial-utils'
 
 export interface InvestVsDebtInputs {
   loanBalance: number
   loanApr: number
   remainingMonths: number
+  firstPaymentMonth: string
   extraMonthlyCash: number
+  lumpSums: LoanLumpSum[]
   expectedReturn: number
   volatility: number
   scenarios: number
@@ -28,29 +38,27 @@ export interface InvestVsDebtResult {
   scenarios: number
 }
 
-const MAX_AMOUNT = 1_000_000_000
-const MAX_APR = 100
-const MAX_MONTHS = 600
+export type InvestVsDebtProgressCallback = (completed: number, total: number) => void
+
 const MAX_VOLATILITY = 200
 const MIN_SCENARIOS = 100
 const MAX_SCENARIOS = 100_000
 
 export function getInvestVsDebtValidationErrors(inputs: InvestVsDebtInputs): string[] {
-  const errors: string[] = []
-  if (!Number.isFinite(inputs.loanBalance) || inputs.loanBalance <= 0 || inputs.loanBalance > MAX_AMOUNT) {
-    errors.push('Loan balance must be greater than 0 and no more than 1,000,000,000.')
-  }
-  if (!Number.isFinite(inputs.loanApr) || inputs.loanApr < 0 || inputs.loanApr > MAX_APR) {
-    errors.push('Loan APR must be between 0% and 100%.')
-  }
-  if (!Number.isInteger(inputs.remainingMonths) || inputs.remainingMonths < 1 || inputs.remainingMonths > MAX_MONTHS) {
-    errors.push('Remaining term must be between 1 and 600 months.')
-  }
-  if (!Number.isFinite(inputs.extraMonthlyCash) || inputs.extraMonthlyCash <= 0 || inputs.extraMonthlyCash > MAX_AMOUNT) {
-    errors.push('Extra monthly cash must be greater than 0.')
+  const errors = getLoanValidationErrors({
+    principal: inputs.loanBalance,
+    apr: inputs.loanApr,
+    termMonths: inputs.remainingMonths,
+    firstPaymentMonth: inputs.firstPaymentMonth,
+    extraMonthlyPayment: inputs.extraMonthlyCash,
+    lumpSums: inputs.lumpSums,
+  })
+
+  if (inputs.extraMonthlyCash === 0 && inputs.lumpSums.length === 0) {
+    errors.push('Enter monthly extra cash, at least one one-time payment, or both to compare the strategies.')
   }
   if (!Number.isFinite(inputs.expectedReturn) || inputs.expectedReturn <= -100 || inputs.expectedReturn > 100) {
-    errors.push('Expected investment return must be greater than -100% and no more than 100%.')
+    errors.push('Median geometric return assumption must be greater than -100% and no more than 100%.')
   }
   if (!Number.isFinite(inputs.volatility) || inputs.volatility < 0 || inputs.volatility > MAX_VOLATILITY) {
     errors.push('Volatility must be between 0% and 200%.')
@@ -61,16 +69,15 @@ export function getInvestVsDebtValidationErrors(inputs: InvestVsDebtInputs): str
   if (typeof inputs.seed !== 'string' || inputs.seed.length < 1 || inputs.seed.length > 100) {
     errors.push('Simulation seed must contain between 1 and 100 characters.')
   }
-  return errors
+  return Array.from(new Set(errors))
 }
 
 function contributionSchedules(inputs: InvestVsDebtInputs) {
-  const firstPaymentMonth = '2000-01'
   const baseline = calculateLoan({
     principal: inputs.loanBalance,
     apr: inputs.loanApr,
     termMonths: inputs.remainingMonths,
-    firstPaymentMonth,
+    firstPaymentMonth: inputs.firstPaymentMonth,
     extraMonthlyPayment: 0,
     lumpSums: [],
   })
@@ -78,20 +85,30 @@ function contributionSchedules(inputs: InvestVsDebtInputs) {
     principal: inputs.loanBalance,
     apr: inputs.loanApr,
     termMonths: inputs.remainingMonths,
-    firstPaymentMonth,
+    firstPaymentMonth: inputs.firstPaymentMonth,
     extraMonthlyPayment: inputs.extraMonthlyCash,
-    lumpSums: [],
+    lumpSums: inputs.lumpSums,
   })
 
+  const oneTimeByMonth = new Map<string, number>()
+  for (const payment of inputs.lumpSums) {
+    oneTimeByMonth.set(payment.month, roundLoanMoney((oneTimeByMonth.get(payment.month) ?? 0) + payment.amount))
+  }
+
   const scheduledPayment = baseline.scheduledPayment
-  const monthlyBudget = scheduledPayment + inputs.extraMonthlyCash
   const investFirstContributions: number[] = []
   const debtFirstContributions: number[] = []
 
   for (let index = 0; index < inputs.remainingMonths; index += 1) {
+    const month = addMonths(inputs.firstPaymentMonth, index)
+    const oneTimeCash = oneTimeByMonth.get(month) ?? 0
     const scheduledActual = baseline.schedule[index]?.totalPayment ?? 0
     const debtActual = debtFirst.schedule[index]?.totalPayment ?? 0
-    investFirstContributions.push(roundLoanMoney(inputs.extraMonthlyCash + Math.max(0, scheduledPayment - scheduledActual)))
+    const monthlyBudget = roundLoanMoney(scheduledPayment + inputs.extraMonthlyCash + oneTimeCash)
+
+    investFirstContributions.push(roundLoanMoney(
+      inputs.extraMonthlyCash + oneTimeCash + Math.max(0, scheduledPayment - scheduledActual),
+    ))
     debtFirstContributions.push(roundLoanMoney(Math.max(0, monthlyBudget - debtActual)))
   }
 
@@ -108,7 +125,10 @@ function deterministicFutureValue(contributions: number[], annualReturnPct: numb
   return balance
 }
 
-export function compareInvestVsDebt(inputs: InvestVsDebtInputs): InvestVsDebtResult {
+export function compareInvestVsDebt(
+  inputs: InvestVsDebtInputs,
+  onProgress?: InvestVsDebtProgressCallback,
+): InvestVsDebtResult {
   const errors = getInvestVsDebtValidationErrors(inputs)
   if (errors.length > 0) throw new Error(errors[0])
 
@@ -122,6 +142,7 @@ export function compareInvestVsDebt(inputs: InvestVsDebtInputs): InvestVsDebtRes
   const debtValues: number[] = []
   const differences: number[] = []
   let investWins = 0
+  const progressInterval = Math.max(1, Math.floor(inputs.scenarios / 100))
 
   for (let path = 0; path < inputs.scenarios; path += 1) {
     const random = createSeededRandom(`${inputs.seed}:path:${path}`)
@@ -139,6 +160,11 @@ export function compareInvestVsDebt(inputs: InvestVsDebtInputs): InvestVsDebtRes
     debtValues.push(debtFirst)
     differences.push(difference)
     if (difference > 0) investWins += 1
+
+    const completed = path + 1
+    if (onProgress && (completed === inputs.scenarios || completed % progressInterval === 0)) {
+      onProgress(completed, inputs.scenarios)
+    }
   }
 
   investValues.sort((a, b) => a - b)
@@ -148,9 +174,9 @@ export function compareInvestVsDebt(inputs: InvestVsDebtInputs): InvestVsDebtRes
     principal: inputs.loanBalance,
     apr: inputs.loanApr,
     termMonths: inputs.remainingMonths,
-    firstPaymentMonth: '2000-01',
+    firstPaymentMonth: inputs.firstPaymentMonth,
     extraMonthlyPayment: inputs.extraMonthlyCash,
-    lumpSums: [],
+    lumpSums: inputs.lumpSums,
   })
 
   return {

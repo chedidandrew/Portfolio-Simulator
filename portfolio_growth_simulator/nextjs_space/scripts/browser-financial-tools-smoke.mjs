@@ -114,7 +114,8 @@ try {
   await replaceNumber(page, 'Already paying extra', '750')
   const sharedFirstPayment = await page.locator('input[type="month"]').first().inputValue()
 
-  // Refinance must immediately reuse the same current-loan assumptions.
+  // Refinance must reuse the same current-loan assumptions and explicitly
+  // include the saved accelerated payoff plan in its comparison.
   const payoffNav = await assertFinanceNav(page, 'Payoff Goal')
   await payoffNav.getByRole('link', { name: 'Refinance', exact: true }).click()
   await page.getByRole('heading', { name: 'Refinance Comparison' }).waitFor()
@@ -123,13 +124,15 @@ try {
   assert.equal(await fieldValue(page, 'Current APR'), '8')
   assert.equal(await fieldValue(page, 'Remaining term'), '20')
   assert.equal(await page.locator('input[type="month"]').first().inputValue(), sharedFirstPayment)
+  await page.getByText('Your current plan', { exact: true }).waitFor()
   await replaceNumber(page, 'New APR', '6')
   await replaceNumber(page, 'New term', '15')
   await replaceNumber(page, 'Closing costs', '7000')
-  await page.getByText('Estimated lifetime savings after closing costs', { exact: true }).waitFor()
+  await page.getByText('Estimated lifetime savings vs. your current plan', { exact: true }).waitFor()
 
   // Invest vs. Debt shares balance/APR/term/extra cash, while keeping its own
-  // market assumptions persistent between visits.
+  // market assumptions persistent between visits. Its Monte Carlo work runs
+  // off the UI thread and large runs require an explicit start.
   const refiNav = await assertFinanceNav(page, 'Refinance')
   await refiNav.getByRole('link', { name: 'Invest vs. Debt', exact: true }).click()
   await page.getByRole('heading', { name: 'Invest vs. Pay Down Debt' }).waitFor()
@@ -138,19 +141,28 @@ try {
   assert.equal(await fieldValue(page, 'Loan APR'), '8')
   assert.equal(await fieldValue(page, 'Remaining term'), '20')
   assert.equal(await fieldValue(page, 'Extra cash each month'), '750')
-  await replaceNumber(page, 'Expected annual return', '7.5')
+  await replaceNumber(page, 'Median geometric return assumption', '7.5')
   await replaceNumber(page, 'Annual volatility', '12.5')
 
   const scenarios = page.getByRole('combobox', { name: 'Scenarios' })
   await scenarios.click()
   await page.getByRole('option', { name: '5,000 scenarios' }).click()
-  await page.getByText('Across 5,000 seeded market scenarios over the remaining loan term.', { exact: true }).waitFor()
+  await page.getByText('Across 5,000 seeded market scenarios over the remaining loan term.', { exact: true }).waitFor({ timeout: 30_000 })
+  await scenarios.click()
+  await page.getByRole('option', { name: '50,000 scenarios' }).click()
+  await page.getByRole('button', { name: 'Run 50,000 scenarios' }).waitFor()
+  await page.getByText('Ready to run 50,000 scenarios. Use the Run button under Investment assumptions.', { exact: true }).waitFor()
+  await scenarios.click()
+  await page.getByRole('option', { name: '5,000 scenarios' }).click()
+  await page.getByText('Across 5,000 seeded market scenarios over the remaining loan term.', { exact: true }).waitFor({ timeout: 30_000 })
+
   await page.reload({ waitUntil: 'networkidle' })
   assert.equal(await fieldValue(page, 'Loan balance'), '420000', 'Shared loan balance should survive reload.')
   assert.equal(await fieldValue(page, 'Extra cash each month'), '750', 'Shared monthly cash should survive reload.')
-  assert.equal(await fieldValue(page, 'Expected annual return'), '7.5', 'Invest return assumption should survive reload.')
+  assert.equal(await fieldValue(page, 'Median geometric return assumption'), '7.5', 'Invest return assumption should survive reload.')
   assert.equal(await fieldValue(page, 'Annual volatility'), '12.5', 'Invest volatility should survive reload.')
   assert.match(await page.getByRole('combobox', { name: 'Scenarios' }).innerText(), /5,000 scenarios/, 'Scenario count should survive reload.')
+  await page.getByText('Across 5,000 seeded market scenarios over the remaining loan term.', { exact: true }).waitFor({ timeout: 30_000 })
 
   // Refinance-specific proposal values survive a trip through another tool.
   const investNav = await assertFinanceNav(page, 'Invest vs. Debt')
@@ -171,24 +183,36 @@ try {
   assert.equal(await page.locator('#loan-extra-monthly').inputValue(), '750')
   assert.equal(await page.locator('#loan-start-month').inputValue(), sharedFirstPayment)
 
-  // Editing the full Loan Calculator flows back to every focused tool.
+  // Editing the full Loan Calculator, including a one-time payment, flows back
+  // to the focused tools and enables a direct invest-vs-debt handoff.
   await page.locator('#loan-principal').fill('430000')
   await page.locator('#loan-principal').press('Tab')
   await page.locator('#loan-extra-monthly').fill('900')
   await page.locator('#loan-extra-monthly').press('Tab')
+  await page.getByRole('button', { name: 'Add', exact: true }).click()
+  await page.getByLabel('Amount').last().fill('10000')
+  await page.getByLabel('Amount').last().press('Tab')
+  await page.getByRole('link', { name: 'Compare investing these extras' }).waitFor()
+
   const loanNav = await assertFinanceNav(page, 'Loan')
   await loanNav.getByRole('link', { name: 'Payoff Goal', exact: true }).click()
   assert.equal(await fieldValue(page, 'Loan balance'), '430000')
   assert.equal(await fieldValue(page, 'Already paying extra'), '900')
+  await page.getByText(/1 saved one-time payment is included in the target calculation\./).waitFor()
+  const comparePayment = page.getByRole('button', { name: /Compare this payment vs\. investing/ })
+  await comparePayment.waitFor()
+  await comparePayment.click()
+  await page.getByRole('heading', { name: 'Invest vs. Pay Down Debt' }).waitFor()
+  await page.getByText(/1 saved one-time cash event is included/).waitFor()
 
   // The shared settings gear contains appearance, currency, and a guarded reset.
   await openFinancialSettings(page)
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('menuitem', { name: 'Reset financial tools' }).click()
   assert.equal(await fieldValue(page, 'Loan balance'), '350000')
-  assert.equal(await fieldValue(page, 'APR'), '6.5')
+  assert.equal(await fieldValue(page, 'Loan APR'), '6.5')
   assert.equal(await fieldValue(page, 'Remaining term'), '30')
-  assert.equal(await fieldValue(page, 'Already paying extra'), '0')
+  assert.equal(await fieldValue(page, 'Extra cash each month'), '0')
   assert.equal(
     await page.evaluate(() => JSON.parse(localStorage.getItem('portfolio-sim-currency') || 'null')),
     'USD',

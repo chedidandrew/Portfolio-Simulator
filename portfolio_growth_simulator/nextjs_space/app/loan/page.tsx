@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight, CalendarCheck2, RefreshCw, Scale } from 'lucide-react'
 import { LoanProfileBridge } from '@/components/loan/loan-profile-bridge'
+import { LoanInvestComparisonLink } from '@/components/loan/loan-invest-comparison-link'
 import { FinancialToolHeader } from '@/components/financial-tools/tool-header'
 import { FinancialToolNav } from '@/components/financial-tools/tool-nav'
 
@@ -27,11 +28,12 @@ export default function LoanPage() {
       <div className="[&>div>header]:hidden">
         <LoanProfileBridge />
       </div>
+      <LoanInvestComparisonLink />
       <section className="border-t bg-background px-4 py-5 print:hidden" aria-label="Related loan planning tools">
         <div className="mx-auto grid max-w-6xl gap-3 sm:grid-cols-3">
           <RelatedTool href="/loan/payoff-goal" icon={CalendarCheck2} title="Payoff Goal" text="Solve for the monthly extra payment needed to hit a target payoff month." />
           <RelatedTool href="/loan/refinance" icon={RefreshCw} title="Refinance" text="Compare payment savings, closing costs, break-even time, and lifetime cost." />
-          <RelatedTool href="/invest-vs-debt" icon={Scale} title="Invest vs. Debt" text="Compare extra principal with investing the same monthly cash." />
+          <RelatedTool href="/invest-vs-debt" icon={Scale} title="Invest vs. Debt" text="Compare recurring and one-time extra principal with investing the same cash." />
         </div>
       </section>
       <aside className="border-t bg-muted/10 px-4 py-5 print:hidden" aria-label="Loan calculation methodology">

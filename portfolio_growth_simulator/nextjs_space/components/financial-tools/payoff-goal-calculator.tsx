@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
-import { CalendarCheck2, CheckCircle2, Gauge, Sparkles } from 'lucide-react'
+import { CalendarCheck2, CheckCircle2, Gauge, Scale, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -39,22 +39,17 @@ interface PayoffGoalState {
 function isValidPayoffGoalState(value: unknown): value is PayoffGoalState {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
   const candidate = value as Record<string, unknown>
-  return typeof candidate.targetMonth === 'string' && /^\d{4}-\d{2}$/.test(candidate.targetMonth)
+  return typeof candidate.targetMonth === 'string' && (candidate.targetMonth === '' || /^\d{4}-\d{2}$/.test(candidate.targetMonth))
 }
 
 export function PayoffGoalCalculator() {
   const { currency } = useCurrency()
-  const { profile, setProfile } = useFinancialProfile()
+  const { profile, hydrated, setProfile } = useFinancialProfile()
   const symbol = getAppCurrency().symbol
-  const inputs = useMemo<LoanInputs>(() => ({
-    ...financialProfileToLoanInputs(profile),
-    // This planner intentionally solves recurring extra principal only. One-time
-    // payments stay saved in the shared profile for the full Loan Calculator.
-    lumpSums: [],
-  }), [profile])
+  const inputs = useMemo<LoanInputs>(() => financialProfileToLoanInputs(profile), [profile])
   const [toolState, setToolState] = useLocalStorage<PayoffGoalState>(
     PAYOFF_GOAL_STORAGE_KEY,
-    { targetMonth: addMonths(profile.firstPaymentMonth, Math.min(179, Math.max(0, profile.remainingMonths - 1))) },
+    { targetMonth: '' },
     { validatePersisted: isValidPayoffGoalState },
   )
   const targetMonth = toolState.targetMonth
@@ -68,15 +63,18 @@ export function PayoffGoalCalculator() {
   }, [inputs.firstPaymentMonth, inputs.termMonths])
 
   useEffect(() => {
-    if (!inputs.firstPaymentMonth || !lastScheduledMonth) return
-    if (targetMonth < inputs.firstPaymentMonth) {
+    if (!hydrated || !inputs.firstPaymentMonth || !lastScheduledMonth) return
+    if (!targetMonth) {
+      setToolState({ targetMonth: addMonths(inputs.firstPaymentMonth, Math.min(179, Math.max(0, inputs.termMonths - 1))) })
+    } else if (targetMonth < inputs.firstPaymentMonth) {
       setToolState({ targetMonth: inputs.firstPaymentMonth })
     } else if (targetMonth > lastScheduledMonth) {
       setToolState({ targetMonth: lastScheduledMonth })
     }
-  }, [inputs.firstPaymentMonth, lastScheduledMonth, setToolState, targetMonth])
+  }, [hydrated, inputs.firstPaymentMonth, inputs.termMonths, lastScheduledMonth, setToolState, targetMonth])
 
   const estimate = useMemo(() => {
+    if (!targetMonth) return null
     try {
       return estimatePayoffGoal(inputs, targetMonth)
     } catch {
@@ -86,7 +84,7 @@ export function PayoffGoalCalculator() {
 
   const baseline = useMemo(() => {
     try {
-      return calculateLoan({ ...inputs, extraMonthlyPayment: 0 })
+      return calculateLoan({ ...inputs, extraMonthlyPayment: 0, lumpSums: [] })
     } catch {
       return null
     }
@@ -106,21 +104,23 @@ export function PayoffGoalCalculator() {
     setProfile((current) => ({ ...current, firstPaymentMonth: value }))
   }
 
-  const applyToLoan = () => {
+  const usePaymentAndGo = (destination: '/loan' | '/invest-vs-debt') => {
     if (!estimate) return
     setProfile((current) => ({
       ...current,
       extraMonthlyPayment: estimate.requiredExtraMonthlyPayment,
     }))
-    window.location.assign('/loan')
+    window.location.assign(destination)
   }
+
+  const hasComparableExtraCash = Boolean(estimate && (estimate.requiredExtraMonthlyPayment > 0 || inputs.lumpSums.length > 0))
 
   return (
     <div className="grid min-w-0 gap-6 lg:grid-cols-[0.9fr_1.1fr]">
       <Card className="h-fit min-w-0">
         <CardHeader>
           <CardTitle>Payoff goal</CardTitle>
-          <CardDescription>Choose when you want the loan gone. The calculator solves for the minimum recurring extra payment to reach that month.</CardDescription>
+          <CardDescription>Choose when you want the loan gone. The calculator solves for the minimum recurring extra payment needed alongside your saved one-time principal payments.</CardDescription>
         </CardHeader>
         <CardContent className="min-w-0 space-y-5">
           <div className="grid min-w-0 gap-4 sm:grid-cols-2">
@@ -143,7 +143,11 @@ export function PayoffGoalCalculator() {
               <NumericInput className="min-w-0" min={0} max={1_000_000_000} step={50} value={profile.extraMonthlyPayment} onChange={(value) => setProfile((current) => ({ ...current, extraMonthlyPayment: value }))} />
             </Field>
           </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">This planner solves recurring monthly extra principal. One-time lump sums remain saved for the full Loan Calculator.</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            This planner solves recurring monthly extra principal. {inputs.lumpSums.length > 0
+              ? `${inputs.lumpSums.length} saved one-time ${inputs.lumpSums.length === 1 ? 'payment is' : 'payments are'} included in the target calculation.`
+              : 'One-time payments added in the full Loan Calculator will also be included here.'}
+          </p>
         </CardContent>
       </Card>
 
@@ -153,7 +157,7 @@ export function PayoffGoalCalculator() {
             <CardHeader className="min-w-0 pb-3">
               <CardDescription>Required recurring extra payment</CardDescription>
               <CardTitle className="break-words text-4xl tracking-tight text-primary sm:text-5xl">{formatCurrency(estimate.requiredExtraMonthlyPayment, true, 2, false)}</CardTitle>
-              <p className="text-sm text-muted-foreground">Total planned monthly outflow: <strong className="break-words text-foreground">{formatCurrency(totalMonthly, true, 2, false)}</strong></p>
+              <p className="text-sm text-muted-foreground">Recurring planned monthly outflow: <strong className="break-words text-foreground">{formatCurrency(totalMonthly, true, 2, false)}</strong></p>
             </CardHeader>
             <CardContent>
               <div className="grid min-w-0 gap-3 sm:grid-cols-2">
@@ -164,7 +168,14 @@ export function PayoffGoalCalculator() {
               </div>
             </CardContent>
           </Card>
-          <Button type="button" size="lg" className="w-full whitespace-normal sm:w-auto" onClick={applyToLoan}>Use this payment in Loan Calculator</Button>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button type="button" size="lg" className="w-full whitespace-normal" onClick={() => usePaymentAndGo('/loan')}>Use this payment in Loan Calculator</Button>
+            {hasComparableExtraCash && (
+              <Button type="button" size="lg" variant="outline" className="w-full whitespace-normal" onClick={() => usePaymentAndGo('/invest-vs-debt')}>
+                <Scale className="mr-2 h-4 w-4" /> Compare this payment vs. investing
+              </Button>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">Display currency: {currency}. Symbols change only; values are not converted using exchange rates.</p>
         </div>
       ) : (

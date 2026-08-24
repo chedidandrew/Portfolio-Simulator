@@ -47,6 +47,7 @@ try {
   await page.getByRole('button', { name: 'Add' }).click()
   await page.getByText('Extra Payment Impact').waitFor()
   await page.getByText('$2,212.24', { exact: true }).first().waitFor()
+  await page.getByRole('link', { name: 'Compare investing these extras' }).waitFor()
 
   const summaryCard = page
     .getByText('Required monthly payment', { exact: true })
@@ -132,8 +133,21 @@ try {
     `Unexpected shared loan page horizontal overflow: ${dimensions.page}px > ${dimensions.viewport}px`,
   )
 
+  const yearlyTable = sharedPage.locator('table[class*="min-w-[780px]"]')
+  await yearlyTable.waitFor()
+  const yearlyLayout = await yearlyTable.evaluate((element) => ({
+    display: getComputedStyle(element).display,
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }))
+  assert.equal(yearlyLayout.display, 'block', 'Yearly amortization summary should use the stacked mobile treatment.')
+  assert.ok(yearlyLayout.scrollWidth <= yearlyLayout.clientWidth + 2, 'Yearly amortization summary should fit without horizontal scrolling on iPhone widths.')
+
   await sharedPage.getByRole('button', { name: 'View full monthly schedule' }).click()
   await sharedPage.getByText('Scheduled Principal', { exact: true }).first().waitFor()
+  const monthlyTable = sharedPage.locator('table[class*="min-w-[860px]"]')
+  await monthlyTable.waitFor()
+  assert.ok(await monthlyTable.evaluate((element) => element.scrollWidth > element.parentElement.clientWidth), 'Full monthly schedule should remain intentionally horizontally scrollable on mobile.')
 
   await sharedPage.emulateMedia({ media: 'print' })
   const assumptionsHeading = sharedPage.getByRole('heading', { name: 'Loan Assumptions' })
