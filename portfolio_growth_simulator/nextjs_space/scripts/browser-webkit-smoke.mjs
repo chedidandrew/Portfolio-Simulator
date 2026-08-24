@@ -29,7 +29,9 @@ try {
     await tab.waitFor({ state: 'visible' })
     assert.equal(await tab.getByText(label, { exact: true }).isVisible(), true, `${label} text should be visible on mobile`)
   }
-  await page.getByRole('tabpanel', { name: 'Guide' }).getByRole('link', { name: 'Loan Calculator' }).waitFor({ state: 'visible' })
+  const guidePanel = page.getByRole('tabpanel', { name: 'Guide' })
+  await guidePanel.getByRole('link', { name: 'Financial Tools' }).waitFor({ state: 'visible' })
+  assert.equal(await guidePanel.getByRole('link', { name: 'Loan Calculator' }).count(), 0, 'Guide should use Financial Tools as the single finance entry point.')
 
   await page.getByRole('tab', { name: 'Growth' }).click()
   const startingBalance = page.locator('#starting-balance')
@@ -39,6 +41,29 @@ try {
 
   const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, page: document.documentElement.scrollWidth }))
   assert.ok(dimensions.page <= dimensions.viewport + 2, `Unexpected WebKit page-level horizontal overflow: ${dimensions.page}px > ${dimensions.viewport}px`)
+
+  await page.getByRole('switch', { name: 'Use Monte Carlo simulation for growth' }).click()
+  const returnInput = page.locator('#mc-return')
+  const volatilityInput = page.locator('#mc-volatility')
+  await returnInput.waitFor({ state: 'visible' })
+  assert.equal(await returnInput.getAttribute('readonly'), '', 'Preset return should begin read-only.')
+  assert.equal(await returnInput.isEditable(), false, 'Preset return should not edit before activation.')
+  await returnInput.click()
+  await page.waitForFunction(() => !document.querySelector('#mc-return')?.hasAttribute('readonly'))
+  assert.equal(await returnInput.isEditable(), true, 'Tapping preset return should switch to Custom and make it editable.')
+  await returnInput.fill('8.25')
+  await returnInput.blur()
+  assert.equal(await returnInput.inputValue(), '8.25')
+
+  await page.getByRole('button', { name: /^Balanced/ }).click()
+  await page.waitForFunction(() => document.querySelector('#mc-volatility')?.hasAttribute('readonly'))
+  assert.equal(await volatilityInput.isEditable(), false, 'Preset volatility should return to read-only after selecting Balanced.')
+  await volatilityInput.click()
+  await page.waitForFunction(() => !document.querySelector('#mc-volatility')?.hasAttribute('readonly'))
+  assert.equal(await volatilityInput.isEditable(), true, 'Tapping preset volatility should switch to Custom and make it editable.')
+  await volatilityInput.fill('12.5')
+  await volatilityInput.blur()
+  assert.equal(await volatilityInput.inputValue(), '12.5')
 
   await page.getByRole('button', { name: 'Open settings' }).click()
   await page.getByRole('menuitem', { name: 'Display Currency' }).click()
@@ -54,6 +79,21 @@ try {
   await page.goto(`${baseUrl}/loan`, { waitUntil: 'networkidle' })
   await page.getByRole('heading', { name: 'Loan & Amortization Calculator', level: 1 }).waitFor()
   await assertFinancialToolSafeArea(page, '/loan')
+
+  const startMonth = page.locator('#loan-start-month')
+  const loanDetailsCard = startMonth.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " rounded-lg ")][1]')
+  const [startMonthBox, loanDetailsCardBox] = await Promise.all([
+    startMonth.boundingBox(),
+    loanDetailsCard.boundingBox(),
+  ])
+  assert.ok(startMonthBox, 'First payment month should be measurable on iPhone width.')
+  assert.ok(loanDetailsCardBox, 'Loan Details card should be measurable on iPhone width.')
+  assert.ok(
+    startMonthBox.x >= loanDetailsCardBox.x + 22
+      && startMonthBox.x + startMonthBox.width <= loanDetailsCardBox.x + loanDetailsCardBox.width - 22,
+    `First payment month must stay inside the Loan Details card padding: input=${JSON.stringify(startMonthBox)}, card=${JSON.stringify(loanDetailsCardBox)}`,
+  )
+
   await page.locator('#loan-principal').fill('300000')
   await page.locator('#loan-extra-monthly').fill('250')
   await page.getByRole('button', { name: 'Add' }).click()
