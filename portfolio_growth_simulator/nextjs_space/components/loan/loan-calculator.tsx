@@ -37,6 +37,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
 import { CurrencyPickerDialog } from '@/components/currency-picker-dialog'
 import { useCurrency } from '@/components/currency-provider'
@@ -119,11 +120,6 @@ function formatMonthsSaved(months: number): string {
   if (years === 0) return `${remainder} ${remainder === 1 ? 'month' : 'months'}`
   if (remainder === 0) return `${years} ${years === 1 ? 'year' : 'years'}`
   return `${years} ${years === 1 ? 'year' : 'years'} ${remainder} ${remainder === 1 ? 'month' : 'months'}`
-}
-
-function numberValue(value: string): number {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : 0
 }
 
 export function LoanCalculator() {
@@ -428,48 +424,16 @@ export function LoanCalculator() {
             <CardContent className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Loan amount" htmlFor="loan-principal" suffix={currencySymbol}>
-                  <Input
-                    id="loan-principal"
-                    type="number"
-                    inputMode="decimal"
-                    min="1"
-                    max="1000000000"
-                    step="1000"
-                    value={inputs.principal}
-                    onChange={(event) => updateInput('principal', numberValue(event.target.value))}
-                  />
+                  <NumericInput id="loan-principal" min={1} max={1_000_000_000} step={1000} value={inputs.principal} onChange={(value) => updateInput('principal', value)} />
                 </Field>
                 <Field label="APR" htmlFor="loan-apr" suffix="%">
-                  <Input
-                    id="loan-apr"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={inputs.apr}
-                    onChange={(event) => updateInput('apr', numberValue(event.target.value))}
-                  />
+                  <NumericInput id="loan-apr" min={0} max={100} step={0.01} value={inputs.apr} onChange={(value) => updateInput('apr', value)} />
                 </Field>
                 <Field label="Loan term" htmlFor="loan-term" suffix="years">
-                  <Input
-                    id="loan-term"
-                    type="number"
-                    inputMode="decimal"
-                    min="1"
-                    max="50"
-                    step="0.5"
-                    value={inputs.termMonths / 12}
-                    onChange={(event) => updateInput('termMonths', Math.round(numberValue(event.target.value) * 12))}
-                  />
+                  <NumericInput id="loan-term" min={1} max={50} step={0.5} value={inputs.termMonths / 12} onChange={(years) => updateInput('termMonths', Math.max(1, Math.min(600, Math.round(years * 12))))} />
                 </Field>
                 <Field label="First payment month" htmlFor="loan-start-month">
-                  <Input
-                    id="loan-start-month"
-                    type="month"
-                    value={inputs.firstPaymentMonth}
-                    onChange={(event) => updateInput('firstPaymentMonth', event.target.value)}
-                  />
+                  <Input id="loan-start-month" type="month" value={inputs.firstPaymentMonth} onChange={(event) => updateInput('firstPaymentMonth', event.target.value)} />
                 </Field>
               </div>
 
@@ -484,16 +448,7 @@ export function LoanCalculator() {
                   </div>
                 </div>
                 <Field label="Extra every month" htmlFor="loan-extra-monthly" suffix={currencySymbol}>
-                  <Input
-                    id="loan-extra-monthly"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    max="1000000000"
-                    step="50"
-                    value={inputs.extraMonthlyPayment}
-                    onChange={(event) => updateInput('extraMonthlyPayment', numberValue(event.target.value))}
-                  />
+                  <NumericInput id="loan-extra-monthly" min={0} max={1_000_000_000} step={50} value={inputs.extraMonthlyPayment} onChange={(value) => updateInput('extraMonthlyPayment', value)} />
                 </Field>
 
                 <div className="mt-4 space-y-3">
@@ -510,35 +465,12 @@ export function LoanCalculator() {
                   {inputs.lumpSums.map((payment) => (
                     <div key={payment.id} className="grid gap-2 rounded-lg border bg-background/60 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end sm:border-0 sm:bg-transparent sm:p-0">
                       <Field label="Month" htmlFor={`loan-lump-month-${payment.id}`}>
-                        <Input
-                          id={`loan-lump-month-${payment.id}`}
-                          type="month"
-                          min={inputs.firstPaymentMonth}
-                          max={lastScheduledMonth}
-                          value={payment.month}
-                          onChange={(event) => updateLumpSum(payment.id, { month: event.target.value })}
-                        />
+                        <Input id={`loan-lump-month-${payment.id}`} type="month" min={inputs.firstPaymentMonth} max={lastScheduledMonth} value={payment.month} onChange={(event) => updateLumpSum(payment.id, { month: event.target.value })} />
                       </Field>
                       <Field label="Amount" htmlFor={`loan-lump-amount-${payment.id}`} suffix={currencySymbol}>
-                        <Input
-                          id={`loan-lump-amount-${payment.id}`}
-                          type="number"
-                          inputMode="decimal"
-                          min="1"
-                          max="1000000000"
-                          step="100"
-                          value={payment.amount}
-                          onChange={(event) => updateLumpSum(payment.id, { amount: numberValue(event.target.value) })}
-                        />
+                        <NumericInput id={`loan-lump-amount-${payment.id}`} min={1} max={1_000_000_000} step={100} value={payment.amount} onChange={(value) => updateLumpSum(payment.id, { amount: value })} />
                       </Field>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="justify-self-end sm:justify-self-auto"
-                        aria-label="Remove one-time payment"
-                        onClick={() => removeLumpSum(payment.id)}
-                      >
+                      <Button type="button" size="icon" variant="ghost" className="justify-self-end sm:justify-self-auto" aria-label="Remove one-time payment" onClick={() => removeLumpSum(payment.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -630,17 +562,8 @@ export function LoanCalculator() {
                         </div>
                       </div>
                       <div className="grid gap-3 text-sm sm:grid-cols-2">
-                        <PlanSummary
-                          title="Scheduled plan"
-                          payoff={comparison.baseline.payoffMonth}
-                          interest={comparison.baseline.totalInterest}
-                        />
-                        <PlanSummary
-                          title="Your accelerated plan"
-                          payoff={comparison.accelerated.payoffMonth}
-                          interest={comparison.accelerated.totalInterest}
-                          emphasized
-                        />
+                        <PlanSummary title="Scheduled plan" payoff={comparison.baseline.payoffMonth} interest={comparison.baseline.totalInterest} />
+                        <PlanSummary title="Your accelerated plan" payoff={comparison.accelerated.payoffMonth} interest={comparison.accelerated.totalInterest} emphasized />
                       </div>
                     </CardContent>
                   </Card>
@@ -668,16 +591,9 @@ export function LoanCalculator() {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                      <XAxis
-                        dataKey="payment"
-                        minTickGap={28}
-                        tickFormatter={(value) => `${Math.max(1, Math.ceil(Number(value) / 12))}y`}
-                      />
+                      <XAxis dataKey="payment" minTickGap={28} tickFormatter={(value) => `${Math.max(1, Math.ceil(Number(value) / 12))}y`} />
                       <YAxis width={76} tickFormatter={(value) => formatCurrency(Number(value), true, 0, true)} />
-                      <RechartsTooltip
-                        formatter={(value: number, name: string) => [formatCurrency(value, true, 2, false), name === 'baseline' ? 'Scheduled' : 'Accelerated']}
-                        labelFormatter={(value) => `Payment ${value}`}
-                      />
+                      <RechartsTooltip formatter={(value: number, name: string) => [formatCurrency(value, true, 2, false), name === 'baseline' ? 'Scheduled' : 'Accelerated']} labelFormatter={(value) => `Payment ${value}`} />
                       {hasAcceleration && <Legend formatter={(value) => value === 'baseline' ? 'Scheduled' : 'Accelerated'} />}
                       <Line type="monotone" dataKey="baseline" dot={false} stroke="hsl(var(--muted-foreground))" strokeWidth={2} />
                       {hasAcceleration && <Line type="monotone" dataKey="accelerated" dot={false} stroke="hsl(var(--primary))" strokeWidth={2.5} />}
@@ -694,13 +610,7 @@ export function LoanCalculator() {
                     <CardTitle>Amortization Schedule</CardTitle>
                     <CardDescription>Yearly summary by default, with the full payment-by-payment schedule available when needed.</CardDescription>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="print:hidden"
-                    onClick={() => setShowMonthlySchedule((current) => !current)}
-                  >
+                  <Button type="button" variant="outline" size="sm" className="print:hidden" onClick={() => setShowMonthlySchedule((current) => !current)}>
                     <List className="mr-2 h-4 w-4" />
                     {showMonthlySchedule ? 'Show yearly summary' : 'View full monthly schedule'}
                   </Button>
@@ -829,15 +739,7 @@ function Field({
   )
 }
 
-function Metric({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Gauge
-  label: string
-  value: string
-}) {
+function Metric({ icon: Icon, label, value }: { icon: typeof Gauge; label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-xl bg-muted/35 p-4">
       <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
@@ -848,17 +750,7 @@ function Metric({
   )
 }
 
-function PlanSummary({
-  title,
-  payoff,
-  interest,
-  emphasized = false,
-}: {
-  title: string
-  payoff: string
-  interest: number
-  emphasized?: boolean
-}) {
+function PlanSummary({ title, payoff, interest, emphasized = false }: { title: string; payoff: string; interest: number; emphasized?: boolean }) {
   return (
     <div className={`rounded-xl border p-4 ${emphasized ? 'border-primary/30 bg-primary/5' : 'bg-muted/15'}`}>
       <p className="font-medium">{title}</p>
