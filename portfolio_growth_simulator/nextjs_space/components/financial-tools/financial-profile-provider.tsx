@@ -11,7 +11,9 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  addMonths,
   getLoanValidationErrors,
+  isValidMonth,
   type LoanInputs,
   type LoanLumpSum,
 } from '@/lib/loan/loan-engine'
@@ -87,6 +89,41 @@ export function loanInputsToFinancialProfile(inputs: LoanInputs): FinancialProfi
   }
 }
 
+function hasValidLumpSumShape(value: unknown): value is LoanLumpSum {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const candidate = value as Record<string, unknown>
+  return (
+    typeof candidate.id === 'string'
+    && candidate.id.length > 0
+    && candidate.id.length <= 80
+    && typeof candidate.month === 'string'
+    && typeof candidate.amount === 'number'
+    && Number.isFinite(candidate.amount)
+    && candidate.amount > 0
+    && candidate.amount <= 1_000_000_000
+  )
+}
+
+function normalizeFinancialProfile(profile: FinancialProfile): FinancialProfile {
+  if (!isValidMonth(profile.firstPaymentMonth) || !Number.isInteger(profile.remainingMonths) || profile.remainingMonths < 1 || profile.remainingMonths > 600) {
+    return profile
+  }
+
+  const lastScheduledMonth = addMonths(profile.firstPaymentMonth, profile.remainingMonths - 1)
+  const seenIds = new Set<string>()
+  const lumpSums = profile.lumpSums.filter((payment) => {
+    if (!hasValidLumpSumShape(payment) || seenIds.has(payment.id)) return false
+    seenIds.add(payment.id)
+    return isValidMonth(payment.month)
+      && payment.month >= profile.firstPaymentMonth
+      && payment.month <= lastScheduledMonth
+  }).slice(0, 24)
+
+  return lumpSums.length === profile.lumpSums.length && lumpSums.every((payment, index) => payment === profile.lumpSums[index])
+    ? profile
+    : { ...profile, lumpSums }
+}
+
 function isValidFinancialProfile(value: unknown): value is FinancialProfile {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
   const candidate = value as Record<string, unknown>
@@ -97,7 +134,14 @@ function isValidFinancialProfile(value: unknown): value is FinancialProfile {
     || typeof candidate.firstPaymentMonth !== 'string'
     || typeof candidate.extraMonthlyPayment !== 'number'
     || !Array.isArray(candidate.lumpSums)
+    || candidate.lumpSums.length > 24
   ) return false
+
+  const seenIds = new Set<string>()
+  for (const payment of candidate.lumpSums) {
+    if (!hasValidLumpSumShape(payment) || seenIds.has(payment.id)) return false
+    seenIds.add(payment.id)
+  }
 
   const loan: LoanInputs = {
     principal: candidate.loanBalance,
@@ -118,7 +162,7 @@ function readStoredProfile(): FinancialProfile {
     const stored = window.localStorage.getItem(FINANCIAL_PROFILE_STORAGE_KEY)
     if (stored) {
       const parsed: unknown = JSON.parse(stored)
-      if (isValidFinancialProfile(parsed)) return parsed
+      if (isValidFinancialProfile(parsed)) return normalizeFinancialProfile(parsed)
     }
   } catch {
     // Fall through to the legacy loan migration or defaults.
@@ -128,7 +172,10 @@ function readStoredProfile(): FinancialProfile {
     const legacy = window.localStorage.getItem(LEGACY_LOAN_STORAGE_KEY)
     if (legacy) {
       const parsed = JSON.parse(legacy) as LoanInputs
-      if (getLoanValidationErrors(parsed).length === 0) return loanInputsToFinancialProfile(parsed)
+      if (getLoanValidationErrors(parsed).length === 0) {
+        const migrated = loanInputsToFinancialProfile(parsed)
+        if (isValidFinancialProfile(migrated)) return normalizeFinancialProfile(migrated)
+      }
     }
   } catch {
     // Fall through to defaults when legacy storage is malformed or unavailable.
@@ -139,9 +186,14 @@ function readStoredProfile(): FinancialProfile {
 
 function persistProfile(profile: FinancialProfile) {
   if (typeof window === 'undefined') return
+  const normalized = normalizeFinancialProfile(profile)
   try {
-    window.localStorage.setItem(FINANCIAL_PROFILE_STORAGE_KEY, JSON.stringify(profile))
+    const profileJson = JSON.stringify(normalized)
+    const legacyLoanJson = JSON.stringify(financialProfileToLoanInputs(normalized))
+    window.localStorage.setItem(FINANCIAL_PROFILE_STORAGE_KEY, profileJson)
+    window.localStorage.setItem(LEGACY_LOAN_STORAGE_KEY, legacyLoanJson)
     window.dispatchEvent(new CustomEvent('local-storage-update', { detail: { key: FINANCIAL_PROFILE_STORAGE_KEY } }))
+    window.dispatchEvent(new CustomEvent('local-storage-update', { detail: { key: LEGACY_LOAN_STORAGE_KEY } }))
   } catch {
     // In-memory state remains usable if browser storage is unavailable.
   }
@@ -159,23 +211,18 @@ export function FinancialProfileProvider({ children }: { children: ReactNode }) 
     persistProfile(stored)
     setHydrated(true)
 
-    const reload = (event: StorageEvent | CustomEvent) => {
-      if ((event as StorageEvent).key === FINANCIAL_PROFILE_STORAGE_KEY || (event as CustomEvent).detail?.key === FINANCIAL_PROFILE_STORAGE_KEY) {
-        setProfileState(readStoredProfile())
-      }
+    const reloadFromAnotherTab = (event: StorageEvent) => {
+      if (event.key === FINANCIAL_PROFILE_STORAGE_KEY) setProfileState(readStoredProfile())
     }
 
-    window.addEventListener('storage', reload)
-    window.addEventListener('local-storage-update', reload as EventListener)
-    return () => {
-      window.removeEventListener('storage', reload)
-      window.removeEventListener('local-storage-update', reload as EventListener)
-    }
+    window.addEventListener('storage', reloadFromAnotherTab)
+    return () => window.removeEventListener('storage', reloadFromAnotherTab)
   }, [])
 
   const setProfile = useCallback((value: FinancialProfile | ((current: FinancialProfile) => FinancialProfile)) => {
     setProfileState((current) => {
-      const next = value instanceof Function ? value(current) : value
+      const requested = value instanceof Function ? value(current) : value
+      const next = normalizeFinancialProfile(requested)
       if (mountedRef.current) persistProfile(next)
       return next
     })
@@ -189,7 +236,7 @@ export function FinancialProfileProvider({ children }: { children: ReactNode }) 
           window.localStorage.removeItem(key)
           window.dispatchEvent(new CustomEvent('local-storage-update', { detail: { key } }))
         } catch {
-          // Continue resetting the in-memory state even if storage is blocked.
+          // Continue resetting in-memory state even if browser storage is blocked.
         }
       }
     }
