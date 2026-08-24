@@ -11,7 +11,8 @@ All notable repository and production changes are documented here.
 - Kept Payoff Goal target dates inside the selected loan term when the first-payment month or remaining term changes, avoiding stale out-of-range targets after an edit.
 - Replaced the detached `More financial tools` Guide text with explicit `Financial Tools` and `Loan Calculator` buttons while preserving Guide, Growth, and Withdrawal as the primary three tabs.
 - Changed Invest vs. Debt scenario entry to the same preset-style dropdown used by Monte Carlo, with 100, 500, 1,000, 5,000, 10,000, 50,000, and 100,000-scenario choices plus the same large-run warning at 50,000 or more.
-- Expanded Chromium regression coverage for clear-and-retype behavior in the main Loan Calculator and all new financial tools, plus the new Guide navigation, Invest vs. Debt 100,000-scenario selection, and 320 px overflow checks.
+- Fixed display-currency synchronization so the selected currency code, input suffixes, and all formatted result values update together instead of formatted values lagging one selection behind; persisted currency hydration now starts with matching formatting as well.
+- Expanded Chromium regression coverage for clear-and-retype behavior in the main Loan Calculator and all new financial tools, the new Guide navigation, Invest vs. Debt 100,000-scenario selection, currency switching and persisted-currency hydration, plus 320 px overflow checks.
 
 ### Rollback checkpoint
 
