@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { CalendarCheck2, CheckCircle2, Gauge, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,15 +8,15 @@ import { Input } from '@/components/ui/input'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
 import { useCurrency } from '@/components/currency-provider'
+import { useLocalStorage } from '@/hooks/use-local-storage'
 import { formatCurrency, getAppCurrency } from '@/lib/utils'
 import { addMonths, calculateLoan, type LoanInputs } from '@/lib/loan/loan-engine'
 import { estimatePayoffGoal } from '@/lib/financial-tools/payoff-goal'
-
-function nextMonth(): string {
-  const now = new Date()
-  const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  return addMonths(current, 1)
-}
+import {
+  PAYOFF_GOAL_STORAGE_KEY,
+  financialProfileToLoanInputs,
+  useFinancialProfile,
+} from '@/components/financial-tools/financial-profile-provider'
 
 function formatMonth(value: string): string {
   const [year, month] = value.split('-').map(Number)
@@ -32,19 +32,32 @@ function monthsLabel(months: number): string {
   return `${years}y ${remainder}m`
 }
 
+interface PayoffGoalState {
+  targetMonth: string
+}
+
+function isValidPayoffGoalState(value: unknown): value is PayoffGoalState {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const candidate = value as Record<string, unknown>
+  return typeof candidate.targetMonth === 'string' && /^\d{4}-\d{2}$/.test(candidate.targetMonth)
+}
+
 export function PayoffGoalCalculator() {
   const { currency } = useCurrency()
+  const { profile, setProfile } = useFinancialProfile()
   const symbol = getAppCurrency().symbol
-  const firstPayment = useMemo(() => nextMonth(), [])
-  const [inputs, setInputs] = useState<LoanInputs>({
-    principal: 350_000,
-    apr: 6.5,
-    termMonths: 360,
-    firstPaymentMonth: firstPayment,
-    extraMonthlyPayment: 0,
+  const inputs = useMemo<LoanInputs>(() => ({
+    ...financialProfileToLoanInputs(profile),
+    // This planner intentionally solves recurring extra principal only. One-time
+    // payments stay saved in the shared profile for the full Loan Calculator.
     lumpSums: [],
-  })
-  const [targetMonth, setTargetMonth] = useState(() => addMonths(firstPayment, 179))
+  }), [profile])
+  const [toolState, setToolState] = useLocalStorage<PayoffGoalState>(
+    PAYOFF_GOAL_STORAGE_KEY,
+    { targetMonth: addMonths(profile.firstPaymentMonth, Math.min(179, Math.max(0, profile.remainingMonths - 1))) },
+    { validatePersisted: isValidPayoffGoalState },
+  )
+  const targetMonth = toolState.targetMonth
 
   const lastScheduledMonth = useMemo(() => {
     try {
@@ -53,6 +66,15 @@ export function PayoffGoalCalculator() {
       return ''
     }
   }, [inputs.firstPaymentMonth, inputs.termMonths])
+
+  useEffect(() => {
+    if (!inputs.firstPaymentMonth || !lastScheduledMonth) return
+    if (targetMonth < inputs.firstPaymentMonth) {
+      setToolState({ targetMonth: inputs.firstPaymentMonth })
+    } else if (targetMonth > lastScheduledMonth) {
+      setToolState({ targetMonth: lastScheduledMonth })
+    }
+  }, [inputs.firstPaymentMonth, lastScheduledMonth, setToolState, targetMonth])
 
   const estimate = useMemo(() => {
     try {
@@ -75,30 +97,21 @@ export function PayoffGoalCalculator() {
   const monthsSaved = estimate && baseline ? Math.max(0, baseline.paymentCount - estimate.projected.paymentCount) : 0
 
   const updateTermYears = (years: number) => {
-    const termMonths = Math.max(1, Math.min(600, Math.round(years * 12)))
-    setInputs((current) => ({ ...current, termMonths }))
-    if (!inputs.firstPaymentMonth) return
-    try {
-      const maximum = addMonths(inputs.firstPaymentMonth, termMonths - 1)
-      setTargetMonth((current) => current > maximum ? maximum : current)
-    } catch {}
+    const remainingMonths = Math.max(1, Math.min(600, Math.round(years * 12)))
+    setProfile((current) => ({ ...current, remainingMonths }))
   }
 
   const updateFirstPaymentMonth = (value: string) => {
-    setInputs((current) => ({ ...current, firstPaymentMonth: value }))
     if (!value) return
-    try {
-      const maximum = addMonths(value, Math.max(0, inputs.termMonths - 1))
-      setTargetMonth((current) => current < value ? value : current > maximum ? maximum : current)
-    } catch {}
+    setProfile((current) => ({ ...current, firstPaymentMonth: value }))
   }
 
   const applyToLoan = () => {
     if (!estimate) return
-    const scenario: LoanInputs = { ...inputs, extraMonthlyPayment: estimate.requiredExtraMonthlyPayment }
-    try {
-      localStorage.setItem('portfolio-sim-loan-state', JSON.stringify(scenario))
-    } catch {}
+    setProfile((current) => ({
+      ...current,
+      extraMonthlyPayment: estimate.requiredExtraMonthlyPayment,
+    }))
     window.location.assign('/loan')
   }
 
@@ -112,25 +125,25 @@ export function PayoffGoalCalculator() {
         <CardContent className="min-w-0 space-y-5">
           <div className="grid min-w-0 gap-4 sm:grid-cols-2">
             <Field label="Loan balance" suffix={symbol}>
-              <NumericInput className="min-w-0" min={1} max={1_000_000_000} step={1000} value={inputs.principal} onChange={(value) => setInputs((current) => ({ ...current, principal: value }))} />
+              <NumericInput className="min-w-0" min={1} max={1_000_000_000} step={1000} value={profile.loanBalance} onChange={(value) => setProfile((current) => ({ ...current, loanBalance: value }))} />
             </Field>
             <Field label="APR" suffix="%">
-              <NumericInput className="min-w-0" min={0} max={100} step={0.01} value={inputs.apr} onChange={(value) => setInputs((current) => ({ ...current, apr: value }))} />
+              <NumericInput className="min-w-0" min={0} max={100} step={0.01} value={profile.loanApr} onChange={(value) => setProfile((current) => ({ ...current, loanApr: value }))} />
             </Field>
             <Field label="Remaining term" suffix="years">
-              <NumericInput className="min-w-0" min={1} max={50} step={0.5} value={inputs.termMonths / 12} onChange={updateTermYears} />
+              <NumericInput className="min-w-0" min={1} max={50} step={0.5} value={profile.remainingMonths / 12} onChange={updateTermYears} />
             </Field>
             <Field label="First payment month">
-              <Input className="min-w-0" type="month" value={inputs.firstPaymentMonth} onChange={(event) => updateFirstPaymentMonth(event.target.value)} />
+              <Input className="financial-month-input" type="month" value={profile.firstPaymentMonth} onChange={(event) => updateFirstPaymentMonth(event.target.value)} />
             </Field>
             <Field label="Target payoff month">
-              <Input className="min-w-0" type="month" min={inputs.firstPaymentMonth || undefined} max={lastScheduledMonth || undefined} value={targetMonth} onChange={(event) => setTargetMonth(event.target.value)} />
+              <Input className="financial-month-input" type="month" min={profile.firstPaymentMonth || undefined} max={lastScheduledMonth || undefined} value={targetMonth} onChange={(event) => setToolState({ targetMonth: event.target.value })} />
             </Field>
             <Field label="Already paying extra" suffix={symbol}>
-              <NumericInput className="min-w-0" min={0} max={1_000_000_000} step={50} value={inputs.extraMonthlyPayment} onChange={(value) => setInputs((current) => ({ ...current, extraMonthlyPayment: value }))} />
+              <NumericInput className="min-w-0" min={0} max={1_000_000_000} step={50} value={profile.extraMonthlyPayment} onChange={(value) => setProfile((current) => ({ ...current, extraMonthlyPayment: value }))} />
             </Field>
           </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">This planner solves recurring monthly extra principal. One-time lump sums remain available in the full Loan Calculator.</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">This planner solves recurring monthly extra principal. One-time lump sums remain saved for the full Loan Calculator.</p>
         </CardContent>
       </Card>
 
