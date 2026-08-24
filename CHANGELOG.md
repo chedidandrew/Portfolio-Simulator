@@ -9,10 +9,13 @@ All notable repository and production changes are documented here.
 - Replaced direct number coercion in the Loan Calculator, Loan Payoff Goal, Refinance Comparison, and Invest vs. Debt inputs with the simulator's buffered numeric-input behavior so users can clear a field and type a replacement value without an unwanted `0` being forced back into the control.
 - Prevented year-based term fields from momentarily collapsing to one month and displaying values such as `0.08333333333333333` while the user is editing them.
 - Kept Payoff Goal target dates inside the selected loan term when the first-payment month or remaining term changes, avoiding stale out-of-range targets after an edit.
-- Replaced the detached `More financial tools` Guide text with explicit `Financial Tools` and `Loan Calculator` buttons while preserving Guide, Growth, and Withdrawal as the primary three tabs.
+- Simplified Guide navigation to a single `Financial Tools` entry point; the Loan Calculator remains available inside the tools hub instead of appearing as a redundant second Guide shortcut.
 - Changed Invest vs. Debt scenario entry to the same preset-style dropdown used by Monte Carlo, with 100, 500, 1,000, 5,000, 10,000, 50,000, and 100,000-scenario choices plus the same large-run warning at 50,000 or more.
 - Fixed display-currency synchronization so the selected currency code, input suffixes, and all formatted result values update together instead of formatted values lagging one selection behind; persisted currency hydration now starts with matching formatting as well.
-- Expanded Chromium regression coverage for clear-and-retype behavior in the main Loan Calculator and all new financial tools, the new Guide navigation, Invest vs. Debt 100,000-scenario selection, currency switching and persisted-currency hydration, plus 320 px overflow checks.
+- Reserved the iPhone safe-area/status-bar region above the Loan Calculator and shared Financial Tools headers so theme, currency, and navigation controls remain below the Dynamic Island.
+- Constrained shared input controls to their available width so native iPhone month pickers, including `First payment month`, remain inside their cards on narrow screens.
+- Made preset Monte Carlo return and volatility fields tap-to-edit: tapping either read-only preset value automatically switches the profile to `Custom` and makes the field editable without an extra profile-selection step.
+- Expanded Chromium and WebKit regression coverage for clear-and-retype behavior, Guide navigation, Invest vs. Debt 100,000-scenario selection, currency switching and persisted-currency hydration, iPhone safe-area spacing, month-input containment, tap-to-Custom Monte Carlo editing, and 320 px overflow checks.
 
 ### Rollback checkpoint
 
