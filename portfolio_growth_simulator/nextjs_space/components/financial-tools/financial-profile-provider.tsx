@@ -41,6 +41,7 @@ export interface FinancialProfile {
 
 interface FinancialProfileContextValue {
   profile: FinancialProfile
+  hydrated: boolean
   setProfile: (value: FinancialProfile | ((current: FinancialProfile) => FinancialProfile)) => void
   resetFinancialData: () => void
 }
@@ -148,6 +149,7 @@ function persistProfile(profile: FinancialProfile) {
 
 export function FinancialProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfileState] = useState<FinancialProfile>(() => defaultFinancialProfile())
+  const [hydrated, setHydrated] = useState(false)
   const mountedRef = useRef(false)
 
   useEffect(() => {
@@ -155,6 +157,7 @@ export function FinancialProfileProvider({ children }: { children: ReactNode }) 
     const stored = readStoredProfile()
     setProfileState(stored)
     persistProfile(stored)
+    setHydrated(true)
 
     const reload = (event: StorageEvent | CustomEvent) => {
       if ((event as StorageEvent).key === FINANCIAL_PROFILE_STORAGE_KEY || (event as CustomEvent).detail?.key === FINANCIAL_PROFILE_STORAGE_KEY) {
@@ -194,7 +197,10 @@ export function FinancialProfileProvider({ children }: { children: ReactNode }) 
     persistProfile(defaults)
   }, [])
 
-  const value = useMemo(() => ({ profile, setProfile, resetFinancialData }), [profile, resetFinancialData, setProfile])
+  const value = useMemo(
+    () => ({ profile, hydrated, setProfile, resetFinancialData }),
+    [hydrated, profile, resetFinancialData, setProfile],
+  )
 
   return <FinancialProfileContext.Provider value={value}>{children}</FinancialProfileContext.Provider>
 }
