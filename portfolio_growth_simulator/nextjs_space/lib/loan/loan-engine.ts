@@ -96,6 +96,9 @@ export function getLoanValidationErrors(inputs: LoanInputs): string[] {
   if (!validTerm) {
     errors.push('Loan term must be between 1 and 600 months.')
   }
+  if (validPrincipal && validApr && validTerm && calculateScheduledPayment(inputs.principal, inputs.apr, inputs.termMonths) < 0.01) {
+    errors.push('Loan amount is too small to produce a cent-level monthly payment for the selected term.')
+  }
   if (!validFirstPaymentMonth) {
     errors.push('Choose a valid first payment month.')
   }

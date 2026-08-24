@@ -173,3 +173,13 @@ test('scheduled payment formula rejects unusable inputs safely', () => {
   assert.equal(calculateScheduledPayment(100_000, -1, 360), 0)
   assert.equal(calculateScheduledPayment(100_000, 5, 0), 0)
 })
+
+test('loan validation rejects terms that round the required monthly payment below one cent', () => {
+  const errors = getLoanValidationErrors({
+    ...baseLoan,
+    principal: 1,
+    apr: 0,
+    termMonths: 600,
+  })
+  assert.ok(errors.includes('Loan amount is too small to produce a cent-level monthly payment for the selected term.'))
+})

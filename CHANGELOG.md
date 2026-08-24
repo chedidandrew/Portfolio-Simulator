@@ -2,6 +2,41 @@
 
 All notable repository and production changes are documented here.
 
+## 2026-08-24 - Financial tool correctness and cross-tool decisions
+
+### Fixed
+
+- Payoff Goal now includes saved one-time principal payments when solving the minimum recurring extra payment, so an existing bonus or windfall cannot be silently ignored when determining whether a target month is achievable.
+- Payoff Goal now waits for the shared financial profile to hydrate before creating a default target month, preventing saved future-dated loans from inheriting a stale target based on temporary defaults.
+- Refinance now compares the proposed loan against the user's actual saved current payoff plan, including recurring extra principal and one-time payments, while still showing the contractual required-payment comparison separately.
+- Refinance now rejects financed closing costs that would push the new principal above the supported loan ceiling and reports no artificial upfront break-even when closing costs are financed.
+- Refinance month validation now reuses the loan engine's real calendar-month validation instead of accepting malformed month numbers that only matched the `YYYY-MM` shape.
+- Added a cent-level guard for unrealistically tiny loan/term combinations whose required monthly payment would round below one cent.
+
+### Changed
+
+- Invest vs. Debt now compares recurring extra cash, saved one-time cash events, or both using the same dates and equal household cash commitments under the invest-first and debt-first strategies.
+- Moved Invest vs. Debt Monte Carlo execution into a Web Worker so simulation work cannot block the browser UI; 50,000- and 100,000-scenario runs now start explicitly and report progress, while smaller runs continue updating automatically.
+- Renamed the Invest vs. Debt return input to `Median geometric return assumption` so the UI matches the lognormal model's actual drift interpretation and the Growth/Withdrawal Monte Carlo terminology.
+- Added direct handoffs from Payoff Goal and the Loan Calculator to Invest vs. Debt so the same recurring and one-time extra-payment plan can be compared against investing without re-entering the loan assumptions.
+- Changed the phone-sized yearly amortization summary from a clipped wide table into stacked key/value cards while retaining intentional horizontal scrolling for the full payment-by-payment monthly schedule.
+- Expanded deterministic and browser regression coverage for payoff targets with lump sums, accelerated-current-plan refinance comparisons, financed-cost limits, one-time Invest vs. Debt cash, background-worker behavior, high-scenario manual runs, cross-tool handoffs, tiny-loan validation, and mobile amortization layout.
+
+## 2026-08-23 - Financial tool continuity and mobile navigation
+
+### Changed
+
+- Added a shared, validated financial profile so loan balance, APR, remaining term, first payment month, recurring extra payment, and one-time principal payments carry between Loan, Payoff Goal, Refinance, and Invest vs. Debt without re-entry.
+- Persisted Payoff Goal target month, Refinance proposal inputs, and Invest vs. Debt return/volatility/scenario assumptions in browser storage so navigating away, refreshing, or returning later restores the working scenario and recalculates the same results locally.
+- Kept the historical Loan Calculator storage key synchronized as a compatibility mirror so existing saved loan scenarios migrate cleanly and rollback deployments continue to see the latest shared loan inputs.
+- Added direct Loan / Payoff Goal / Refinance / Invest vs. Debt navigation to every financial calculator page, with the active tool clearly identified.
+- Consolidated financial-tool Theme, Display Currency, and Reset controls under one settings gear, matching the minimalist Guide/Growth/Withdrawal settings interaction instead of showing separate theme and currency buttons in the header.
+- Added a guarded `Reset financial tools` action that restores the shared financial profile and tool-specific inputs to defaults while preserving theme and display-currency preferences.
+- Hardened all shared `month` inputs for narrow iPhone/WebKit layouts, including first-payment, target-payoff, and one-time-payment month controls, with 16 px native-control text sizing and width containment.
+- Pruned one-time principal payments that fall outside a newly shortened or shifted shared loan term so cross-tool edits cannot persist an invalid loan profile.
+- Expanded Chromium and WebKit regression coverage for cross-tool synchronization, reload persistence, shared settings, reset behavior, direct tool navigation, all visible iPhone month inputs, and 320 px overflow.
+- Updated the Privacy page and README to describe local shared financial-tool state and browser-only result recalculation.
+
 ## 2026-08-23 - Financial tool input editing hardening
 
 ### Fixed
@@ -9,10 +44,13 @@ All notable repository and production changes are documented here.
 - Replaced direct number coercion in the Loan Calculator, Loan Payoff Goal, Refinance Comparison, and Invest vs. Debt inputs with the simulator's buffered numeric-input behavior so users can clear a field and type a replacement value without an unwanted `0` being forced back into the control.
 - Prevented year-based term fields from momentarily collapsing to one month and displaying values such as `0.08333333333333333` while the user is editing them.
 - Kept Payoff Goal target dates inside the selected loan term when the first-payment month or remaining term changes, avoiding stale out-of-range targets after an edit.
-- Replaced the detached `More financial tools` Guide text with explicit `Financial Tools` and `Loan Calculator` buttons while preserving Guide, Growth, and Withdrawal as the primary three tabs.
+- Simplified Guide navigation to a single `Financial Tools` entry point; the Loan Calculator remains available inside the tools hub instead of appearing as a redundant second Guide shortcut.
 - Changed Invest vs. Debt scenario entry to the same preset-style dropdown used by Monte Carlo, with 100, 500, 1,000, 5,000, 10,000, 50,000, and 100,000-scenario choices plus the same large-run warning at 50,000 or more.
 - Fixed display-currency synchronization so the selected currency code, input suffixes, and all formatted result values update together instead of formatted values lagging one selection behind; persisted currency hydration now starts with matching formatting as well.
-- Expanded Chromium regression coverage for clear-and-retype behavior in the main Loan Calculator and all new financial tools, the new Guide navigation, Invest vs. Debt 100,000-scenario selection, currency switching and persisted-currency hydration, plus 320 px overflow checks.
+- Reserved the iPhone safe-area/status-bar region above the Loan Calculator and shared Financial Tools headers so theme, currency, and navigation controls remain below the Dynamic Island.
+- Constrained shared input controls to their available width so native iPhone month pickers, including `First payment month`, remain inside their cards on narrow screens.
+- Made preset Monte Carlo return and volatility fields tap-to-edit: tapping either read-only preset value automatically switches the profile to `Custom` and makes the field editable without an extra profile-selection step.
+- Expanded Chromium and WebKit regression coverage for clear-and-retype behavior, Guide navigation, Invest vs. Debt 100,000-scenario selection, currency switching and persisted-currency hydration, iPhone safe-area spacing, month-input containment, tap-to-Custom Monte Carlo editing, and 320 px overflow checks.
 
 ### Rollback checkpoint
 

@@ -17,6 +17,8 @@ A responsive financial planning website for modeling portfolio growth, retiremen
 - Target payoff planner that solves for the recurring extra payment needed by a chosen month
 - Refinance comparison with closing costs, payment savings, break-even timing, and lifetime remaining cost
 - Invest-vs-debt comparison using equal monthly cash commitments and seeded market scenarios
+- Shared persistent financial-tool profile so loan balance, APR, term, payment month, and recurring extra cash carry between Loan, Payoff Goal, Refinance, and Invest vs. Debt without re-entry
+- Tool-specific payoff, refinance, and investment assumptions persist locally between navigation and browser visits
 - Annual, quarterly, monthly, and weekly portfolio cash flows
 - Inflation, contribution growth, withdrawals, goals, and multiple tax treatments
 - Gross, spendable, tax-drag, and real-dollar reporting
@@ -102,6 +104,7 @@ Portfolio-Simulator/
 - The invest-vs-debt comparison excludes investment taxes, mortgage-interest deductions, investment fees, employer matches, and behavioral differences.
 - Shared links contain the selected scenario inputs in the URL fragment. Review a link before sharing it publicly.
 - Calculator data is stored locally in the browser unless the user deliberately creates a share link.
+- Financial-tool results are recalculated from locally saved inputs; the site does not maintain a server-side account or scenario database.
 - Detailed formulas, timing rules, and limitations are documented on the website's Methodology pages.
 
 ## Change history

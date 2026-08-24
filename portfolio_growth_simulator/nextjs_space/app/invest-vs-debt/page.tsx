@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight, Scale } from 'lucide-react'
 import { FinancialToolHeader } from '@/components/financial-tools/tool-header'
+import { FinancialToolNav } from '@/components/financial-tools/tool-nav'
 import { InvestVsDebtCalculator } from '@/components/financial-tools/invest-vs-debt-calculator'
 
 export const metadata: Metadata = {
@@ -20,8 +21,9 @@ export default function InvestVsDebtPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
       <FinancialToolHeader backHref="/tools" backLabel="Tools" />
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 pb-16 sm:py-8">
-        <section className="space-y-3">
+      <main className="mx-auto max-w-6xl space-y-6 px-4 py-4 pb-16 sm:py-5">
+        <FinancialToolNav />
+        <section className="space-y-3 pt-2 sm:pt-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"><Scale className="h-6 w-6" /></div>
           <div><h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Invest vs. Pay Down Debt</h1><p className="mt-2 max-w-3xl text-muted-foreground">Use the same extra monthly cash under both strategies and compare a guaranteed debt payoff benefit with uncertain market outcomes.</p></div>
         </section>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { CalendarCheck2 } from 'lucide-react'
 import { FinancialToolHeader } from '@/components/financial-tools/tool-header'
+import { FinancialToolNav } from '@/components/financial-tools/tool-nav'
 import { PayoffGoalCalculator } from '@/components/financial-tools/payoff-goal-calculator'
 
 export const metadata: Metadata = {
@@ -19,8 +20,9 @@ export default function PayoffGoalPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
       <FinancialToolHeader backHref="/tools" backLabel="Tools" />
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 pb-16 sm:py-8">
-        <section className="space-y-3">
+      <main className="mx-auto max-w-6xl space-y-6 px-4 py-4 pb-16 sm:py-5">
+        <FinancialToolNav />
+        <section className="space-y-3 pt-2 sm:pt-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <CalendarCheck2 className="h-6 w-6" />
           </div>
