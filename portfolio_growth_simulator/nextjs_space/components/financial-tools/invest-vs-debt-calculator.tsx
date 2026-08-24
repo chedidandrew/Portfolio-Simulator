@@ -5,6 +5,7 @@ import { BarChart3, Landmark, PiggyBank, Scale, ShieldCheck, TrendingUp } from '
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCurrency } from '@/components/currency-provider'
 import { formatCurrency, getAppCurrency } from '@/lib/utils'
 import { compareInvestVsDebt, type InvestVsDebtInputs } from '@/lib/financial-tools/invest-vs-debt'
@@ -61,9 +62,31 @@ export function InvestVsDebtCalculator() {
                 <Field label="Annual volatility" suffix="%">
                   <NumericInput min={0} max={200} step={0.5} value={inputs.volatility} onChange={(value) => setInputs((current) => ({ ...current, volatility: value }))} />
                 </Field>
-                <Field label="Scenarios">
-                  <NumericInput min={100} max={5000} step={100} value={inputs.scenarios} onChange={(value) => setInputs((current) => ({ ...current, scenarios: Math.max(100, Math.min(5000, Math.round(value))) }))} />
-                </Field>
+                <div className="space-y-1.5">
+                  <Label htmlFor="invest-debt-scenarios">Scenarios</Label>
+                  <Select
+                    value={inputs.scenarios.toString()}
+                    onValueChange={(value) => setInputs((current) => ({ ...current, scenarios: Number(value) }))}
+                  >
+                    <SelectTrigger id="invest-debt-scenarios">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="100">100 scenarios</SelectItem>
+                      <SelectItem value="500">500 scenarios</SelectItem>
+                      <SelectItem value="1000">1,000 scenarios</SelectItem>
+                      <SelectItem value="5000">5,000 scenarios</SelectItem>
+                      <SelectItem value="10000">10,000 scenarios</SelectItem>
+                      <SelectItem value="50000">50,000 scenarios</SelectItem>
+                      <SelectItem value="100000">100,000 scenarios</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {inputs.scenarios >= 50_000 && (
+                    <p className="text-[10px] font-medium text-orange-600 dark:text-orange-400">
+                      Large runs reduce sampling noise but can take noticeably longer.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </CardContent>
