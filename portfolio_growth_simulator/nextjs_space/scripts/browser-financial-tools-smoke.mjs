@@ -56,6 +56,16 @@ try {
   await replaceNumber(page, 'Loan APR', '8')
   await replaceNumber(page, 'Extra cash each month', '750')
   await replaceNumber(page, 'Expected annual return', '7.5')
+  await replaceNumber(page, 'Remaining term', '1')
+
+  const scenarios = page.getByRole('combobox', { name: 'Scenarios' })
+  await scenarios.waitFor()
+  assert.match(await scenarios.innerText(), /1,000 scenarios/, 'Invest-vs-debt should default to the same 1,000-scenario preset used by Monte Carlo.')
+  await scenarios.click()
+  await page.getByRole('option', { name: '100,000 scenarios' }).click()
+  await page.getByText('Large runs reduce sampling noise but can take noticeably longer.', { exact: true }).waitFor()
+  await page.getByText('Across 100,000 seeded market scenarios over the remaining loan term.', { exact: true }).waitFor()
+
   const probability = page.getByText('Probability investing the extra cash finishes ahead', { exact: true }).locator('xpath=..').locator('h3')
   await probability.waitFor()
   assert.match(await probability.innerText(), /^\d+(\.\d)?%$/, 'Invest-vs-debt should report a probability.')
