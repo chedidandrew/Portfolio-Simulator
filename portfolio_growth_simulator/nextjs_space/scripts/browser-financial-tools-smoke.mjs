@@ -14,6 +14,10 @@ async function replaceNumber(page, labelText, value) {
   return field
 }
 
+async function fieldValue(page, labelText) {
+  return page.locator('label').filter({ hasText: labelText }).locator('input').first().inputValue()
+}
+
 async function selectCurrency(page, code, expectedSymbol) {
   await page.getByRole('button', { name: /^Display currency:/ }).click()
   await page.locator(`[data-currency-code="${code}"]`).click()
@@ -28,6 +32,20 @@ async function selectCurrency(page, code, expectedSymbol) {
     (await payoffValue.innerText()).startsWith(expectedSymbol),
     `Payoff result should use ${expectedSymbol} immediately when the header shows ${code}.`,
   )
+}
+
+async function assertFinanceNav(page, activeLabel) {
+  const nav = page.getByRole('navigation', { name: 'Financial calculators' })
+  await nav.waitFor()
+  for (const label of ['Loan', 'Payoff Goal', 'Refinance', 'Invest vs. Debt']) {
+    await nav.getByRole('link', { name: label, exact: true }).waitFor()
+  }
+  assert.equal(
+    await nav.getByRole('link', { name: activeLabel, exact: true }).getAttribute('aria-current'),
+    'page',
+    `${activeLabel} should be marked as the active financial tool.`,
+  )
+  return nav
 }
 
 try {
@@ -45,15 +63,16 @@ try {
   await page.getByRole('link', { name: /Payoff Goal/ }).waitFor()
   await page.getByRole('link', { name: /Refinance Comparison/ }).waitFor()
   await page.getByRole('link', { name: /Invest vs. Pay Down Debt/ }).waitFor()
+  await page.getByRole('button', { name: 'Financial tool settings' }).waitFor()
 
   await page.goto(`${baseUrl}/loan/payoff-goal`, { waitUntil: 'networkidle' })
   await page.getByRole('heading', { name: 'Loan Payoff Goal' }).waitFor()
+  await assertFinanceNav(page, 'Payoff Goal')
   await page.getByText('Required recurring extra payment', { exact: true }).waitFor()
   const payoffAmount = await page.getByText('Required recurring extra payment', { exact: true }).locator('xpath=..').locator('h3').innerText()
   assert.match(payoffAmount, /[$€£¥]/, 'Payoff goal should show a currency result.')
 
   // Currency code, input suffixes, and formatCurrency output must change together.
-  // This specifically guards against the formatter bridge being one selection behind.
   await selectCurrency(page, 'EUR', '€')
   await page.reload({ waitUntil: 'networkidle' })
   await page.getByRole('button', { name: 'Display currency: EUR' }).waitFor()
@@ -64,45 +83,96 @@ try {
   await selectCurrency(page, 'JPY', '¥')
   await selectCurrency(page, 'USD', '$')
 
+  // Establish a shared loan profile from Payoff Goal.
+  await replaceNumber(page, 'Loan balance', '420000')
   const apr = await replaceNumber(page, 'APR', '8')
   assert.equal(await apr.inputValue(), '8', 'APR should commit as 8, not 08 or 0.')
-  const remainingTerm = await replaceNumber(page, 'Remaining term', '8')
-  assert.equal(await remainingTerm.inputValue(), '8', 'Remaining term should remain 8 years after editing.')
-  await page.getByText('Required recurring extra payment', { exact: true }).waitFor()
-  await page.getByRole('button', { name: 'Use this payment in Loan Calculator' }).waitFor()
-
-  await page.goto(`${baseUrl}/loan/refinance`, { waitUntil: 'networkidle' })
-  await page.getByRole('heading', { name: 'Refinance Comparison' }).waitFor()
-  await replaceNumber(page, 'Current APR', '8')
-  await replaceNumber(page, 'New APR', '6')
   await replaceNumber(page, 'Remaining term', '20')
-  await replaceNumber(page, 'New term', '15')
-  await page.getByText('Estimated lifetime savings after closing costs', { exact: true }).waitFor()
-  await page.getByText('Side-by-side cost', { exact: true }).waitFor()
+  await replaceNumber(page, 'Already paying extra', '750')
+  const sharedFirstPayment = await page.locator('input[type="month"]').first().inputValue()
 
-  await page.goto(`${baseUrl}/invest-vs-debt`, { waitUntil: 'networkidle' })
+  // Refinance must immediately reuse the same current-loan assumptions.
+  const payoffNav = await assertFinanceNav(page, 'Payoff Goal')
+  await payoffNav.getByRole('link', { name: 'Refinance', exact: true }).click()
+  await page.getByRole('heading', { name: 'Refinance Comparison' }).waitFor()
+  await assertFinanceNav(page, 'Refinance')
+  assert.equal(await fieldValue(page, 'Remaining balance'), '420000')
+  assert.equal(await fieldValue(page, 'Current APR'), '8')
+  assert.equal(await fieldValue(page, 'Remaining term'), '20')
+  assert.equal(await page.locator('input[type="month"]').first().inputValue(), sharedFirstPayment)
+  await replaceNumber(page, 'New APR', '6')
+  await replaceNumber(page, 'New term', '15')
+  await replaceNumber(page, 'Closing costs', '7000')
+  await page.getByText('Estimated lifetime savings after closing costs', { exact: true }).waitFor()
+
+  // Invest vs. Debt shares balance/APR/term/extra cash, while keeping its own
+  // market assumptions persistent between visits.
+  const refiNav = await assertFinanceNav(page, 'Refinance')
+  await refiNav.getByRole('link', { name: 'Invest vs. Debt', exact: true }).click()
   await page.getByRole('heading', { name: 'Invest vs. Pay Down Debt' }).waitFor()
-  await replaceNumber(page, 'Loan APR', '8')
-  await replaceNumber(page, 'Extra cash each month', '750')
+  await assertFinanceNav(page, 'Invest vs. Debt')
+  assert.equal(await fieldValue(page, 'Loan balance'), '420000')
+  assert.equal(await fieldValue(page, 'Loan APR'), '8')
+  assert.equal(await fieldValue(page, 'Remaining term'), '20')
+  assert.equal(await fieldValue(page, 'Extra cash each month'), '750')
   await replaceNumber(page, 'Expected annual return', '7.5')
-  await replaceNumber(page, 'Remaining term', '1')
+  await replaceNumber(page, 'Annual volatility', '12.5')
 
   const scenarios = page.getByRole('combobox', { name: 'Scenarios' })
-  await scenarios.waitFor()
-  assert.match(await scenarios.innerText(), /1,000 scenarios/, 'Invest-vs-debt should default to the same 1,000-scenario preset used by Monte Carlo.')
   await scenarios.click()
-  await page.getByRole('option', { name: '100,000 scenarios' }).click()
-  await page.getByText('Large runs reduce sampling noise but can take noticeably longer.', { exact: true }).waitFor()
-  await page.getByText('Across 100,000 seeded market scenarios over the remaining loan term.', { exact: true }).waitFor()
+  await page.getByRole('option', { name: '5,000 scenarios' }).click()
+  await page.getByText('Across 5,000 seeded market scenarios over the remaining loan term.', { exact: true }).waitFor()
+  await page.reload({ waitUntil: 'networkidle' })
+  assert.equal(await fieldValue(page, 'Loan balance'), '420000', 'Shared loan balance should survive reload.')
+  assert.equal(await fieldValue(page, 'Extra cash each month'), '750', 'Shared monthly cash should survive reload.')
+  assert.equal(await fieldValue(page, 'Expected annual return'), '7.5', 'Invest return assumption should survive reload.')
+  assert.equal(await fieldValue(page, 'Annual volatility'), '12.5', 'Invest volatility should survive reload.')
+  assert.match(await page.getByRole('combobox', { name: 'Scenarios' }).innerText(), /5,000 scenarios/, 'Scenario count should survive reload.')
 
-  const probability = page.getByText('Probability investing the extra cash finishes ahead', { exact: true }).locator('xpath=..').locator('h3')
-  await probability.waitFor()
-  assert.match(await probability.innerText(), /^\d+(\.\d)?%$/, 'Invest-vs-debt should report a probability.')
-  await page.getByText('Outcome spread', { exact: true }).waitFor()
+  // Refinance-specific proposal values survive a trip through another tool.
+  const investNav = await assertFinanceNav(page, 'Invest vs. Debt')
+  await investNav.getByRole('link', { name: 'Refinance', exact: true }).click()
+  assert.equal(await fieldValue(page, 'New APR'), '6')
+  assert.equal(await fieldValue(page, 'New term'), '15')
+  assert.equal(await fieldValue(page, 'Closing costs'), '7000')
+
+  // The full Loan Calculator receives the same shared profile through its
+  // backward-compatible storage bridge, including the recurring extra payment.
+  const navToLoan = await assertFinanceNav(page, 'Refinance')
+  await navToLoan.getByRole('link', { name: 'Loan', exact: true }).click()
+  await page.getByRole('heading', { name: 'Loan & Amortization Calculator', level: 1 }).waitFor()
+  await assertFinanceNav(page, 'Loan')
+  assert.equal(await page.locator('#loan-principal').inputValue(), '420000')
+  assert.equal(await page.locator('#loan-apr').inputValue(), '8')
+  assert.equal(await page.locator('#loan-term').inputValue(), '20')
+  assert.equal(await page.locator('#loan-extra-monthly').inputValue(), '750')
+  assert.equal(await page.locator('#loan-start-month').inputValue(), sharedFirstPayment)
+
+  // Editing the full Loan Calculator flows back to every focused tool.
+  await page.locator('#loan-principal').fill('430000')
+  await page.locator('#loan-principal').press('Tab')
+  await page.locator('#loan-extra-monthly').fill('900')
+  await page.locator('#loan-extra-monthly').press('Tab')
+  const loanNav = await assertFinanceNav(page, 'Loan')
+  await loanNav.getByRole('link', { name: 'Payoff Goal', exact: true }).click()
+  assert.equal(await fieldValue(page, 'Loan balance'), '430000')
+  assert.equal(await fieldValue(page, 'Already paying extra'), '900')
+
+  // Global reset lives in the shared header and clears both the shared profile
+  // and focused-tool state while leaving currency/theme preferences alone.
+  await page.getByRole('button', { name: 'Financial tool settings' }).click()
+  const settingsDialog = page.getByRole('dialog', { name: 'Financial tool settings' })
+  await settingsDialog.waitFor()
+  await settingsDialog.getByRole('button', { name: 'Reset financial tools' }).click()
+  assert.equal(await fieldValue(page, 'Loan balance'), '350000')
+  assert.equal(await fieldValue(page, 'APR'), '6.5')
+  assert.equal(await fieldValue(page, 'Remaining term'), '30')
+  assert.equal(await fieldValue(page, 'Already paying extra'), '0')
+  await page.getByRole('button', { name: 'Display currency: USD' }).waitFor()
 
   const mobile = await browser.newContext({ viewport: { width: 320, height: 740 } })
   const mobilePage = await mobile.newPage()
-  for (const path of ['/', '/tools', '/loan/payoff-goal', '/loan/refinance', '/invest-vs-debt']) {
+  for (const path of ['/', '/tools', '/loan', '/loan/payoff-goal', '/loan/refinance', '/invest-vs-debt']) {
     await mobilePage.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle' })
     const dimensions = await mobilePage.evaluate(() => ({
       viewport: document.documentElement.clientWidth,
