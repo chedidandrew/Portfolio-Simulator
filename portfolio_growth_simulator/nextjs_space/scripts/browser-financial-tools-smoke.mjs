@@ -18,10 +18,28 @@ async function fieldValue(page, labelText) {
   return page.locator('label').filter({ hasText: labelText }).locator('input').first().inputValue()
 }
 
+async function openFinancialSettings(page) {
+  await page.getByRole('button', { name: 'Open settings' }).click()
+  await page.getByRole('menuitem', { name: /Theme/ }).waitFor()
+  await page.getByRole('menuitem', { name: /Display Currency/ }).waitFor()
+  await page.getByRole('menuitem', { name: 'Reset financial tools' }).waitFor()
+}
+
 async function selectCurrency(page, code, expectedSymbol) {
-  await page.getByRole('button', { name: /^Display currency:/ }).click()
-  await page.locator(`[data-currency-code="${code}"]`).click()
-  await page.getByRole('button', { name: `Display currency: ${code}` }).waitFor()
+  await openFinancialSettings(page)
+  const currencyTrigger = page.getByRole('menuitem', { name: /Display Currency/ })
+  await currencyTrigger.hover()
+  await page.getByRole('menuitem', { name: new RegExp(`^${code} \\(`) }).click()
+  await page.waitForFunction(
+    (expected) => {
+      try {
+        return JSON.parse(localStorage.getItem('portfolio-sim-currency') || 'null') === expected
+      } catch {
+        return false
+      }
+    },
+    code,
+  )
 
   const payoffValue = page
     .getByText('Required recurring extra payment', { exact: true })
@@ -30,7 +48,7 @@ async function selectCurrency(page, code, expectedSymbol) {
   await payoffValue.waitFor()
   assert.ok(
     (await payoffValue.innerText()).startsWith(expectedSymbol),
-    `Payoff result should use ${expectedSymbol} immediately when the header shows ${code}.`,
+    `Payoff result should use ${expectedSymbol} immediately when the saved currency is ${code}.`,
   )
 }
 
@@ -63,7 +81,8 @@ try {
   await page.getByRole('link', { name: /Payoff Goal/ }).waitFor()
   await page.getByRole('link', { name: /Refinance Comparison/ }).waitFor()
   await page.getByRole('link', { name: /Invest vs. Pay Down Debt/ }).waitFor()
-  await page.getByRole('button', { name: 'Financial tool settings' }).waitFor()
+  await openFinancialSettings(page)
+  await page.keyboard.press('Escape')
 
   await page.goto(`${baseUrl}/loan/payoff-goal`, { waitUntil: 'networkidle' })
   await page.getByRole('heading', { name: 'Loan Payoff Goal' }).waitFor()
@@ -75,7 +94,11 @@ try {
   // Currency code, input suffixes, and formatCurrency output must change together.
   await selectCurrency(page, 'EUR', '€')
   await page.reload({ waitUntil: 'networkidle' })
-  await page.getByRole('button', { name: 'Display currency: EUR' }).waitFor()
+  assert.equal(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('portfolio-sim-currency') || 'null')),
+    'EUR',
+    'Persisted EUR should survive reload.',
+  )
   assert.ok(
     (await page.getByText('Required recurring extra payment', { exact: true }).locator('xpath=..').locator('h3').innerText()).startsWith('€'),
     'Persisted EUR should hydrate with EUR formatting on the same render.',
@@ -158,17 +181,19 @@ try {
   assert.equal(await fieldValue(page, 'Loan balance'), '430000')
   assert.equal(await fieldValue(page, 'Already paying extra'), '900')
 
-  // Global reset lives in the shared header and clears both the shared profile
-  // and focused-tool state while leaving currency/theme preferences alone.
-  await page.getByRole('button', { name: 'Financial tool settings' }).click()
-  const settingsDialog = page.getByRole('dialog', { name: 'Financial tool settings' })
-  await settingsDialog.waitFor()
-  await settingsDialog.getByRole('button', { name: 'Reset financial tools' }).click()
+  // The shared settings gear contains appearance, currency, and a guarded reset.
+  await openFinancialSettings(page)
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('menuitem', { name: 'Reset financial tools' }).click()
   assert.equal(await fieldValue(page, 'Loan balance'), '350000')
   assert.equal(await fieldValue(page, 'APR'), '6.5')
   assert.equal(await fieldValue(page, 'Remaining term'), '30')
   assert.equal(await fieldValue(page, 'Already paying extra'), '0')
-  await page.getByRole('button', { name: 'Display currency: USD' }).waitFor()
+  assert.equal(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('portfolio-sim-currency') || 'null')),
+    'USD',
+    'Resetting financial inputs should preserve display currency.',
+  )
 
   const mobile = await browser.newContext({ viewport: { width: 320, height: 740 } })
   const mobilePage = await mobile.newPage()
