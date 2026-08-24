@@ -5,6 +5,7 @@ import './mobile-chart-tooltips.css'
 import 'katex/dist/katex.min.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { CurrencyProvider } from '@/components/currency-provider'
+import { FinancialProfileProvider } from '@/components/financial-tools/financial-profile-provider'
 import Script from 'next/script'
 import Image from 'next/image'
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt'
@@ -103,23 +104,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           disableTransitionOnChange
         >
           <CurrencyProvider>
-            <header className="print-header">
-              <Image
-                src="/favicon.png"
-                alt="Portfolio Simulator"
-                width={24}
-                height={24}
-                style={{ borderRadius: 6 }}
-              />
-              <span className="print-header__title">Portfolio Simulator</span>
-            </header>
-            {children}
-            <SiteFooter />
-            <Toaster />
-            <PwaInstallPrompt />
-            <SimulationProgressHost />
-            <MobileChartTooltipLayout />
-            <UrlOnlyShareGuard />
+            <FinancialProfileProvider>
+              <header className="print-header">
+                <Image
+                  src="/favicon.png"
+                  alt="Portfolio Simulator"
+                  width={24}
+                  height={24}
+                  style={{ borderRadius: 6 }}
+                />
+                <span className="print-header__title">Portfolio Simulator</span>
+              </header>
+              {children}
+              <SiteFooter />
+              <Toaster />
+              <PwaInstallPrompt />
+              <SimulationProgressHost />
+              <MobileChartTooltipLayout />
+              <UrlOnlyShareGuard />
+            </FinancialProfileProvider>
           </CurrencyProvider>
         </ThemeProvider>
         <Script
