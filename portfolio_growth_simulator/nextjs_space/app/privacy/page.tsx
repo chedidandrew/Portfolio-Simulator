@@ -41,10 +41,13 @@ export default function PrivacyPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
             <p>
-              Growth, withdrawal, loan, payoff-goal, refinance, invest-versus-debt, display, and simulation inputs are processed in your browser. Portfolio Simulator uses browser local storage for selected calculator settings and preferences so they can persist between visits; focused comparison tools can also operate only in the current page session unless you deliberately transfer a result into a saved calculator scenario.
+              Growth, withdrawal, loan, payoff-goal, refinance, invest-versus-debt, display, and simulation inputs are processed in your browser. Portfolio Simulator uses browser local storage for selected calculator settings and preferences so they can persist between visits.
             </p>
             <p>
-              The application does not require a user account and does not maintain an application database of your portfolio, loan, refinance, or comparison scenarios. The Reset option in Settings clears simulator-owned browser storage from your device, and individual tools can also provide their own reset control.
+              The financial tools keep a shared local loan profile for values such as balance, APR, remaining term, first payment month, recurring extra payment, and one-time principal payments. Tool-specific inputs such as a payoff target, refinance proposal, and investment assumptions are also stored locally so moving between financial tools or returning later does not require re-entering the scenario. Results are recalculated in the browser from those saved inputs rather than stored in an application database.
+            </p>
+            <p>
+              The application does not require a user account and does not maintain an application database of your portfolio, loan, refinance, or comparison scenarios. The main simulator Reset option clears simulator-owned browser storage. Financial-tool settings also include a dedicated reset that restores the saved financial profile and financial-tool inputs to defaults while leaving theme and display-currency preferences intact.
             </p>
           </CardContent>
         </Card>
