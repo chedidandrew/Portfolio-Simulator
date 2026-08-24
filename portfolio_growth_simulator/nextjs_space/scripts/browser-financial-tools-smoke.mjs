@@ -36,8 +36,9 @@ try {
 
   await page.goto(baseUrl, { waitUntil: 'networkidle' })
   await page.getByRole('tab', { name: 'Guide' }).click()
-  await page.getByRole('link', { name: 'Financial Tools' }).waitFor()
-  await page.getByRole('link', { name: 'Loan Calculator' }).waitFor()
+  const guidePanel = page.getByRole('tabpanel', { name: 'Guide' })
+  await guidePanel.getByRole('link', { name: 'Financial Tools' }).waitFor()
+  assert.equal(await guidePanel.getByRole('link', { name: 'Loan Calculator' }).count(), 0, 'Guide should use Financial Tools as the single finance entry point.')
 
   await page.goto(`${baseUrl}/tools`, { waitUntil: 'networkidle' })
   await page.getByRole('heading', { name: 'Plan around the portfolio, not just inside it.' }).waitFor()
