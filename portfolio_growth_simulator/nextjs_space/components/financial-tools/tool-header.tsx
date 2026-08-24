@@ -3,16 +3,32 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useState } from 'react'
-import { ArrowLeft, Moon, Sun } from 'lucide-react'
+import { ArrowLeft, Moon, RotateCcw, Settings, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
 import { CurrencyPickerDialog } from '@/components/currency-picker-dialog'
 import { useCurrency } from '@/components/currency-provider'
+import { useFinancialProfile } from '@/components/financial-tools/financial-profile-provider'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 export function FinancialToolHeader({ backHref = '/tools', backLabel = 'Tools' }: { backHref?: string; backLabel?: string }) {
   const { resolvedTheme, setTheme } = useTheme()
   const { currency, setCurrency } = useCurrency()
+  const { resetFinancialData } = useFinancialProfile()
   const [currencyOpen, setCurrencyOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  const resetAll = () => {
+    resetFinancialData()
+    setSettingsOpen(false)
+  }
 
   return (
     <>
@@ -32,7 +48,7 @@ export function FinancialToolHeader({ backHref = '/tools', backLabel = 'Tools' }
               Portfolio Simulator
             </span>
           </Link>
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -43,10 +59,20 @@ export function FinancialToolHeader({ backHref = '/tools', backLabel = 'Tools' }
             >
               {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setCurrencyOpen(true)} aria-label={`Display currency: ${currency}`}>
+            <Button variant="outline" size="sm" className="px-2.5" onClick={() => setCurrencyOpen(true)} aria-label={`Display currency: ${currency}`}>
               {currency}
             </Button>
-            <Button asChild variant="ghost" size="sm">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-full"
+              aria-label="Financial tool settings"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+            <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
               <Link href={backHref} aria-label={`Back to ${backLabel}`}>
                 <ArrowLeft className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">{backLabel}</span>
@@ -61,6 +87,25 @@ export function FinancialToolHeader({ backHref = '/tools', backLabel = 'Tools' }
         onOpenChange={setCurrencyOpen}
         onValueChange={setCurrency}
       />
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="w-[calc(100%-2rem)] rounded-xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Financial tool settings</DialogTitle>
+            <DialogDescription>
+              Reset the saved loan profile and all payoff, refinance, and invest-vs-debt inputs on this device. Currency and theme preferences are kept.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">
+            Your saved financial-tool inputs will be restored to defaults. This cannot be undone.
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>Cancel</Button>
+            <Button type="button" variant="destructive" onClick={resetAll}>
+              <RotateCcw className="mr-2 h-4 w-4" /> Reset financial tools
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
