@@ -2,6 +2,20 @@
 
 All notable repository and production changes are documented here.
 
+## 2026-08-23 - Financial tool input editing hardening
+
+### Fixed
+
+- Replaced direct number coercion in the Loan Calculator, Loan Payoff Goal, Refinance Comparison, and Invest vs. Debt inputs with the simulator's buffered numeric-input behavior so users can clear a field and type a replacement value without an unwanted `0` being forced back into the control.
+- Prevented year-based term fields from momentarily collapsing to one month and displaying values such as `0.08333333333333333` while the user is editing them.
+- Kept Payoff Goal target dates inside the selected loan term when the first-payment month or remaining term changes, avoiding stale out-of-range targets after an edit.
+- Replaced the detached `More financial tools` Guide text with explicit `Financial Tools` and `Loan Calculator` buttons while preserving Guide, Growth, and Withdrawal as the primary three tabs.
+- Expanded Chromium regression coverage for clear-and-retype behavior in the main Loan Calculator and all new financial tools, plus the new Guide navigation and 320 px overflow checks.
+
+### Rollback checkpoint
+
+- Created `backup/pre-financial-tools-input-fix-2026-08-23` from production commit `8021638b694312a5a521a4ad23fd7cf817270fb5` before this fix. If the revised input behavior or Guide navigation is not preferred after deployment, restore that Vercel deployment first and revert this release through a normal pull request.
+
 ## 2026-08-23 - Financial planning tools expansion
 
 ### Added
