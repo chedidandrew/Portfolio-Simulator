@@ -23,6 +23,23 @@ try {
   assert.equal(brandStyles.backgroundImage, 'none', 'Header brand text should not render the old green gradient.')
   assert.notEqual(brandStyles.color, 'rgba(0, 0, 0, 0)', 'Header brand text should use a visible foreground color.')
 
+  const editableApr = page.locator('#loan-apr')
+  await editableApr.fill('')
+  assert.equal(await editableApr.inputValue(), '', 'Loan APR should allow a transient empty edit state.')
+  await editableApr.fill('8')
+  assert.equal(await editableApr.inputValue(), '8', 'Loan APR should accept 8 without forcing 08 or 0.')
+  await editableApr.press('Tab')
+  assert.equal(await editableApr.inputValue(), '8')
+  await editableApr.fill('6.5')
+  await editableApr.press('Tab')
+
+  const editableTerm = page.locator('#loan-term')
+  await editableTerm.fill('')
+  assert.equal(await editableTerm.inputValue(), '', 'Loan term should allow a transient empty edit state.')
+  await editableTerm.fill('30')
+  await editableTerm.press('Tab')
+  assert.equal(await editableTerm.inputValue(), '30', 'Loan term should remain 30 years after editing.')
+
   await page.locator('#loan-principal').fill('350000')
   await page.locator('#loan-apr').fill('6.5')
   await page.locator('#loan-term').fill('30')
