@@ -188,12 +188,11 @@ function persistProfile(profile: FinancialProfile) {
   if (typeof window === 'undefined') return
   const normalized = normalizeFinancialProfile(profile)
   try {
-    const profileJson = JSON.stringify(normalized)
-    const legacyLoanJson = JSON.stringify(financialProfileToLoanInputs(normalized))
-    window.localStorage.setItem(FINANCIAL_PROFILE_STORAGE_KEY, profileJson)
-    window.localStorage.setItem(LEGACY_LOAN_STORAGE_KEY, legacyLoanJson)
-    window.dispatchEvent(new CustomEvent('local-storage-update', { detail: { key: FINANCIAL_PROFILE_STORAGE_KEY } }))
-    window.dispatchEvent(new CustomEvent('local-storage-update', { detail: { key: LEGACY_LOAN_STORAGE_KEY } }))
+    // Keep the historical Loan Calculator key current as a compatibility mirror.
+    // That preserves existing saved data and makes a deployment rollback less surprising,
+    // while the React context remains the single in-page source of truth.
+    window.localStorage.setItem(FINANCIAL_PROFILE_STORAGE_KEY, JSON.stringify(normalized))
+    window.localStorage.setItem(LEGACY_LOAN_STORAGE_KEY, JSON.stringify(financialProfileToLoanInputs(normalized)))
   } catch {
     // In-memory state remains usable if browser storage is unavailable.
   }
