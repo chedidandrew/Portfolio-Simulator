@@ -54,6 +54,12 @@ export function MonteCarloParameters({
   const cashflowLabel = mode === 'growth'
     ? `${periodTitle(params.cashflowFrequency)} Contribution`
     : `${periodTitle(params.cashflowFrequency)} Withdrawal${params.taxEnabled && params.taxType !== 'income' ? ' (Gross)' : ''}`
+  const profileFieldClassName = profile === 'custom'
+    ? undefined
+    : 'cursor-text bg-muted/30 text-muted-foreground'
+  const activateCustomProfile = () => {
+    if (profile !== 'custom') setProfile('custom')
+  }
 
   return (
     <div className="space-y-6">
@@ -125,7 +131,10 @@ export function MonteCarloParameters({
                   const rate = Number.isFinite(Number(value)) ? Number(value) : 0
                   setParams({ ...params, expectedReturn: Number(rate.toFixed(6)) })
                 }}
-                disabled={profile !== 'custom'}
+                readOnly={profile !== 'custom'}
+                onPointerDown={activateCustomProfile}
+                className={profileFieldClassName}
+                title={profile === 'custom' ? undefined : 'Tap to switch to Custom and edit'}
                 min={-99.999999}
                 max={100000}
                 maxErrorMessage="This return is outside the supported range."
@@ -145,7 +154,10 @@ export function MonteCarloParameters({
                   const volatility = Math.max(0, Number.isFinite(Number(value)) ? Number(value) : 0)
                   setParams({ ...params, volatility: Number(volatility.toFixed(6)) })
                 }}
-                disabled={profile !== 'custom'}
+                readOnly={profile !== 'custom'}
+                onPointerDown={activateCustomProfile}
+                className={profileFieldClassName}
+                title={profile === 'custom' ? undefined : 'Tap to switch to Custom and edit'}
                 min={0}
                 max={100}
                 maxErrorMessage="Volatility must be between 0% and 100%."
