@@ -2,6 +2,21 @@
 
 All notable repository and production changes are documented here.
 
+## 2026-08-23 - Financial tool continuity and mobile navigation
+
+### Changed
+
+- Added a shared, validated financial profile so loan balance, APR, remaining term, first payment month, recurring extra payment, and one-time principal payments carry between Loan, Payoff Goal, Refinance, and Invest vs. Debt without re-entry.
+- Persisted Payoff Goal target month, Refinance proposal inputs, and Invest vs. Debt return/volatility/scenario assumptions in browser storage so navigating away, refreshing, or returning later restores the working scenario and recalculates the same results locally.
+- Kept the historical Loan Calculator storage key synchronized as a compatibility mirror so existing saved loan scenarios migrate cleanly and rollback deployments continue to see the latest shared loan inputs.
+- Added direct Loan / Payoff Goal / Refinance / Invest vs. Debt navigation to every financial calculator page, with the active tool clearly identified.
+- Consolidated financial-tool Theme, Display Currency, and Reset controls under one settings gear, matching the minimalist Guide/Growth/Withdrawal settings interaction instead of showing separate theme and currency buttons in the header.
+- Added a guarded `Reset financial tools` action that restores the shared financial profile and tool-specific inputs to defaults while preserving theme and display-currency preferences.
+- Hardened all shared `month` inputs for narrow iPhone/WebKit layouts, including first-payment, target-payoff, and one-time-payment month controls, with 16 px native-control text sizing and width containment.
+- Pruned one-time principal payments that fall outside a newly shortened or shifted shared loan term so cross-tool edits cannot persist an invalid loan profile.
+- Expanded Chromium and WebKit regression coverage for cross-tool synchronization, reload persistence, shared settings, reset behavior, direct tool navigation, all visible iPhone month inputs, and 320 px overflow.
+- Updated the Privacy page and README to describe local shared financial-tool state and browser-only result recalculation.
+
 ## 2026-08-23 - Financial tool input editing hardening
 
 ### Fixed
