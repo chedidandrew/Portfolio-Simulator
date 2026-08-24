@@ -104,7 +104,7 @@ export function PayoffGoalCalculator() {
     setProfile((current) => ({ ...current, firstPaymentMonth: value }))
   }
 
-  const usePaymentAndGo = (destination: '/loan' | '/invest-vs-debt') => {
+  const applyPaymentAndGo = (destination: '/loan' | '/invest-vs-debt') => {
     if (!estimate) return
     setProfile((current) => ({
       ...current,
@@ -169,9 +169,9 @@ export function PayoffGoalCalculator() {
             </CardContent>
           </Card>
           <div className="grid gap-2 sm:grid-cols-2">
-            <Button type="button" size="lg" className="w-full whitespace-normal" onClick={() => usePaymentAndGo('/loan')}>Use this payment in Loan Calculator</Button>
+            <Button type="button" size="lg" className="w-full whitespace-normal" onClick={() => applyPaymentAndGo('/loan')}>Use this payment in Loan Calculator</Button>
             {hasComparableExtraCash && (
-              <Button type="button" size="lg" variant="outline" className="w-full whitespace-normal" onClick={() => usePaymentAndGo('/invest-vs-debt')}>
+              <Button type="button" size="lg" variant="outline" className="w-full whitespace-normal" onClick={() => applyPaymentAndGo('/invest-vs-debt')}>
                 <Scale className="mr-2 h-4 w-4" /> Compare this payment vs. investing
               </Button>
             )}
