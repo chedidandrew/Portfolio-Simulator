@@ -42,6 +42,18 @@ try {
   const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, page: document.documentElement.scrollWidth }))
   assert.ok(dimensions.page <= dimensions.viewport + 2, `Unexpected WebKit page-level horizontal overflow: ${dimensions.page}px > ${dimensions.viewport}px`)
 
+  // Verify the top-level settings flow before deeper page interactions cause the
+  // auto-hiding mobile header to intentionally move out of the viewport.
+  await page.getByRole('button', { name: 'Open settings' }).click()
+  await page.getByRole('menuitem', { name: 'Display Currency' }).click()
+  const currencyDialog = page.getByRole('dialog', { name: 'Display Currency' })
+  await currencyDialog.waitFor({ state: 'visible' })
+  const dialogBox = await currencyDialog.boundingBox()
+  assert.ok(dialogBox, 'Expected the WebKit currency dialog to be measurable.')
+  assert.ok(dialogBox.x >= -1 && dialogBox.x + dialogBox.width <= 391)
+  assert.ok(dialogBox.y >= -1 && dialogBox.y + dialogBox.height <= 845)
+  await currencyDialog.getByRole('button', { name: 'Close dialog' }).click()
+
   await page.getByRole('switch', { name: 'Use Monte Carlo simulation for growth' }).click()
   const returnInput = page.locator('#mc-return')
   const volatilityInput = page.locator('#mc-volatility')
@@ -64,16 +76,6 @@ try {
   await volatilityInput.fill('12.5')
   await volatilityInput.blur()
   assert.equal(await volatilityInput.inputValue(), '12.5')
-
-  await page.getByRole('button', { name: 'Open settings' }).click()
-  await page.getByRole('menuitem', { name: 'Display Currency' }).click()
-  const currencyDialog = page.getByRole('dialog', { name: 'Display Currency' })
-  await currencyDialog.waitFor({ state: 'visible' })
-  const dialogBox = await currencyDialog.boundingBox()
-  assert.ok(dialogBox, 'Expected the WebKit currency dialog to be measurable.')
-  assert.ok(dialogBox.x >= -1 && dialogBox.x + dialogBox.width <= 391)
-  assert.ok(dialogBox.y >= -1 && dialogBox.y + dialogBox.height <= 845)
-  await currencyDialog.getByRole('button', { name: 'Close dialog' }).click()
 
   await page.setViewportSize({ width: 320, height: 740 })
   await page.goto(`${baseUrl}/loan`, { waitUntil: 'networkidle' })
