@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { BarChart3, Landmark, PiggyBank, Scale, ShieldCheck, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
 import { useCurrency } from '@/components/currency-provider'
 import { formatCurrency, getAppCurrency } from '@/lib/utils'
@@ -38,18 +38,32 @@ export function InvestVsDebtCalculator() {
           <CardHeader><CardTitle>Your decision</CardTitle><CardDescription>Use the same extra monthly cash under both strategies so the comparison stays fair.</CardDescription></CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Loan balance" suffix={symbol}><Input type="number" min="1" step="1000" value={inputs.loanBalance} onChange={(e) => setInputs({ ...inputs, loanBalance: Number(e.target.value) || 0 })} /></Field>
-              <Field label="Loan APR" suffix="%"><Input type="number" min="0" max="100" step="0.01" value={inputs.loanApr} onChange={(e) => setInputs({ ...inputs, loanApr: Number(e.target.value) || 0 })} /></Field>
-              <Field label="Remaining term" suffix="years"><Input type="number" min="1" max="50" step="0.5" value={inputs.remainingMonths / 12} onChange={(e) => setInputs({ ...inputs, remainingMonths: Math.max(1, Math.round((Number(e.target.value) || 0) * 12)) })} /></Field>
-              <Field label="Extra cash each month" suffix={symbol}><Input type="number" min="0" step="50" value={inputs.extraMonthlyCash} onChange={(e) => setInputs({ ...inputs, extraMonthlyCash: Number(e.target.value) || 0 })} /></Field>
+              <Field label="Loan balance" suffix={symbol}>
+                <NumericInput min={1} max={1_000_000_000} step={1000} value={inputs.loanBalance} onChange={(value) => setInputs((current) => ({ ...current, loanBalance: value }))} />
+              </Field>
+              <Field label="Loan APR" suffix="%">
+                <NumericInput min={0} max={100} step={0.01} value={inputs.loanApr} onChange={(value) => setInputs((current) => ({ ...current, loanApr: value }))} />
+              </Field>
+              <Field label="Remaining term" suffix="years">
+                <NumericInput min={1} max={50} step={0.5} value={inputs.remainingMonths / 12} onChange={(years) => setInputs((current) => ({ ...current, remainingMonths: Math.max(1, Math.min(600, Math.round(years * 12))) }))} />
+              </Field>
+              <Field label="Extra cash each month" suffix={symbol}>
+                <NumericInput min={1} max={1_000_000_000} step={50} value={inputs.extraMonthlyCash} onChange={(value) => setInputs((current) => ({ ...current, extraMonthlyCash: value }))} />
+              </Field>
             </div>
 
             <div className="rounded-xl border bg-muted/20 p-4">
               <div className="mb-4 flex items-start gap-3"><div className="rounded-lg bg-primary/10 p-2 text-primary"><TrendingUp className="h-4 w-4" /></div><div><p className="font-medium">Investment assumptions</p><p className="text-xs text-muted-foreground">Seeded lognormal scenarios use the same return path for both strategies.</p></div></div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Expected annual return" suffix="%"><Input type="number" min="-99" max="100" step="0.1" value={inputs.expectedReturn} onChange={(e) => setInputs({ ...inputs, expectedReturn: Number(e.target.value) || 0 })} /></Field>
-                <Field label="Annual volatility" suffix="%"><Input type="number" min="0" max="200" step="0.5" value={inputs.volatility} onChange={(e) => setInputs({ ...inputs, volatility: Number(e.target.value) || 0 })} /></Field>
-                <Field label="Scenarios"><Input type="number" min="100" max="5000" step="100" value={inputs.scenarios} onChange={(e) => setInputs({ ...inputs, scenarios: Math.max(100, Math.min(5000, Math.round(Number(e.target.value) || 100))) })} /></Field>
+                <Field label="Expected annual return" suffix="%">
+                  <NumericInput min={-99.99} max={100} step={0.1} value={inputs.expectedReturn} onChange={(value) => setInputs((current) => ({ ...current, expectedReturn: value }))} />
+                </Field>
+                <Field label="Annual volatility" suffix="%">
+                  <NumericInput min={0} max={200} step={0.5} value={inputs.volatility} onChange={(value) => setInputs((current) => ({ ...current, volatility: value }))} />
+                </Field>
+                <Field label="Scenarios">
+                  <NumericInput min={100} max={5000} step={100} value={inputs.scenarios} onChange={(value) => setInputs((current) => ({ ...current, scenarios: Math.max(100, Math.min(5000, Math.round(value))) }))} />
+                </Field>
               </div>
             </div>
           </CardContent>
