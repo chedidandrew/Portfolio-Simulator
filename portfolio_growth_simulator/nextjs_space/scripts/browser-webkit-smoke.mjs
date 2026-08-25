@@ -177,7 +177,7 @@ try {
   }
 
   for (const [path, heading] of [
-    ['/methodology/loan', 'Loan Methodology'],
+    ['/methodology/loan', 'Loan & Amortization Methodology'],
     ['/methodology/refinance', 'Refinance Methodology'],
     ['/methodology/invest-vs-debt', 'Invest vs. Debt Methodology'],
   ]) {
