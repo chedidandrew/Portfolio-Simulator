@@ -2,6 +2,15 @@
 
 All notable repository and production changes are documented here.
 
+## 2026-08-24 - iPhone finance layout follow-up
+
+### Changed
+
+- Restored the yearly amortization summary as the original horizontally scrollable table on phones instead of transforming each year into a stacked card.
+- Added a small mobile-only inset to native month controls so first-payment, payoff-target, refinance, and one-time-payment date boxes no longer press against the right edge of their field on iPhone/WebKit layouts.
+- Added the same iPhone safe-area spacer used by financial-tool headers to the shared Methodology layout, keeping back-navigation links below the Dynamic Island, time, and battery/status-bar region across Loan, Refinance, Invest vs. Debt, and the main Methodology section.
+- Tightened Chromium/WebKit regression coverage so the amortization table remains a real table with intentional horizontal scrolling, month controls retain a visible field-edge inset, and methodology back links remain below the simulated iPhone safe area.
+
 ## 2026-08-24 - Financial tool correctness and cross-tool decisions
 
 ### Fixed
