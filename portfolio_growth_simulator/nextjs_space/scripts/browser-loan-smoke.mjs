@@ -137,11 +137,11 @@ try {
   await yearlyTable.waitFor()
   const yearlyLayout = await yearlyTable.evaluate((element) => ({
     display: getComputedStyle(element).display,
-    clientWidth: element.clientWidth,
     scrollWidth: element.scrollWidth,
+    parentWidth: element.parentElement?.clientWidth ?? 0,
   }))
-  assert.equal(yearlyLayout.display, 'block', 'Yearly amortization summary should use the stacked mobile treatment.')
-  assert.ok(yearlyLayout.scrollWidth <= yearlyLayout.clientWidth + 2, 'Yearly amortization summary should fit without horizontal scrolling on iPhone widths.')
+  assert.equal(yearlyLayout.display, 'table', 'Yearly amortization summary should remain a real table on mobile.')
+  assert.ok(yearlyLayout.scrollWidth > yearlyLayout.parentWidth, 'Yearly amortization table should use its overflow container for horizontal scrolling on iPhone widths.')
 
   await sharedPage.getByRole('button', { name: 'View full monthly schedule' }).click()
   await sharedPage.getByText('Scheduled Principal', { exact: true }).first().waitFor()

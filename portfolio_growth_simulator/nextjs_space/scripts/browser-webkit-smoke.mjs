@@ -19,18 +19,40 @@ async function assertFinancialToolSafeArea(page, path) {
   assert.ok(settingsButtonBox.y >= 48, `${path} settings button should sit below the iPhone safe area`)
 }
 
+async function assertMethodologySafeArea(page, path) {
+  await page.evaluate(() => document.documentElement.style.setProperty('--safe-area-top', '48px'))
+  const safeArea = page.getByTestId('methodology-safe-area')
+  await safeArea.waitFor({ state: 'visible' })
+  const safeAreaBox = await safeArea.boundingBox()
+  assert.ok(safeAreaBox, `${path} methodology safe-area spacer should be measurable`)
+  assert.ok(safeAreaBox.height >= 47, `${path} should reserve the simulated iPhone safe area`)
+
+  const backLink = page.getByRole('link', { name: /^Back to/ }).first()
+  await backLink.waitFor({ state: 'visible' })
+  const backBox = await backLink.boundingBox()
+  assert.ok(backBox, `${path} back link should be measurable`)
+  assert.ok(backBox.y >= 48, `${path} back link should sit below the iPhone safe area`)
+}
+
 async function assertMonthInputsFit(page, path) {
   const viewportWidth = await page.evaluate(() => document.documentElement.clientWidth)
   const inputs = page.locator('input[type="month"]:visible')
   const count = await inputs.count()
   for (let index = 0; index < count; index += 1) {
-    const box = await inputs.nth(index).boundingBox()
+    const input = inputs.nth(index)
+    const box = await input.boundingBox()
     assert.ok(box, `${path} month input ${index + 1} should be measurable`)
     assert.ok(box.x >= -1, `${path} month input ${index + 1} should not extend past the left edge: ${JSON.stringify(box)}`)
     assert.ok(
       box.x + box.width <= viewportWidth + 1,
       `${path} month input ${index + 1} should fit the iPhone viewport: ${JSON.stringify(box)} > ${viewportWidth}px`,
     )
+    const parentGap = await input.evaluate((element) => {
+      const parent = element.parentElement?.getBoundingClientRect()
+      const rect = element.getBoundingClientRect()
+      return parent ? parent.right - rect.right : 0
+    })
+    assert.ok(parentGap >= 6, `${path} month input ${index + 1} should keep a visible inset from its field edge; got ${parentGap}px`)
   }
   return count
 }
@@ -152,6 +174,16 @@ try {
     assert.equal(await assertMonthInputsFit(page, path), expectedMonthInputs, `${path} should expose the expected iPhone-safe month controls.`)
     const toolDimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, page: document.documentElement.scrollWidth }))
     assert.ok(toolDimensions.page <= toolDimensions.viewport + 2, `${path} overflowed in WebKit at 320px: ${toolDimensions.page}px > ${toolDimensions.viewport}px`)
+  }
+
+  for (const [path, heading] of [
+    ['/methodology/loan', 'Loan Methodology'],
+    ['/methodology/refinance', 'Refinance Methodology'],
+    ['/methodology/invest-vs-debt', 'Invest vs. Debt Methodology'],
+  ]) {
+    await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle' })
+    await page.getByRole('heading', { name: heading, level: 1 }).waitFor()
+    await assertMethodologySafeArea(page, path)
   }
 
   await page.goto(`${baseUrl}/tools`, { waitUntil: 'networkidle' })

@@ -166,61 +166,8 @@ header :is(h1, span)[class~="bg-gradient-to-r"][class~="from-primary"][class~="t
   stroke-opacity: 0.28;
 }
 
-/* The yearly amortization summary becomes stacked key/value cards on phones.
-   The full monthly schedule intentionally remains horizontally scrollable
-   because preserving all payment-by-payment columns is more useful than hiding data. */
-@media (max-width: 639px) {
-  .loan-page table[class*="min-w-[780px]"] {
-    display: block;
-    min-width: 0;
-    width: 100%;
-  }
-
-  .loan-page table[class*="min-w-[780px]"] thead {
-    display: none;
-  }
-
-  .loan-page table[class*="min-w-[780px]"] tbody,
-  .loan-page table[class*="min-w-[780px]"] tr {
-    display: block;
-    width: 100%;
-  }
-
-  .loan-page table[class*="min-w-[780px]"] tr {
-    margin-bottom: 0.75rem;
-    border: 1px solid hsl(var(--border));
-    border-radius: 0.75rem;
-    background: hsl(var(--muted) / 0.12);
-    padding: 0.65rem 0.75rem;
-  }
-
-  .loan-page table[class*="min-w-[780px]"] td {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 1rem;
-    border: 0;
-    padding: 0.35rem 0;
-    white-space: normal;
-    text-align: right;
-  }
-
-  .loan-page table[class*="min-w-[780px]"] td::before {
-    flex: 0 0 auto;
-    color: hsl(var(--muted-foreground));
-    font-size: 0.75rem;
-    font-weight: 500;
-    text-align: left;
-  }
-
-  .loan-page table[class*="min-w-[780px]"] td:nth-child(1)::before { content: 'Year'; }
-  .loan-page table[class*="min-w-[780px]"] td:nth-child(2)::before { content: 'Starting balance'; }
-  .loan-page table[class*="min-w-[780px]"] td:nth-child(3)::before { content: 'Total payments'; }
-  .loan-page table[class*="min-w-[780px]"] td:nth-child(4)::before { content: 'Scheduled principal'; }
-  .loan-page table[class*="min-w-[780px]"] td:nth-child(5)::before { content: 'Interest'; }
-  .loan-page table[class*="min-w-[780px]"] td:nth-child(6)::before { content: 'Extra principal'; }
-  .loan-page table[class*="min-w-[780px]"] td:nth-child(7)::before { content: 'Ending balance'; }
-}
+/* Keep both yearly and monthly amortization schedules as real tables on phones.
+   Their existing overflow wrapper provides intentional horizontal scrolling. */
 
 @media (min-width: 1280px) {
   .loan-page [class~="border-primary/20"][class~="print-section"] [class~="xl:grid-cols-4"] {

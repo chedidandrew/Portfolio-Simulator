@@ -14,5 +14,15 @@ export const metadata: Metadata = {
 }
 
 export default function MethodologyLayout({ children }: { children: ReactNode }) {
-  return children
+  return (
+    <>
+      <div
+        data-testid="methodology-safe-area"
+        aria-hidden="true"
+        className="bg-background print:hidden"
+        style={{ height: 'var(--safe-area-top, env(safe-area-inset-top, 0px))' }}
+      />
+      {children}
+    </>
+  )
 }
